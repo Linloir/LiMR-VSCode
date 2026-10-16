@@ -1,0 +1,25 @@
+node_modules/
+dist/
+artifacts/
+.vscode-test/
+test-results/
+playwright-report/
+coverage/
+.cache/
+*.vsix
+*.tsbuildinfo
+*.log
+
+# Local credentials and machine-specific editor settings.
+.env
+.env.*
+!.env.example
+.vscode/settings.json
+.vscode/*.local.json
+
+# OS and editor temporary files.
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

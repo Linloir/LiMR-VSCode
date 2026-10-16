@@ -1,0 +1,704 @@
+{
+  "name": "limr-vscode",
+  "displayName": "LiMR — Markdown Reader",
+  "description": "Read and annotate Markdown beside your editor with LiMR. Inline notes, highlights, AI context, and VS Code themes.",
+  "version": "1.0.0",
+  "publisher": "linloir",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "markdown",
+    "preview",
+    "annotation",
+    "reader",
+    "codex"
+  ],
+  "main": "./dist/extension.cjs",
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onCustomEditor:limr.reader",
+    "onLanguage:markdown"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Markdown reading is available; writing and skill installation require a trusted workspace."
+    },
+    "virtualWorkspaces": true
+  },
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "limr.reader",
+        "displayName": "LiMR Reader",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          },
+          {
+            "filenamePattern": "*.markdown"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "limr.openPreview",
+        "title": "%limr.openPreview%",
+        "category": "LiMR",
+        "icon": "$(book)"
+      },
+      {
+        "command": "limr.openPreviewToSide",
+        "title": "%limr.openPreviewToSide%",
+        "category": "LiMR",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "limr.openSource",
+        "title": "%limr.openSource%",
+        "category": "LiMR",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "limr.chooseTheme",
+        "title": "%limr.chooseTheme%",
+        "category": "LiMR",
+        "icon": "$(color-mode)"
+      },
+      {
+        "command": "limr.toggleEditing",
+        "title": "%limr.toggleEditing%",
+        "category": "LiMR",
+        "icon": "$(edit)",
+        "toggled": "limr.readerEditing"
+      },
+      {
+        "command": "limr.openSettings",
+        "title": "%limr.openSettings%",
+        "category": "LiMR",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "limr.openSkillGuide",
+        "title": "%limr.openSkillGuide%",
+        "category": "LiMR",
+        "icon": "$(book)"
+      },
+      {
+        "command": "limr.installSkill",
+        "title": "%limr.installSkill%",
+        "category": "LiMR",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "limr.chooseTypography",
+        "title": "%limr.chooseTypography%",
+        "category": "LiMR",
+        "icon": "$(text-size)"
+      },
+      {
+        "command": "limr.chooseTranslationMode",
+        "title": "%limr.chooseTranslationMode%",
+        "category": "LiMR",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "limr.configureTopBar",
+        "title": "%limr.configureTopBar%",
+        "category": "LiMR",
+        "icon": "$(layout)"
+      },
+      {
+        "command": "limr.configureBottomBar",
+        "title": "%limr.configureBottomBar%",
+        "category": "LiMR",
+        "icon": "$(layout)"
+      },
+      {
+        "command": "limr.resetFileSettings",
+        "title": "%limr.resetFileSettings%",
+        "category": "LiMR",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "limr.installGlobalSkill",
+        "title": "%limr.installGlobalSkill%",
+        "category": "LiMR",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "limr.copySkillInstallPrompt",
+        "title": "%limr.copySkillInstallPrompt%",
+        "category": "LiMR",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "limr.reloadPlugins",
+        "title": "%limr.reloadPlugins%",
+        "category": "LiMR",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "limr.openPreviewToSide",
+          "when": "resourceLangId == markdown && activeCustomEditorId != limr.reader",
+          "group": "navigation@1",
+          "alt": "markdown.showPreviewToSide"
+        },
+        {
+          "command": "limr.chooseTheme",
+          "when": "activeCustomEditorId == limr.reader && limr.show.theme",
+          "group": "navigation@1"
+        },
+        {
+          "command": "limr.toggleEditing",
+          "when": "activeCustomEditorId == limr.reader && limr.show.editing",
+          "group": "navigation@2"
+        },
+        {
+          "submenu": "limr.aiMenu",
+          "when": "activeCustomEditorId == limr.reader && limr.show.ai",
+          "group": "navigation@3"
+        },
+        {
+          "command": "limr.openSettings",
+          "when": "activeCustomEditorId == limr.reader && limr.show.settings",
+          "group": "navigation@4"
+        },
+        {
+          "command": "limr.openSource",
+          "when": "activeCustomEditorId == limr.reader && limr.show.source",
+          "group": "navigation@5"
+        },
+        {
+          "command": "limr.chooseTypography",
+          "when": "activeCustomEditorId == limr.reader && limr.show.typography",
+          "group": "navigation@2.1"
+        },
+        {
+          "command": "limr.chooseTranslationMode",
+          "when": "activeCustomEditorId == limr.reader && limr.show.translation",
+          "group": "navigation@2.2"
+        },
+        {
+          "submenu": "limr.previewMenu",
+          "when": "resourceLangId == markdown && activeCustomEditorId != limr.reader",
+          "group": "3_open"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "limr.openPreviewToSide",
+          "when": "resourceExtname == .md || resourceExtname == .markdown",
+          "group": "navigation"
+        }
+      ],
+      "limr.aiMenu": [
+        {
+          "command": "limr.openSkillGuide",
+          "group": "1_guide"
+        },
+        {
+          "command": "limr.installSkill",
+          "group": "2_install"
+        },
+        {
+          "command": "limr.installGlobalSkill",
+          "group": "2_install@2"
+        },
+        {
+          "command": "limr.copySkillInstallPrompt",
+          "group": "2_install@3"
+        }
+      ],
+      "limr.previewMenu": [
+        {
+          "command": "limr.openPreviewToSide",
+          "group": "1_limr@1"
+        },
+        {
+          "command": "limr.openPreview",
+          "group": "1_limr@2"
+        },
+        {
+          "command": "markdown.showPreviewToSide",
+          "group": "2_builtin@1"
+        },
+        {
+          "command": "markdown.showPreview",
+          "group": "2_builtin@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "LiMR",
+      "properties": {
+        "limr.theme": {
+          "type": "string",
+          "enum": [
+            "playground",
+            "playground-light",
+            "playground-dark",
+            "auto",
+            "vscode-light",
+            "vscode-dark",
+            "one-dark-pro",
+            "one-dark-pro-darker"
+          ],
+          "enumDescriptions": [
+            "Playground colors, following VS Code light or dark mode.",
+            "Playground Light",
+            "Playground Dark",
+            "Follow the current VS Code theme and its colors.",
+            "VS Code Light",
+            "VS Code Dark",
+            "One Dark Pro",
+            "One Dark Pro Darker"
+          ],
+          "default": "playground",
+          "description": "%limr.theme.description%",
+          "scope": "resource"
+        },
+        "limr.editingEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "%limr.editingEnabled.description%",
+          "scope": "resource"
+        },
+        "limr.bodyFontFamily": {
+          "type": "string",
+          "default": "",
+          "description": "%limr.bodyFontFamily.description%",
+          "scope": "resource"
+        },
+        "limr.chineseFontFamily": {
+          "type": "string",
+          "default": "",
+          "description": "%limr.chineseFontFamily.description%",
+          "scope": "resource"
+        },
+        "limr.otherFontFamily": {
+          "type": "string",
+          "default": "",
+          "description": "%limr.otherFontFamily.description%",
+          "scope": "resource"
+        },
+        "limr.bodyFontSize": {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 40,
+          "default": 16,
+          "description": "%limr.bodyFontSize.description%",
+          "scope": "resource"
+        },
+        "limr.chineseFontSize": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 40,
+          "default": 0,
+          "description": "%limr.chineseFontSize.description%",
+          "scope": "resource"
+        },
+        "limr.otherFontSize": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 40,
+          "default": 0,
+          "description": "%limr.otherFontSize.description%",
+          "scope": "resource"
+        },
+        "limr.codeFontFamily": {
+          "type": "string",
+          "default": "",
+          "description": "%limr.codeFontFamily.description%",
+          "scope": "resource"
+        },
+        "limr.codeFontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 32,
+          "default": 14,
+          "description": "%limr.codeFontSize.description%",
+          "scope": "resource"
+        },
+        "limr.lineHeight": {
+          "type": "number",
+          "minimum": 1.2,
+          "maximum": 2.5,
+          "default": 1.8,
+          "description": "%limr.lineHeight.description%",
+          "scope": "resource"
+        },
+        "limr.maxWidth": {
+          "type": "number",
+          "minimum": 400,
+          "maximum": 1600,
+          "default": 860,
+          "description": "%limr.maxWidth.description%",
+          "scope": "resource"
+        },
+        "limr.showSidebar": {
+          "type": "boolean",
+          "default": true,
+          "description": "%limr.showSidebar.description%",
+          "markdownDeprecationMessage": "%limr.showSidebar.deprecation%",
+          "scope": "resource"
+        },
+        "limr.sidebarMode": {
+          "type": "string",
+          "default": "content",
+          "description": "%limr.sidebarMode.description%",
+          "enum": [
+            "always",
+            "content",
+            "hidden"
+          ],
+          "enumDescriptions": [
+            "%limr.sidebarMode.option.always%",
+            "%limr.sidebarMode.option.content%",
+            "%limr.sidebarMode.option.hidden%"
+          ],
+          "scope": "resource"
+        },
+        "limr.sidebarAutoCollapse": {
+          "type": "boolean",
+          "default": true,
+          "description": "%limr.sidebarAutoCollapse.description%",
+          "scope": "resource"
+        },
+        "limr.syncScroll": {
+          "type": "boolean",
+          "default": true,
+          "description": "%limr.syncScroll.description%",
+          "scope": "resource"
+        },
+        "limr.tocMode": {
+          "type": "string",
+          "default": "always",
+          "description": "%limr.tocMode.description%",
+          "enum": [
+            "always",
+            "wide",
+            "hidden"
+          ],
+          "enumDescriptions": [
+            "%limr.tocMode.option.always%",
+            "%limr.tocMode.option.wide%",
+            "%limr.tocMode.option.hidden%"
+          ],
+          "scope": "resource"
+        },
+        "limr.typography": {
+          "type": "string",
+          "default": "standard",
+          "description": "%limr.typography.description%",
+          "enum": [
+            "standard",
+            "justify",
+            "knuth-plass"
+          ],
+          "enumDescriptions": [
+            "%limr.typography.option.standard%",
+            "%limr.typography.option.justify%",
+            "%limr.typography.option.knuth-plass%"
+          ],
+          "scope": "resource"
+        },
+        "limr.translationMode": {
+          "type": "string",
+          "default": "paragraph",
+          "description": "%limr.translationMode.description%",
+          "enum": [
+            "bilingual",
+            "original",
+            "translated",
+            "paragraph"
+          ],
+          "enumDescriptions": [
+            "%limr.translationMode.option.bilingual%",
+            "%limr.translationMode.option.original%",
+            "%limr.translationMode.option.translated%",
+            "%limr.translationMode.option.paragraph%"
+          ],
+          "scope": "resource"
+        },
+        "limr.language": {
+          "type": "string",
+          "default": "auto",
+          "description": "%limr.language.description%",
+          "enum": [
+            "auto",
+            "zh-CN",
+            "en"
+          ],
+          "enumDescriptions": [
+            "%limr.language.option.auto%",
+            "%limr.language.option.zh-CN%",
+            "%limr.language.option.en%"
+          ],
+          "scope": "resource"
+        },
+        "limr.topBarButtons": {
+          "type": "array",
+          "default": [
+            "theme",
+            "editing",
+            "typography",
+            "translation",
+            "ai",
+            "settings",
+            "source"
+          ],
+          "description": "%limr.topBarButtons.description%",
+          "items": {
+            "type": "string",
+            "enum": [
+              "theme",
+              "editing",
+              "typography",
+              "translation",
+              "ai",
+              "settings",
+              "source"
+            ]
+          },
+          "uniqueItems": true,
+          "scope": "resource"
+        },
+        "limr.bottomBarButtons": {
+          "type": "array",
+          "default": [
+            "editing",
+            "typography",
+            "translation"
+          ],
+          "description": "%limr.bottomBarButtons.description%",
+          "items": {
+            "type": "string",
+            "enum": [
+              "editing",
+              "typography",
+              "translation",
+              "theme",
+              "settings"
+            ]
+          },
+          "uniqueItems": true,
+          "scope": "resource"
+        },
+        "limr.previewButtonMode": {
+          "type": "string",
+          "default": "separate",
+          "description": "%limr.previewButtonMode.description%",
+          "enum": [
+            "separate",
+            "merged"
+          ],
+          "enumDescriptions": [
+            "%limr.previewButtonMode.option.separate%",
+            "%limr.previewButtonMode.option.merged%"
+          ],
+          "scope": "resource"
+        },
+        "limr.skills.promptOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "%limr.skills.promptOnStartup.description%",
+          "scope": "resource"
+        },
+        "limr.images.pathMode": {
+          "type": "string",
+          "default": "auto",
+          "description": "%limr.images.pathMode.description%",
+          "enum": [
+            "auto",
+            "file",
+            "workspace",
+            "folder"
+          ],
+          "enumDescriptions": [
+            "%limr.images.pathMode.option.auto%",
+            "%limr.images.pathMode.option.file%",
+            "%limr.images.pathMode.option.workspace%",
+            "%limr.images.pathMode.option.folder%"
+          ],
+          "scope": "resource"
+        },
+        "limr.images.baseFolder": {
+          "type": "string",
+          "default": "",
+          "description": "%limr.images.baseFolder.description%",
+          "scope": "resource"
+        },
+        "limr.images.searchPaths": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "%limr.images.searchPaths.description%",
+          "scope": "resource"
+        },
+        "limr.plugins.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "%limr.plugins.enabled.description%",
+          "scope": "resource"
+        },
+        "limr.plugins.manifest": {
+          "type": "string",
+          "default": ".limr/plugins/manifest.json",
+          "description": "%limr.plugins.manifest.description%",
+          "scope": "resource"
+        },
+        "limr.syntaxHighlighting.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "%limr.syntaxHighlighting.enabled.description%"
+        }
+      }
+    },
+    "submenus": [
+      {
+        "id": "limr.aiMenu",
+        "label": "%menu.ai%",
+        "icon": "$(sparkle)"
+      },
+      {
+        "id": "limr.previewMenu",
+        "label": "%menu.preview%",
+        "icon": "$(open-preview)"
+      }
+    ],
+    "colors": [
+      {
+        "id": "limr.syntax.punctuation",
+        "description": "%limr.syntax.punctuation.description%",
+        "defaults": {
+          "dark": "symbolIcon.keywordForeground",
+          "light": "symbolIcon.keywordForeground",
+          "highContrast": "symbolIcon.keywordForeground",
+          "highContrastLight": "symbolIcon.keywordForeground"
+        }
+      },
+      {
+        "id": "limr.syntax.tag",
+        "description": "%limr.syntax.tag.description%",
+        "defaults": {
+          "dark": "symbolIcon.classForeground",
+          "light": "symbolIcon.classForeground",
+          "highContrast": "symbolIcon.classForeground",
+          "highContrastLight": "symbolIcon.classForeground"
+        }
+      },
+      {
+        "id": "limr.syntax.attribute",
+        "description": "%limr.syntax.attribute.description%",
+        "defaults": {
+          "dark": "symbolIcon.propertyForeground",
+          "light": "symbolIcon.propertyForeground",
+          "highContrast": "symbolIcon.propertyForeground",
+          "highContrastLight": "symbolIcon.propertyForeground"
+        }
+      },
+      {
+        "id": "limr.syntax.value",
+        "description": "%limr.syntax.value.description%",
+        "defaults": {
+          "dark": "symbolIcon.stringForeground",
+          "light": "symbolIcon.stringForeground",
+          "highContrast": "symbolIcon.stringForeground",
+          "highContrastLight": "symbolIcon.stringForeground"
+        }
+      },
+      {
+        "id": "limr.syntax.annotation",
+        "description": "%limr.syntax.annotation.description%",
+        "defaults": {
+          "dark": "editorInfo.foreground",
+          "light": "editorInfo.foreground",
+          "highContrast": "editorInfo.foreground",
+          "highContrastLight": "editorInfo.foreground"
+        }
+      },
+      {
+        "id": "limr.syntax.highlight",
+        "description": "%limr.syntax.highlight.description%",
+        "defaults": {
+          "dark": "editorWarning.foreground",
+          "light": "editorWarning.foreground",
+          "highContrast": "editorWarning.foreground",
+          "highContrastLight": "editorWarning.foreground"
+        }
+      },
+      {
+        "id": "limr.syntax.math",
+        "description": "%limr.syntax.math.description%",
+        "defaults": {
+          "dark": "textLink.foreground",
+          "light": "textLink.foreground",
+          "highContrast": "textLink.foreground",
+          "highContrastLight": "textLink.foreground"
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:browser": "npm run test:vscode",
+    "test:vscode": "node scripts/test-vscode.mjs",
+    "package": "vsce package --no-dependencies --no-rewrite-relative-links -o artifacts/limr-vscode-1.0.0.vsix",
+    "vscode:prepublish": "npm run build",
+    "test:animations": "node scripts/test-vscode.mjs --animations",
+    "test:regressions": "node scripts/test-vscode.mjs --regressions",
+    "test:features": "node scripts/test-vscode.mjs --features",
+    "test:frontmatter": "node scripts/test-vscode.mjs --frontmatter",
+    "test:skills": "node scripts/test-vscode.mjs --skills"
+  },
+  "dependencies": {
+    "@fontsource-variable/noto-serif-sc": "5.3.1",
+    "@linloir/limr": "1.2.2",
+    "js-yaml": "4.3.2",
+    "mdast-util-math": "3.0.0",
+    "micromark-extension-math": "3.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/vscode": "^1.96.0",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Linloir/LiMR-VSCode.git"
+  },
+  "homepage": "https://github.com/Linloir/LiMR-VSCode#readme",
+  "bugs": {
+    "url": "https://github.com/Linloir/LiMR-VSCode/issues"
+  }
+}

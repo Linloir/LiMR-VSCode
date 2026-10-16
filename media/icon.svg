@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none" role="img" aria-labelledby="title">
+  <title id="title">LiMR — L down arrow MR</title>
+  <rect x="24" y="132" width="464" height="248" rx="16" fill="#fff" stroke="#000" stroke-width="20"/>
+  <g fill="#000">
+    <path d="M64 192H88V296H138V320H64Z"/>
+    <path d="M176 192H200V272H225L188 320L151 272H176Z"/>
+    <path d="M240 320V192H263L285 232L307 192H330V320H306V239L285 276L264 239V320Z"/>
+    <path fill-rule="evenodd" d="M354 192H399C428 192 446 208 446 232C446 250 436 263 421 270L452 320H424L397 275H378V320H354ZM378 216V251H397C414 251 422 245 422 233C422 222 414 216 397 216Z"/>
+  </g>
+</svg>
