@@ -9,28 +9,35 @@ export function useWorkspacePlugins(entries: readonly PluginEntry[], notify: (me
   React.useEffect(() => {
     let cancelled = false;
     const styles: HTMLLinkElement[] = [];
-    void (async () => {
-      const extensions: limr.RendererExtension[] = [];
-      for (const entry of entries) {
+    const extensions: Array<limr.RendererExtension | undefined> = new Array(entries.length);
+    // A slow or unresolved async factory must not hold up other extensions.
+    entries.forEach((entry, index) => {
+      void (async () => {
         try {
           if (entry.module) {
             const module = await import(/* webpackIgnore: true */ entry.module);
+            if (cancelled) return;
             if (typeof module.default !== 'function') throw new Error('Export a default factory: ({ React, limr }) => RendererExtension.');
             const extension = await module.default({ React, limr });
+            if (cancelled) return;
             if (!extension || typeof extension.name !== 'string') throw new Error('The factory must return a named RendererExtension.');
-            extensions.push(extension);
+            // Registry IDs isolate module configuration and cache identity. Syntax
+            // names stay unchanged so authored tags and annotations still resolve.
+            extensions[index] = { ...extension, name: entry.id };
+            setLoaded({ key, extensions: extensions.filter((value): value is limr.RendererExtension => !!value) });
           }
           if (entry.stylesheet && !cancelled) {
             const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = entry.stylesheet;
             link.dataset.limrPlugin = entry.id;
             link.onerror = () => { if (!cancelled) notify(`LiMR plugin ${entry.id}: stylesheet failed to load.`, true); };
-            document.head.append(link); styles.push(link);
+            // Keep stylesheet precedence deterministic even when factories finish
+            // in a different order from their manifest/registration entries.
+            document.head.insertBefore(link, styles.slice(index + 1).find(Boolean) ?? null);
+            styles[index] = link;
           }
         } catch (error) { if (!cancelled) notify(`LiMR plugin ${entry.id}: ${error instanceof Error ? error.message : String(error)}`, true); }
-        if (cancelled) break;
-      }
-      if (!cancelled) setLoaded({ key, extensions });
-    })();
+      })();
+    });
     return () => { cancelled = true; styles.forEach(link => link.remove()); };
   }, [key, notify]);
   return loaded.key === key ? loaded.extensions : [];

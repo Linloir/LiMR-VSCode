@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { collectSyntaxTokens, syntaxTags } from '../src/syntax-tokens';
 
 const tokens = (source: string) => collectSyntaxTokens(source).map(token => ({ ...token, text: source.slice(token.start, token.end) }));
@@ -6,6 +7,27 @@ const named = (body: string, definition = ':::limr-annotation{#note ranges="r1" 
 const pair = '::%%limr%%{<#r1}selected::%%limr%%{>#r1}';
 
 describe('native Markdown LiMR source colors', () => {
+  it('colors every exact attribute and quoted value in translation, figure and list reference headers', () => {
+    const source = readFileSync(new URL('./syntax-attributes.md', import.meta.url), 'utf8').replaceAll('\n', '\r\n');
+    const spans = tokens(source);
+    const expected = [
+      ['default', '"both"'], ['id', '"fv-objectives"'], ['min-width', '"160"'], ['max-width', '"240"'],
+      ['min-height', '"120"'], ['max-height', '"240"'], ['src', '"./papers/feature vectors/图1.png"'],
+      ['alt', '"中文图示 😀"'], ['caption', '\'Feature-vector "objectives"\''], ['id', '"fv-paper"'],
+      ['id', '"fv-paper"'], ['title', '"Feature vectors"'], ['url', '"https://example.com/paper"'],
+    ];
+    let offset = 0;
+    for (const [attribute, value] of expected) {
+      const start = source.indexOf(`${attribute}=${value}`, offset);
+      expect(start, `${attribute}=${value}`).toBeGreaterThanOrEqual(offset);
+      expect(spans).toContainEqual({ kind: 'attribute', start, end: start + attribute.length, text: attribute });
+      expect(spans).toContainEqual({ kind: 'value', start: start + attribute.length + 1, end: start + attribute.length + 1 + value.length, text: value });
+      offset = start + attribute.length + 1 + value.length;
+    }
+    expect(spans.filter(item => item.kind === 'attribute')).toHaveLength(expected.length);
+    expect(spans.filter(item => item.kind === 'value')).toHaveLength(expected.length);
+    expect(spans.some(item => item.text.includes('Ordinary') || item.text.includes('supports this point'))).toBe(false);
+  });
   it('colors registered tag headers, static attributes and closers without coloring prose', () => {
     const source = '<definition title="中文 > value" open>\n\n**ordinary text**\n\n</definition>';
     const spans = tokens(source);

@@ -1,14 +1,14 @@
 # LiMR for VS Code
 
-<img src="media/icon.png" alt="LiMR" width="96" />
+<img src="media/limr-icon.png" alt="LiMR" width="96" />
 
 [English](README.en.md)
 
-基于 **@linloir/limr 1.2.2** 的 Markdown 阅读器。源代码编辑器与阅读界面可以并排显示；旁注、提问和高亮直接保存在 Markdown 中，可随 Git 追踪。
+基于 **@linloir/limr 1.2.3** 的 Markdown 阅读器。源代码编辑器与阅读界面可以并排显示；旁注、提问和高亮直接保存在 Markdown 中，可随 Git 追踪。
 
 ## 安装与打开
 
-使用扩展面板的 **从 VSIX 安装…** 选择 `limr-vscode-1.0.0.vsix`。打开 `.md` 或 `.markdown` 文件，点击编辑器右上角的阅读器按钮，或执行：
+使用扩展面板的 **从 VSIX 安装…** 选择 `limr-vscode-1.0.1.vsix`。打开 `.md` 或 `.markdown` 文件，点击编辑器右上角的阅读器按钮，或执行：
 
 - `LiMR: Open Reader to the Side`：源码与阅读器双栏并排。
 - `LiMR: Open Markdown Reader`：在当前栏打开阅读器。
@@ -21,7 +21,7 @@
 在该窗口的 WSL 终端中也可执行：
 
 ```bash
-code --install-extension ./artifacts/limr-vscode-1.0.0.vsix
+code --install-extension ./artifacts/limr-vscode-1.0.1.vsix
 ```
 
 请确认 `code --list-extensions` 的输出标题为对应的 WSL 环境；如果 VS Code 提示重新加载窗口，按提示执行。**Developer: Show Running Extensions** 可以检查运行位置。开发时在 WSL 窗口打开此仓库，运行 `npm ci && npm run build` 后按 F5。
@@ -40,7 +40,7 @@ code --install-extension ./artifacts/limr-vscode-1.0.0.vsix
 
 笔记编辑器离开编辑状态时提交；宿主拒绝过期修改时保留草稿并提示。外部编辑和 AI 修改会同步回阅读器。未启用编辑或未信任工作区时，阅读器不会创建临时高亮或写入 Markdown。
 
-注释使用 LiMR 1.2.2 的成对范围边界 `::%%limr%%{<#r1}正文::%%limr%%{>#r1}`，以及 `:::limr-annotation` 定义块。支持跨格式、跨段落与交叠范围；解析和写入统一使用 LiMR 的公开接口。旧版内联标记不再支持。删除时会清理不再被引用的范围边界；空白新标注取消时也会撤销临时边界。
+注释使用 LiMR 1.2.3 的成对范围边界 `::%%limr%%{<#r1}正文::%%limr%%{>#r1}`，以及 `:::limr-annotation` 定义块。支持跨格式、跨段落与交叠范围；解析和写入统一使用 LiMR 的公开接口。旧版内联标记不再支持。删除时会清理不再被引用的范围边界；空白新标注取消时也会撤销临时边界。
 
 默认“自动”模式下，图片首先按 Markdown 所在目录解析；找不到时，仅再尝试当前文件所属的工作区根目录。支持 `../`、工作区根路径、绝对路径、`file:`、Windows／WSL 路径以及带空格、中文和编码字符的文件名。明确指定层级的 `../` 路径按所选起点精确解析，不再使用附加目录；不会扫描静态目录或按同名文件猜测替代图片。
 
@@ -70,7 +70,7 @@ code --install-extension ./artifacts/limr-vscode-1.0.0.vsix
 | `limr.topBarButtons` / `bottomBarButtons` | 分别选择顶栏和状态栏显示的操作 |
 | `limr.previewButtonMode` | `separate` 独立按钮；`merged` 合并为默认打开 LiMR 的预览入口 |
 | `limr.skills.promptOnStartup` | 首次安装 Skill 提醒，可在用户或工作区级别关闭 |
-| `limr.plugins.enabled` / `plugins.manifest` | 自定义样式与语法插件；仅在已信任工作区加载 |
+| `limr.plugins.enabled` / `plugins.manifest` | 加载工作区与附加扩展提供的阅读器插件；仅在已信任窗口启用，`manifest` 只指定工作区清单 |
 | `limr.syncScroll` | 源码与阅读器的滚动同步 |
 | `limr.syntaxHighlighting.enabled` | Markdown 原文编辑器中的 LiMR 补充语法颜色，默认开启，切换即时生效 |
 | `limr.images.pathMode` | 图片相对路径：`auto` 先查 Markdown 目录再查所属工作区（默认）、`file` 仅 Markdown 目录、`workspace` 仅所属工作区、`folder` 固定目录 |
@@ -85,13 +85,15 @@ code --install-extension ./artifacts/limr-vscode-1.0.0.vsix
 
 阅读器与命令对话框使用 `limr.language`；VS Code 原生命令名称和设置标签遵循 VS Code 自身的界面语言。
 
-原文高亮覆盖 LiMR 1.2.2 内置组件标签、指令及静态属性、有效标注定义与成对边界、`==高亮==`、`^[行内脚注]`、数学分隔符和引用块中的 `[!类型]`。保留普通 Markdown、代码与注释的现有颜色；被真实标注定义引用的成对边界即使位于代码中也会高亮，与阅读器解析一致。工作区插件新增的自定义语法不自动加入。此设置适用于本地、远程及未保存的 Markdown；关闭会立即移除补充颜色。颜色跟随当前主题，可在 `workbench.colorCustomizations` 中覆盖 `limr.syntax.punctuation`、`tag`、`attribute`、`value`、`annotation`、`highlight`、`math`（每项均以 `limr.syntax.` 开头）。
+原文高亮覆盖 LiMR 1.2.3 内置组件标签、指令及静态属性、有效标注定义与成对边界、`==高亮==`、`^[行内脚注]`、数学分隔符和引用块中的 `[!类型]`。保留普通 Markdown、代码与注释的现有颜色；被真实标注定义引用的成对边界即使位于代码中也会高亮，与阅读器解析一致。阅读器插件新增的自定义语法不自动加入。此设置适用于本地、远程及未保存的 Markdown；关闭会立即移除补充颜色。颜色跟随当前主题，可在 `workbench.colorCustomizations` 中覆盖 `limr.syntax.punctuation`、`tag`、`attribute`、`value`、`annotation`、`highlight`、`math`（每项均以 `limr.syntax.` 开头）。
 
 ## 样式与语法插件
 
 文件开头由 `---` 包围的 YAML 元信息会自动显示为文档信息卡片：突出名称与描述，并展示其它字段、列表和嵌套信息。“查看原始元信息”可展开完整原文。此能力默认启用，也适用于 `SKILL.md`；不会改写文件，不需要配置工作区插件。无法解析的元信息保留原文显示。
 
-在工作区创建 `.limr/plugins/manifest.json`，将 CSS 或 ESM 模块列入 `plugins`。模块通过 `export default ({ React, limr }) => RendererExtension` 复用阅读器现有 React/LiMR，可添加语法、组件、标注和操作；无需修改插件源码。文件修改自动重新加载，也可运行 `LiMR: Reload Workspace Plugins`。解析或加载失败会保留基础阅读器并提示错误。
+在工作区创建 `.limr/plugins/manifest.json`，将 CSS 或 ESM 模块列入 `plugins`。模块通过 `export default ({ React, limr }) => RendererExtension` 复用阅读器现有 React/LiMR，可添加语法、组件、标注和操作；无需修改插件源码。工作区文件修改自动重新加载，也可运行 `LiMR: Reload Reader Plugins`。解析或加载失败会保留基础阅读器并提示错误。
+
+也可将能力做成独立的 VS Code 扩展，安装后自动注册到 LiMR。附加扩展声明 `extensionDependencies: ["linloir.limr-vscode"]` 与 `extensionKind: ["workspace"]`，激活 LiMR 后调用公开的 `registerPlugin(context.extension.id, { id, module, stylesheet })`，并通过 `context.subscriptions` 释放注册。模块和样式路径相对附加扩展目录，不需要工作区清单；注册和释放会立即刷新已打开的阅读器。参见 [API v1 类型定义](api/index.d.ts) 与 [无需构建的完整示例](examples/vscode-reader-addon)。两类插件都受 `limr.plugins.enabled` 和窗口信任状态控制；Remote-WSL 下请将附加扩展与 LiMR 安装到同一 WSL 扩展宿主。
 
 完整例子见 [扩展指引](skills/limr-annotations/references/reader-plugins.md)。已安装的 Skill 包含同一指引，可直接让 AI 修改样式或添加语法。
 
@@ -109,7 +111,7 @@ code --install-extension ./artifacts/limr-vscode-1.0.0.vsix
 
 建议 Node.js 22.12+。
 
-使用 npm 上的固定版本 `@linloir/limr@1.2.2`，运行 `npm ci` 按锁文件安装；无需准备相邻仓库或本地 tarball。
+使用 npm 上的固定版本 `@linloir/limr@1.2.3`，运行 `npm ci` 按锁文件安装；无需准备相邻仓库或本地 tarball。
 
 ```bash
 npm ci
@@ -129,4 +131,6 @@ npm run package
 
 `test:regressions` 检查混合格式选区、工具栏宽度、浮卡切换、焦点样式、批量删除与 Undo，以及宽窄窗口布局。
 
-打包产物为 `artifacts/limr-vscode-1.0.0.vsix`。运行资源全部随 VSIX 打包，不依赖开发服务器或 CDN；Markdown 自己引用的远程图片、视频仍可能联网。
+`test:plugins` 在独立配置中加载真正的附加扩展，检查注册、释放、开关与故障隔离。`test:scroll` 检查双栏滚动与复杂块边界；`test:translations` 覆盖原译源码逆序及三种翻译显示模式；`test:syntax` 检查原文高亮与主题颜色。先运行 `npm run package`，再运行 `npm run test:installed-icon`，可在独立配置中安装 VSIX，核对扩展列表和详情页实际加载的图标。
+
+打包产物为 `artifacts/limr-vscode-1.0.1.vsix`。运行资源全部随 VSIX 打包，不依赖开发服务器或 CDN；Markdown 自己引用的远程图片、视频仍可能联网。

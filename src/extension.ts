@@ -4,7 +4,9 @@ import { basename } from 'node:path';
 import { homedir } from 'node:os';
 import { readerSettings, setReaderSetting, themeKind, themes, readerLocale, typographyModes, translationModes, topBarButtons, bottomBarButtons } from './settings';
 import { installSkill, installGlobalSkill, copySkillInstallPrompt, maybePromptSkillInstall, showSkillGuide } from './skills';
-import { loadWorkspacePlugins } from './plugins';
+import { loadReaderPlugins, replacePluginResourceRoots } from './plugins';
+import { createExtensionApi, PluginRegistry } from './plugin-registry';
+import type { LiMRExtensionApi } from '../api';
 import { validateFileSettings } from './file-settings';
 import { validateTransaction } from './transactions';
 import { resolveReaderLink } from './links';
@@ -17,7 +19,7 @@ const viewType = 'limr.reader';
 const localized = (uri: vscode.Uri | undefined, zh: string, en: string) => readerLocale(vscode.workspace.getConfiguration('limr', uri).get('language', 'auto')) === 'zh-CN' ? zh : en;
 const isMarkdown = (document: vscode.TextDocument) => document.languageId === 'markdown' || /\.(?:md|markdown)$/i.test(document.uri.path);
 interface ReaderScrollTarget {
-  line: number; from: number; smooth: boolean;
+  offset: number; from: number; last: number; direction: number; smooth: boolean; released: boolean;
   timer: ReturnType<typeof setTimeout>;
 }
 function settingScope(uri: vscode.Uri | undefined, key: string) {
@@ -37,9 +39,11 @@ function settingScope(uri: vscode.Uri | undefined, key: string) {
   };
 }
 
-export function activate(context: vscode.ExtensionContext) {
+export function activate(context: vscode.ExtensionContext): LiMRExtensionApi {
   context.subscriptions.push(new SourceSyntaxHighlighting(context.asAbsolutePath('dist/syntax-worker.cjs')));
-  const provider = new ReaderProvider(context);
+  const pluginRegistry = new PluginRegistry();
+  context.subscriptions.push(pluginRegistry);
+  const provider = new ReaderProvider(context, pluginRegistry);
   context.subscriptions.push(provider, vscode.window.registerCustomEditorProvider(viewType, provider, {
     webviewOptions: { retainContextWhenHidden: true }, supportsMultipleEditorsPerDocument: true,
   }));
@@ -100,7 +104,7 @@ export function activate(context: vscode.ExtensionContext) {
   command('limr.openSkillGuide', () => showSkillGuide(context, resource()));
   command('limr.installSkill', () => installSkill(context, resource()));
   void maybePromptSkillInstall(context, resource()).catch(error => console.error('LiMR skill prompt', error));
-  return { viewType };
+  return createExtensionApi(pluginRegistry);
 }
 
 class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposable {
@@ -109,20 +113,24 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   private readonly pending = new Map<string, Promise<void>>();
   private readonly plugins = new Map<vscode.WebviewPanel, NonNullable<ReaderState['plugins']>>();
   private readonly pluginRevisions = new Map<vscode.WebviewPanel, number>();
+  private readonly pluginRoots = new Map<vscode.WebviewPanel, readonly vscode.Uri[]>();
+  private readonly imageRoots = new Map<vscode.WebviewPanel, Map<string, vscode.Uri>>();
   private readonly extraStatus = new Map<ReaderButton, vscode.StatusBarItem>();
   private readonly fileWrites = new Map<string, Promise<void>>();
   private mergedPreview: boolean | undefined;
   private readonly status = vscode.window.createStatusBarItem('limr.reader', vscode.StatusBarAlignment.Right, 105);
   private pluginTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly readerScrollTargets = new Map<vscode.TextEditor, ReaderScrollTarget>();
-  private readonly sourceScrollOffsets = new WeakMap<vscode.TextEditor, number>();
+  private readonly readerScrollOwners = new Map<string, { panel: vscode.WebviewPanel; epoch: number }>();
+  private readonly sourceScrollGenerations = new Map<string, number>();
+  private sourceScrollOffsets = new WeakMap<vscode.TextEditor, number>();
   private readonly sourceScroll = new ScrollThrottle<vscode.TextEditor, number>((editor, offset) => {
-    if (!vscode.window.visibleTextEditors.includes(editor) || !readerSettings(editor.document.uri).syncScroll) return;
+    if (!vscode.window.visibleTextEditors.includes(editor) || !readerSettings(editor.document.uri).syncScroll || this.readerScrollOwners.has(editor.document.uri.toString())) return;
     for (const [panel, document] of this.panels) if (panel.visible && document.uri.toString() === editor.document.uri.toString())
       this.post(panel, { type: 'reveal', offset });
   });
   activeUri: vscode.Uri | undefined;
-  constructor(private readonly context: vscode.ExtensionContext) {
+  constructor(private readonly context: vscode.ExtensionContext, private readonly pluginRegistry: PluginRegistry) {
     this.status.name = 'LiMR Reader';
     this.status.command = 'limr.toggleEditing';
     for (const [index, name] of ['typography', 'translation', 'theme', 'settings'].entries()) {
@@ -144,33 +152,58 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     this.subscriptions.push(watcher, watcher.onDidChange(onPluginFile), watcher.onDidCreate(onPluginFile), watcher.onDidDelete(onPluginFile));
     this.subscriptions.push(
       this.status,
+      pluginRegistry.onDidChange(() => { void this.reloadPlugins(); }),
       vscode.workspace.onDidChangeTextDocument(event => { if (event.contentChanges.length) this.broadcast(event.document); }),
       vscode.workspace.onDidSaveTextDocument(document => this.broadcast(document)),
-      vscode.workspace.onDidChangeConfiguration(event => { if (['limr', 'editor.fontFamily', 'editor.fontSize', 'workbench.colorTheme'].some(name => event.affectsConfiguration(name))) { this.broadcast(); void this.reloadPlugins(); } }),
+      vscode.workspace.onDidChangeConfiguration(event => {
+        if (event.affectsConfiguration('limr.syncScroll')) this.resetScrollSynchronization();
+        if (['limr', 'editor.fontFamily', 'editor.fontSize', 'workbench.colorTheme'].some(name => event.affectsConfiguration(name))) { this.broadcast(); void this.reloadPlugins(); }
+      }),
       vscode.window.onDidChangeActiveColorTheme(() => this.broadcast()),
       vscode.workspace.onDidGrantWorkspaceTrust(() => { this.broadcast(); void this.reloadPlugins(); void maybePromptSkillInstall(context, this.activeUri); }),
-      vscode.window.onDidChangeActiveTextEditor(editor => { if (editor && isMarkdown(editor.document)) this.activeUri = editor.document.uri; this.updateStatus(); }),
+      vscode.window.onDidChangeActiveTextEditor(editor => {
+        if (editor && isMarkdown(editor.document)) { this.activeUri = editor.document.uri; this.releaseReaderInput(editor.document.uri); }
+        this.updateStatus();
+      }),
+      vscode.window.onDidChangeTextEditorSelection(event => {
+        if (event.kind === vscode.TextEditorSelectionChangeKind.Keyboard || event.kind === vscode.TextEditorSelectionChangeKind.Mouse)
+          this.releaseReaderInput(event.textEditor.document.uri);
+      }),
+      vscode.window.onDidChangeWindowState(event => { if (!event.focused) this.resetScrollSynchronization(); }),
       vscode.window.tabGroups.onDidChangeTabs(() => this.updateStatus()),
       vscode.window.onDidChangeTextEditorVisibleRanges(event => {
         const editor = event.textEditor, range = event.visibleRanges[0];
         if (!range || !readerSettings(editor.document.uri).syncScroll) return;
         const offset = editor.document.offsetAt(range.start);
         const target = this.readerScrollTargets.get(editor);
+        if (this.readerScrollOwners.has(editor.document.uri.toString())) {
+          if (target) {
+            target.direction = Math.sign(offset - target.last) || target.direction; target.last = offset;
+          }
+          this.sourceScrollOffsets.set(editor, offset); return;
+        }
         // AtTop reserves native sticky/cursor padding: the first visible line
         // can precede the requested line. Acknowledge that editor's resulting
         // viewport, including intermediate frames of native smooth scrolling.
-        const reached = target && event.visibleRanges.some(visible => visible.start.line <= target.line && visible.end.line >= target.line);
-        const approaching = target && range.start.line >= Math.min(target.from, target.line) && range.start.line <= Math.max(target.from, target.line);
-        if (target && (reached || target.smooth && approaching)) {
-          // Native reveal can publish more than one viewport event, even with
-          // smooth scrolling disabled. Release after two quiet frames; a
-          // viewport outside this reveal's path takes control immediately.
-          clearTimeout(target.timer);
-          target.timer = setTimeout(() => this.clearReaderScrollTarget(editor), 32);
+        const reached = target && event.visibleRanges.some(visible => editor.document.offsetAt(visible.start) <= target.offset && editor.document.offsetAt(visible.end) >= target.offset);
+        const approaching = target && offset >= Math.min(target.from, target.offset) && offset <= Math.max(target.from, target.offset);
+        const reversedInput = target?.released && target.direction && Math.sign(offset - target.last) === -target.direction;
+        if (target && !reversedInput && (reached || target.smooth && approaching)) {
+          // Leaving the reader is not itself source input: retain matching
+          // animation tails, while reversal or movement outside the requested
+          // viewport hands control to the source immediately.
+          // This target expires relative to the reveal command, never relative
+          // to acknowledgements. Extending it on every viewport notification
+          // can swallow an unlimited same-direction wheel gesture in source.
+          target.last = offset;
           this.sourceScrollOffsets.set(editor, offset); return;
         }
         this.clearReaderScrollTarget(editor);
         if (this.sourceScrollOffsets.get(editor) === offset) return;
+        // A native wheel need not focus the editor or change its selection.
+        // Once a viewport event is accepted as source input, invalidate reader
+        // claims already in transit even if no reader owner has arrived yet.
+        this.releaseReaderInput(editor.document.uri);
         this.sourceScrollOffsets.set(editor, offset);
         this.sourceScroll.push(editor, offset);
       }),
@@ -181,22 +214,64 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     const target = this.readerScrollTargets.get(editor);
     if (target) { clearTimeout(target.timer); this.readerScrollTargets.delete(editor); }
   }
-  dispose() { this.sourceScroll.dispose(); this.readerScrollTargets.forEach((_, editor) => this.clearReaderScrollTarget(editor)); clearTimeout(this.pluginTimer); this.subscriptions.forEach(item => item.dispose()); this.panels.clear(); this.plugins.clear(); if (this.mergedPreview) void vscode.commands.executeCommand('setContext', 'hasCustomMarkdownPreview', false); }
+  private releaseReaderInput(uri: vscode.Uri, sourceInput = true) {
+    const key = uri.toString(), owner = this.readerScrollOwners.get(key);
+    const panels = [...this.panels].filter(([, document]) => document.uri.toString() === key).map(([panel]) => panel);
+    if (!sourceInput && !owner || sourceInput && !owner && !panels.length) return;
+    this.readerScrollOwners.delete(key);
+    for (const editor of new Set([...vscode.window.visibleTextEditors, ...this.readerScrollTargets.keys()])) if (editor.document.uri.toString() === key) {
+      if (sourceInput) {
+        this.clearReaderScrollTarget(editor); this.sourceScroll.cancel(editor); this.sourceScrollOffsets.delete(editor);
+      }
+      else { const target = this.readerScrollTargets.get(editor); if (target) target.released = true; }
+    }
+    // A local pointerleave already released the webview. Echoing it back could
+    // race with a newer reader gesture, so only native input sends a release.
+    if (sourceInput) {
+      const generation = (this.sourceScrollGenerations.get(key) ?? 0) + 1;
+      this.sourceScrollGenerations.set(key, generation);
+      for (const panel of panels) this.post(panel, { type: 'scrollIntent', active: false, generation, epoch: owner?.panel === panel ? owner.epoch : undefined });
+    }
+  }
+  private resetScrollSynchronization() {
+    this.sourceScroll.dispose(); this.sourceScrollOffsets = new WeakMap();
+    const documents = new Map([...this.panels.values()].map(document => [document.uri.toString(), document]));
+    for (const document of documents.values()) this.releaseReaderInput(document.uri);
+    this.readerScrollOwners.clear();
+    this.readerScrollTargets.forEach((_, editor) => this.clearReaderScrollTarget(editor));
+  }
+  dispose() { this.sourceScroll.dispose(); this.readerScrollOwners.clear(); this.sourceScrollGenerations.clear(); this.readerScrollTargets.forEach((_, editor) => this.clearReaderScrollTarget(editor)); clearTimeout(this.pluginTimer); this.subscriptions.forEach(item => item.dispose()); this.panels.clear(); this.plugins.clear(); this.pluginRoots.clear(); this.imageRoots.clear(); if (this.mergedPreview) void vscode.commands.executeCommand('setContext', 'hasCustomMarkdownPreview', false); }
+  private baseResourceRoots(document: vscode.TextDocument) {
+    return [...new Map([vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview'),
+      vscode.Uri.joinPath(document.uri, '..'), ...(vscode.workspace.workspaceFolders?.map(folder => folder.uri) ?? [])]
+      .map(root => [root.toString(), root])).values()];
+  }
+  private updatePluginRoots(panel: vscode.WebviewPanel, document: vscode.TextDocument, next: readonly vscode.Uri[]) {
+    const existing = panel.webview.options.localResourceRoots ?? [];
+    const roots = replacePluginResourceRoots(existing, this.pluginRoots.get(panel) ?? [], next, this.baseResourceRoots(document), [...this.imageRoots.get(panel)?.values() ?? []]);
+    // Updating webview options can recreate its guest; avoid any write when the
+    // effective permissions are unchanged (including normal config reloads).
+    if (JSON.stringify(existing.map(root => root.toString())) !== JSON.stringify(roots.map(root => root.toString())))
+      panel.webview.options = { ...panel.webview.options, localResourceRoots: roots };
+    this.pluginRoots.set(panel, next);
+  }
   resolveCustomTextEditor(document: vscode.TextDocument, panel: vscode.WebviewPanel): void {
     this.panels.set(panel, document); this.activeUri = document.uri;
     void maybePromptSkillInstall(this.context, document.uri).catch(error => console.error('LiMR skill prompt', error));
-    panel.webview.options = { enableScripts: true, localResourceRoots: [
-      vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview'),
-      vscode.Uri.joinPath(document.uri, '..'), ...(vscode.workspace.workspaceFolders?.map(folder => folder.uri) ?? []),
-    ] };
+    panel.webview.options = { enableScripts: true, localResourceRoots: this.baseResourceRoots(document) };
     panel.webview.html = this.html(panel.webview);
     const events = [
       panel.webview.onDidReceiveMessage(message => { void this.message(document, panel, message).catch(error => {
         void vscode.window.showErrorMessage(`LiMR：${error instanceof Error ? error.message : String(error)}`);
       }); }),
-      panel.onDidChangeViewState(() => { if (panel.active) this.activeUri = document.uri; if (panel.visible) this.sendState(panel, document); this.updateStatus(); }),
+      panel.onDidChangeViewState(() => { if (panel.active) this.activeUri = document.uri; if (panel.visible) this.sendState(panel, document); else if (this.readerScrollOwners.get(document.uri.toString())?.panel === panel) this.releaseReaderInput(document.uri); this.updateStatus(); }),
     ];
-    panel.onDidDispose(() => { events.forEach(event => event.dispose()); this.panels.delete(panel); this.plugins.delete(panel); this.pluginRevisions.delete(panel); this.updateStatus(); });
+    panel.onDidDispose(() => {
+      events.forEach(event => event.dispose()); this.panels.delete(panel);
+      if (this.readerScrollOwners.get(document.uri.toString())?.panel === panel) this.releaseReaderInput(document.uri);
+      if (![...this.panels.values()].some(item => item.uri.toString() === document.uri.toString())) this.sourceScrollGenerations.delete(document.uri.toString());
+      this.plugins.delete(panel); this.pluginRevisions.delete(panel); this.pluginRoots.delete(panel); this.imageRoots.delete(panel); this.updateStatus();
+    });
     this.updateStatus();
   }
   private state(document: vscode.TextDocument, webview: vscode.Webview): ReaderState {
@@ -342,11 +417,16 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     await Promise.all([...this.panels].map(async ([panel, document]) => {
       const revision = (this.pluginRevisions.get(panel) ?? 0) + 1; this.pluginRevisions.set(panel, revision);
       try {
-        const plugins = await loadWorkspacePlugins(document.uri, panel.webview);
+        const loaded = await loadReaderPlugins(document.uri, panel.webview, this.pluginRegistry);
         if (this.pluginRevisions.get(panel) !== revision || !this.panels.has(panel)) return;
+        this.updatePluginRoots(panel, document, loaded.resourceRoots);
+        const plugins = loaded.entries;
         if (JSON.stringify(plugins) !== JSON.stringify(this.plugins.get(panel))) { this.plugins.set(panel, plugins); this.sendState(panel, document); }
+        for (const error of loaded.errors) void vscode.window.showErrorMessage(`LiMR plugins: ${error}`);
       } catch (error) {
         if (this.pluginRevisions.get(panel) !== revision || !this.panels.has(panel)) return;
+        this.updatePluginRoots(panel, document, []);
+        this.pluginRoots.delete(panel);
         this.plugins.set(panel, []); this.sendState(panel, document);
         void vscode.window.showErrorMessage(`LiMR plugins: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -362,10 +442,15 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     }
   }
   private async message(document: vscode.TextDocument, panel: vscode.WebviewPanel, candidate: unknown): Promise<void> {
-    if (!candidate || typeof candidate !== 'object' || !('type' in candidate)) return;
+    if (!this.panels.has(panel) || !candidate || typeof candidate !== 'object' || !('type' in candidate)) return;
     const message = candidate as WebviewMessage;
     switch (message.type) {
-      case 'ready': this.sendState(panel, document); this.updateStatus(); await this.reloadPlugins(); break;
+      case 'ready': {
+        if (this.readerScrollOwners.get(document.uri.toString())?.panel === panel) this.releaseReaderInput(document.uri);
+        this.sendState(panel, document);
+        this.post(panel, { type: 'scrollIntent', active: false, generation: this.sourceScrollGenerations.get(document.uri.toString()) ?? 0 });
+        this.updateStatus(); await this.reloadPlugins(); break;
+      }
       case 'resolveImage': {
         if (typeof message.requestId !== 'string' || message.requestId.length > 100 || typeof message.src !== 'string' || message.src.length > 8192) break;
         const settings = this.settings(document.uri);
@@ -381,6 +466,9 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
         if (!this.panels.has(panel)) break;
         if (result.kind === 'local') {
           const resource = vscode.Uri.parse(result.uri);
+          let imageRoots = this.imageRoots.get(panel);
+          if (!imageRoots) this.imageRoots.set(panel, imageRoots = new Map());
+          imageRoots.set(resource.toString(), resource);
           const roots = panel.webview.options.localResourceRoots ?? [];
           // Explicit parent/absolute paths can be outside the workspace. Grant
           // only this existing file, never an entire filesystem root.
@@ -409,18 +497,46 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
         break;
       }
       case 'openSource': await this.openSource(document.uri, message.offset); break;
+      case 'scrollIntent': {
+        if (!Number.isSafeInteger(message.epoch) || message.epoch < 0) break;
+        const generation = this.sourceScrollGenerations.get(document.uri.toString()) ?? 0;
+        if (message.generation !== generation) {
+          this.post(panel, { type: 'scrollIntent', active: false, generation, epoch: message.epoch }); break;
+        }
+        if (message.active === true && panel.visible && readerSettings(document.uri).syncScroll) {
+          const owner = this.readerScrollOwners.get(document.uri.toString());
+          if (owner?.panel === panel && owner.epoch > message.epoch) break;
+          this.readerScrollOwners.set(document.uri.toString(), { panel, epoch: message.epoch });
+          for (const editor of vscode.window.visibleTextEditors) if (editor.document.uri.toString() === document.uri.toString()) this.sourceScroll.cancel(editor);
+        } else if (message.active === false) {
+          const owner = this.readerScrollOwners.get(document.uri.toString());
+          if (owner?.panel === panel && owner.epoch === message.epoch) this.releaseReaderInput(document.uri, false);
+        }
+        break;
+      }
       case 'revealSource': {
         if (!panel.visible || !readerSettings(document.uri).syncScroll || !Number.isSafeInteger(message.offset)) break;
+        const generation = this.sourceScrollGenerations.get(document.uri.toString()) ?? 0;
+        if (message.generation !== generation) {
+          this.post(panel, { type: 'scrollIntent', active: false, generation, epoch: message.epoch }); break;
+        }
+        const owner = this.readerScrollOwners.get(document.uri.toString());
+        if (owner?.panel !== panel || owner.epoch !== message.epoch) break;
         const editor = vscode.window.visibleTextEditors.find(item => item.document.uri.toString() === document.uri.toString());
         if (editor) {
           const position = document.positionAt(Math.max(0, message.offset));
           this.sourceScroll.cancel(editor);
           if (editor.visibleRanges[0]?.start.isEqual(position)) break;
           const smooth = vscode.workspace.getConfiguration('editor', document).get('smoothScrolling', false);
+          const previous = this.readerScrollTargets.get(editor);
+          const from = document.offsetAt(editor.visibleRanges[0]?.start ?? position);
           this.clearReaderScrollTarget(editor);
-          this.readerScrollTargets.set(editor, { line: position.line, from: editor.visibleRanges[0]?.start.line ?? position.line,
-            smooth,
-            timer: setTimeout(() => this.clearReaderScrollTarget(editor), 250) });
+          this.readerScrollTargets.set(editor, { offset: document.offsetAt(position), from, last: from, direction: previous?.direction ?? 0,
+            smooth, released: false,
+            // Native smooth scrolling runs for 125 ms. Allow one frame/message
+            // of delivery slack after that animation, without extending the
+            // deadline when source input begins while the target is visible.
+            timer: setTimeout(() => this.clearReaderScrollTarget(editor), smooth ? 150 : 32) });
           // Use a source range, as VS Code's Markdown preview does, so wrapped
           // text is revealed from this character through the next source line.
           const end = position.line + 1 < document.lineCount ? new vscode.Position(position.line + 1, 0) : document.lineAt(position.line).range.end;

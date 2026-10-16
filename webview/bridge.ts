@@ -5,6 +5,8 @@ declare global { interface Window { acquireVsCodeApi?: () => VSCodeApi } }
 const api = window.acquireVsCodeApi?.();
 
 export const post = (message: WebviewMessage) => api?.postMessage(message);
+export const readWebviewState = () => api?.getState();
+export const saveWebviewState = (state: unknown) => api?.setState(state);
 export function listen(listener: (message: HostMessage) => void) {
   const receive = (event: MessageEvent<HostMessage>) => {
     if (event.data && typeof event.data.type === 'string') listener(event.data);

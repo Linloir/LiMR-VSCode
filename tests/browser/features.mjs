@@ -134,7 +134,7 @@ export async function runFeatureAcceptance({ page, frame, host, artifacts }) {
   await expect(frame.locator('.limr-reader-toc .limr-toc')).toBeVisible();
   await expect(toggle()).not.toBeVisible();
   await screenshot('toc-wide');
-  await save({ check: 'LiMR 1.2.2 narrow TOC has transparent hover, zero text padding and underline animation; wide mode has no narrow placeholder and restores its rail when space permits', regularStyle, hoverStyle, alwaysTop, wideNarrowTop, hiddenTop });
+  await save({ check: 'LiMR 1.2.3 narrow TOC has transparent hover, zero text padding and underline animation; wide mode has no narrow placeholder and restores its rail when space permits', regularStyle, hoverStyle, alwaysTop, wideNarrowTop, hiddenTop });
 
   await host('layout', { sourceSize: .48 });
   await host('configure', { values: { tocMode: 'hidden' } });

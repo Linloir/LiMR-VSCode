@@ -95,11 +95,11 @@ export async function runSkillAcceptance({ page, host, artifacts, fixture }) {
     try { installed = await host('readWorkspaceFiles', { paths: files }); return true; } catch { return false; }
   }).toBe(true);
   expect(installed[files[0]]).toContain('name: limr-annotations');
-  expect(installed[files[1]]).toContain('LiMR 1.2.2');
+  expect(installed[files[1]]).toContain('LiMR 1.2.3');
   expect(installed[files[1]]).toContain('::%%limr%%{<#range-id}');
   expect(installed[files[2]]).toContain('"plugins": [');
   expect(installed[files[2]]).toContain('React, limr');
-  await save({ check: 'Workspace installation copies SKILL.md and both syntax/plugin references; independent file readback confirms LiMR 1.2.2', files });
+  await save({ check: 'Workspace installation copies SKILL.md and both syntax/plugin references; independent file readback confirms LiMR 1.2.3', files });
   await host('command', { command: 'notifications.clearAll' });
   await host('command', { command: 'notifications.hideList' });
 

@@ -87,7 +87,7 @@ describe('workspace plugin host', () => {
     const directory = await fixture();
     const outside = join(isolated, 'outside.js'); await writeFile(outside, 'export default () => ({ name: "outside" });');
     await rm(join(directory, 'sample.js')); await symlink(outside, join(directory, 'sample.js'));
-    await expect(loadWorkspacePlugins(inputUri(), view())).rejects.toThrow('inside the workspace');
+    await expect(loadWorkspacePlugins(inputUri(), view())).rejects.toThrow('inside their registered directory');
     expect(webview.asWebviewUri.mock.calls.some(([uri]) => uri.path.endsWith('sample.js'))).toBe(false);
   });
 
@@ -95,7 +95,7 @@ describe('workspace plugin host', () => {
     const directory = await fixture();
     const outside = join(isolated, 'manifest.json'); await writeFile(outside, '{"plugins": []}');
     await rm(join(directory, 'manifest.json')); await symlink(outside, join(directory, 'manifest.json'));
-    await expect(loadWorkspacePlugins(inputUri(), view())).rejects.toThrow('inside the workspace');
+    await expect(loadWorkspacePlugins(inputUri(), view())).rejects.toThrow('inside their registered directory');
     expect(api.workspace.fs.readFile).not.toHaveBeenCalled();
     expect(webview.asWebviewUri).not.toHaveBeenCalled();
   });

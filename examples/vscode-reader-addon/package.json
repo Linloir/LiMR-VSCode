@@ -1,0 +1,34 @@
+{
+  "name": "limr-reader-addon",
+  "displayName": "LiMR Example — Research Card",
+  "description": "A minimal LiMR reader add-on with a Markdown research-card block.",
+  "version": "0.0.1",
+  "publisher": "limr-examples",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "main": "./extension.cjs",
+  "extensionKind": ["workspace"],
+  "extensionDependencies": ["linloir.limr-vscode"],
+  "activationEvents": ["onStartupFinished"],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "limrExample.enable",
+        "title": "Enable Research Card",
+        "category": "LiMR Example"
+      },
+      {
+        "command": "limrExample.disable",
+        "title": "Disable Research Card",
+        "category": "LiMR Example"
+      }
+    ]
+  }
+}

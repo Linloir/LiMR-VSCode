@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { webviewPointerExit } from './input.mjs';
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const source = '# Continuous scroll acceptance\n\n' + Array.from({ length: 600 }, (_, index) =>
@@ -8,6 +9,7 @@ const source = '# Continuous scroll acceptance\n\n' + Array.from({ length: 600 }
 
 export async function runScrollSyncAcceptance({ page, frame, host, artifacts }) {
   const evidence = [], errors = [];
+  const sourceEditor = page.locator('.editor-group-container').first().locator('.monaco-editor').first();
   page.on('pageerror', error => errors.push(String(error)));
   const save = async value => { evidence.push(value); await writeFile(path.join(artifacts, 'checks.json'), JSON.stringify(evidence, null, 2)); };
   await host('configure', { values: { syncScroll: false, tocMode: 'hidden', sidebarMode: 'hidden', typography: 'standard', 'plugins.enabled': false } });
@@ -56,8 +58,10 @@ export async function runScrollSyncAcceptance({ page, frame, host, artifacts }) 
 
   // Start the opposite direction immediately; no 600 ms reveal cooldown.
   const readerStartLine = sourceFinished.visibleRanges[0].start;
+  await frame.locator('.lv-scroll').hover({ position: { x: 8, y: 200 } });
   const readerStarted = await frame.evaluate(() => {
     const root = document.querySelector('.lv-scroll');
+    root.dispatchEvent(new WheelEvent('wheel', { deltaY: 34, bubbles: true }));
     const series = window.__readerSeries = { started: Date.now(), firstInput: undefined, completed: undefined, steps: 0, initialTop: root.scrollTop };
     const timer = setInterval(() => {
       series.firstInput ??= Date.now();
@@ -92,6 +96,8 @@ export async function runScrollSyncAcceptance({ page, frame, host, artifacts }) 
   // Source must also take control immediately after a reader-driven reveal.
   await frame.locator('.lv-scroll').evaluate(element => element.scrollTop += 130);
   await delay(35);
+  await webviewPointerExit(page, frame);
+  await sourceEditor.hover({ position: { x: 15, y: 220 } });
   await host('scrollSource', { line: 120 });
   await expect.poll(async () => (await host('snapshot')).visibleRanges[0].start).toBeLessThan(121);
   const takeoverSource = await host('scrollSourceStatus');
@@ -123,8 +129,10 @@ export async function runScrollSyncAcceptance({ page, frame, host, artifacts }) 
   await expect.poll(async () => (await host('scrollSourceStatus')).scroll.completed).toBeTruthy();
   await delay(250);
   const smoothStart = await host('scrollSourceStatus');
+  await frame.locator('.lv-scroll').hover({ position: { x: 8, y: 200 } });
   const smoothStarted = await frame.evaluate(() => {
     const root = document.querySelector('.lv-scroll');
+    root.dispatchEvent(new WheelEvent('wheel', { deltaY: 34, bubbles: true }));
     const series = window.__smoothSeries = { started: Date.now(), completed: undefined, steps: 0, top: root.scrollTop };
     const timer = setInterval(() => {
       root.scrollTop += 34;
@@ -162,6 +170,8 @@ export async function runScrollSyncAcceptance({ page, frame, host, artifacts }) 
   await frame.locator('.lv-scroll').evaluate(element => element.scrollTop += 280);
   await expect.poll(async () => (await host('scrollSourceStatus')).events.at(-1).time).toBeGreaterThan(finalReaderInput);
   const smallReverseAt = Date.now();
+  await webviewPointerExit(page, frame);
+  await sourceEditor.hover({ position: { x: 15, y: 220 } });
   await host('scrollSourceLines', { lines: -1 });
   await writeFile(path.join(artifacts, 'reverse-trace.json'), JSON.stringify({ finalReaderInput, smallReverseAt,
     host: await host('scrollSourceStatus'), reader: await frame.evaluate(() => window.__scrollEvidence) }, null, 2));

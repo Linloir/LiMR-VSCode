@@ -20,6 +20,7 @@ import { runSkillAcceptance } from '../tests/browser/skills.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillSuite = process.env.LIMR_TEST_SUITE === 'skills' || process.argv.includes('--skills');
 const syntaxSuite = process.env.LIMR_TEST_SUITE === 'syntax-highlighting' || process.argv.includes('--syntax-highlighting');
+const extensionPluginSuite = process.env.LIMR_TEST_SUITE === 'extension-plugins' || process.argv.includes('--extension-plugins');
 const artifacts = process.env.LIMR_TEST_ARTIFACTS ? path.resolve(root, process.env.LIMR_TEST_ARTIFACTS) : path.join(root, 'artifacts', 'test-vscode');
 const temporary = await mkdtemp(path.join(process.env.LIMR_TEST_TEMP_ROOT ?? os.tmpdir(), 'limr-vscode-test-'));
 const ipc = path.join(temporary, 'ipc');
@@ -39,6 +40,39 @@ const themeDirectory = process.env.LIMR_TEST_THEME_DIR;
 if (themeDirectory) {
   await cp(themeDirectory, path.join(extensionDirectory, 'zhuangtongfa.material-theme'), { recursive: true });
   theme = 'One Dark Pro';
+}
+if (extensionPluginSuite) {
+  // Install a real companion extension into this disposable VS Code profile.
+  // The example itself activates through extensionDependencies and exports API v1.
+  const addon = path.join(extensionDirectory, 'limr-examples.limr-reader-addon');
+  await cp(path.join(root, 'examples/vscode-reader-addon'), addon, { recursive: true });
+  await writeFile(path.join(addon, 'broken.mjs'), 'export default function () { throw new Error("Expected add-on factory failure"); }');
+  await writeFile(path.join(addon, 'pending.mjs'), 'export default function () { window.limrTestPendingFactory = true; return new Promise(() => {}); }');
+  const entry = path.join(addon, 'extension.cjs');
+  await writeFile(entry, await readFile(entry, 'utf8') + `
+const exampleActivate = module.exports.activate;
+module.exports.activate = async function (context) {
+  await exampleActivate(context);
+  const api = await vscode.extensions.getExtension('linloir.limr-vscode').activate();
+  const bad = [];
+  context.subscriptions.push(
+    new vscode.Disposable(() => bad.splice(0).forEach(value => value.dispose())),
+    vscode.commands.registerCommand('limrExampleTest.missing', () => {
+      const registration = api.registerPlugin(context.extension.id, { id: 'missing', module: 'missing.mjs' });
+      bad.push(registration); context.subscriptions.push(registration);
+    }),
+    vscode.commands.registerCommand('limrExampleTest.throwing', () => {
+      const registration = api.registerPlugin(context.extension.id, { id: 'throwing', module: 'broken.mjs' });
+      bad.push(registration); context.subscriptions.push(registration);
+    }),
+    vscode.commands.registerCommand('limrExampleTest.pending', () => {
+      const registration = api.registerPlugin(context.extension.id, { id: 'pending', module: 'pending.mjs' });
+      bad.push(registration); context.subscriptions.push(registration);
+    }),
+    vscode.commands.registerCommand('limrExampleTest.clear', () => bad.splice(0).forEach(value => value.dispose()))
+  );
+};
+`);
 }
 await writeFile(path.join(userData, 'User', 'settings.json'), JSON.stringify({
   'workbench.colorTheme': theme,
@@ -147,15 +181,18 @@ try {
   await page.setViewportSize({ width: 1920, height: 1080 });
   const frame = syntaxSuite ? undefined : await until(async () => { for (const frame of page.frames()) if (await frame.locator('.limr-reader').count().catch(() => 0)) return frame; }, 60_000);
   await page.bringToFront();
-  for (const target of [page, ...(frame ? [frame] : [])]) {
+  for (const target of (process.env.LIMR_TEST_NO_FOCUS_EMULATION ? [] : [page, ...(frame ? [frame] : [])])) {
     const session = await page.context().newCDPSession(target).catch(() => undefined);
     if (session) await session.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   }
   const runAcceptance = skillSuite ? runSkillAcceptance
     : syntaxSuite ? (await import('../tests/browser/syntax-highlighting.mjs')).runSyntaxHighlightingAcceptance
+    : extensionPluginSuite ? (await import('../tests/browser/extension-plugins.mjs')).runExtensionPluginsAcceptance
     : process.env.LIMR_TEST_SUITE === 'images' || process.argv.includes('--images') ? (await import('../tests/browser/images.mjs')).runImageAcceptance
     : process.env.LIMR_TEST_SUITE === 'sidebar-mode' || process.argv.includes('--sidebar-mode') ? (await import('../tests/browser/sidebar-mode.mjs')).runSidebarModeAcceptance
     : process.env.LIMR_TEST_SUITE === 'scroll-sync' || process.argv.includes('--scroll-sync') ? (await import('../tests/browser/scroll-sync.mjs')).runScrollSyncAcceptance
+    : process.env.LIMR_TEST_SUITE === 'scroll-jitter' || process.argv.includes('--scroll-jitter') ? (await import('../tests/browser/scroll-jitter.mjs')).runScrollJitterAcceptance
+    : process.env.LIMR_TEST_SUITE === 'translation-scroll' || process.argv.includes('--translation-scroll') ? (await import('../tests/browser/translation-scroll.mjs')).runTranslationScrollAcceptance
     : process.env.LIMR_TEST_SUITE === 'frontmatter' || process.argv.includes('--frontmatter') ? (await import('../tests/browser/frontmatter.mjs')).runFrontmatterAcceptance
     : process.env.LIMR_TEST_SUITE === 'features' || process.argv.includes('--features') ? runFeatureAcceptance
     : process.env.LIMR_TEST_SUITE === 'regressions' || process.argv.includes('--regressions') ? runRegressionAcceptance

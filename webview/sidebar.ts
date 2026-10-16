@@ -4,7 +4,7 @@ import type { ReaderSidebarMode } from '../src/shared/protocol';
 const anchor = '[data-limr-anchor]';
 const bodyAnchor = `.limr-reader-content > .limr-prose ${anchor}`;
 
-/** LiMR 1.2.2 exposes a boolean sidebar prop but no content-aware mode or
+/** LiMR 1.2.3 exposes a boolean sidebar prop but no content-aware mode or
  * children slot. Its rendered anchors already reflect registered annotation
  * types, references and plugins; highlights do not create an anchor. Observe
  * only marker insertion/removal, without parsing the source a second time or

@@ -41,7 +41,7 @@ describe('source edit transactions', () => {
   });
 });
 
-describe('LiMR 1.2.2 paired annotation boundaries', () => {
+describe('LiMR 1.2.3 paired annotation boundaries', () => {
   const snapshot = (source: string) => createDocument(source, { extensions: standard(), id: 'paired-boundaries' }).getSnapshot();
   const transact = (source: string, change: Parameters<typeof editSourceAnnotations>[0]) => {
     const edits = editSourceAnnotations(change, snapshot(source))!;

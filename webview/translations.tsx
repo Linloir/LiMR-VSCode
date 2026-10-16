@@ -22,7 +22,7 @@ function ReaderTranslation(props: NodeRendererProps) {
   useLayoutEffect(() => {
     const marker = host.current?.querySelector<HTMLButtonElement>('[data-translation-switch]');
     if (!marker) return;
-    // LiMR 1.2.2 owns the marker, movement and collapse animations. Its built-in
+    // LiMR 1.2.3 owns the marker, movement and collapse animations. Its built-in
     // translation labels are Chinese; adapt their accessible text to the host.
     const mode = marker.dataset.mode as typeof paragraphModes[number];
     const next = paragraphModes[(paragraphModes.indexOf(mode) + 1) % paragraphModes.length];

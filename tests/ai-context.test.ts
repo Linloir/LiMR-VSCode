@@ -91,7 +91,7 @@ describe('paired-boundary AI context', () => {
       expect(result.text).toContain('::%%limr%%{<#');
       expect(result.text).toContain('::%%limr%%{>#');
       expect(payload(result.text)).toMatchObject({ format: 'limr-context-v2', annotationSyntax: {
-        liMRVersion: '1.2.2', rangeStart: '::%%limr%%{<#ID}', rangeEnd: '::%%limr%%{>#ID}', definition: ':::limr-annotation',
+        liMRVersion: '1.2.3', rangeStart: '::%%limr%%{<#ID}', rangeEnd: '::%%limr%%{>#ID}', definition: ':::limr-annotation',
       } });
     }
   });

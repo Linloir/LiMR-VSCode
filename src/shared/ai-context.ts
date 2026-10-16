@@ -95,7 +95,7 @@ export function buildAIContext(input: AIContextInput): AIContext {
     allowSourceEdits
       ? '在收到我的实际问题后，将该问题作为 type="question" 标注写回同一 Markdown，并关联这些文本范围；存在范围 ID 时复用，保留已有标注及高亮设置。没有显式高亮时可添加共享高亮。只在可靠取得当前会话或轮次 ID 时记录 threadId / turnId，不要编造。'
       : '当前阅读器未允许修改 Markdown：请先回答问题，不自动写回标注；只有我另行明确要求修改文档时才进行写入。',
-    '源码标注使用 LiMR 1.2.2 的成对边界：::%%limr%%{<#范围ID}原文::%%limr%%{>#范围ID}，并用 :::limr-annotation 定义正文和元数据。只复用下列 rangeIds 中列出的名称；其它范围使用新 ID，避免意外关联选区之外的同名位置。',
+    '源码标注使用 LiMR 1.2.3 的成对边界：::%%limr%%{<#范围ID}原文::%%limr%%{>#范围ID}，并用 :::limr-annotation 定义正文和元数据。只复用下列 rangeIds 中列出的名称；其它范围使用新 ID，避免意外关联选区之外的同名位置。',
     '不要把本段上下文说明或选中文本当作我的提问。',
   ] : [
     `Read the installed ${skill} skill first (normally .agents/skills/limr-annotations/SKILL.md or .claude/skills/limr-annotations/SKILL.md), then answer the question I add after this context.`,
@@ -104,12 +104,12 @@ export function buildAIContext(input: AIContextInput): AIContext {
     allowSourceEdits
       ? 'After receiving my actual question, write that question into this Markdown as a type="question" annotation on these ranges. Reuse existing range IDs and preserve other annotations and highlight settings. Add a shared highlight only if none is explicitly configured. Record threadId / turnId only when reliably available for this conversation; never invent them.'
       : 'Markdown editing is disabled in the reader: answer without automatically writing annotations. Only change the document if I explicitly request that separately.',
-    'Use LiMR 1.2.2 paired source boundaries: ::%%limr%%{<#rangeID}source::%%limr%%{>#rangeID}, with :::limr-annotation definitions for content and metadata. Reuse only names listed in rangeIds below; create a new ID for other ranges so repeated names cannot attach the question outside the selection.',
+    'Use LiMR 1.2.3 paired source boundaries: ::%%limr%%{<#rangeID}source::%%limr%%{>#rangeID}, with :::limr-annotation definitions for content and metadata. Reuse only names listed in rangeIds below; create a new ID for other ranges so repeated names cannot attach the question outside the selection.',
     'Do not treat this context instruction or the selected text as my question.',
   ];
   const payload = {
     format: 'limr-context-v2',
-    annotationSyntax: { liMRVersion: '1.2.2', rangeStart: '::%%limr%%{<#ID}', rangeEnd: '::%%limr%%{>#ID}', definition: ':::limr-annotation' },
+    annotationSyntax: { liMRVersion: '1.2.3', rangeStart: '::%%limr%%{<#ID}', rangeEnd: '::%%limr%%{>#ID}', definition: ':::limr-annotation' },
     file: { uri: input.uri, path: label, fsPath: input.fsPath, editorVersion: input.version },
     allowSourceEdits,
     coordinates: { offsetBase: 0, lineBase: 1, columnBase: 1, encoding: 'UTF-16', endExclusive: true },

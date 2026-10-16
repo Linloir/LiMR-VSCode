@@ -65,6 +65,7 @@ export type HostMessage =
   | { type: 'imageResolved'; requestId: string; src: string; uri?: string; reason?: 'missing' | 'ambiguous' | 'unsupported' }
   | { type: 'editResult'; requestId: string; success: boolean; state: ReaderState; error?: string }
   | { type: 'reveal'; offset: number }
+  | { type: 'scrollIntent'; active: false; generation: number; epoch?: number }
   | { type: 'notice'; message: string; error?: boolean };
 export type WebviewMessage =
   | { type: 'ready' }
@@ -80,4 +81,5 @@ export type WebviewMessage =
   | { type: 'setFileSettings'; settings: ReaderFileSettings }
   | { type: 'copyFallback'; text: string }
   | { type: 'openLink'; href: string }
-  | { type: 'revealSource'; offset: number };
+  | { type: 'revealSource'; offset: number; epoch: number; generation: number }
+  | { type: 'scrollIntent'; active: boolean; epoch: number; generation: number };

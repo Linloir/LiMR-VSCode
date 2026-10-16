@@ -1,0 +1,7 @@
+.limr-example-research-card {
+  margin-block: 1.2em;
+  padding: 0.5em 1.25em;
+  border-inline-start: 2px solid var(--vscode-textLink-foreground);
+  border-radius: 0 0.5em 0.5em 0;
+  background: var(--vscode-textBlockQuote-background, transparent);
+}

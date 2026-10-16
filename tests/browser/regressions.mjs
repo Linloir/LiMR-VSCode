@@ -70,6 +70,10 @@ One named annotation has two separate occurrences.
 
 const model = source => createDocument(source, { id: 'regression-model', extensions: standard() }).getSnapshot();
 const anchorQuotes = (annotation, source) => annotation.anchors.map(anchor => source.slice(anchor.range.start, anchor.range.end).replaceAll('**', ''));
+const expectShortIds = snapshot => {
+  for (const annotation of snapshot.annotations) expect(annotation.id).toMatch(/^[0-9a-f]{6}$/);
+  for (const id of snapshot.annotationRanges.keys()) expect(id).toMatch(/^[0-9a-f]{6}$/);
+};
 
 export async function runRegressionAcceptance({ page, frame, host, artifacts }) {
   const evidence = [], errors = [];
@@ -148,7 +152,9 @@ export async function runRegressionAcceptance({ page, frame, host, artifacts }) 
     await toolbar.getByRole('button', { name: '添加高亮', exact: true }).click();
     await expect.poll(async () => (await host('snapshot')).source).toContain('::%%limr%%{<#');
     await expect(toolbar.getByRole('alert')).toHaveCount(0);
-    expect(model((await host('snapshot')).source).annotations.filter(annotation => annotation.type === 'highlight')).toHaveLength(1);
+    const created = model((await host('snapshot')).source);
+    expect(created.annotations.filter(annotation => annotation.type === 'highlight')).toHaveLength(1);
+    expectShortIds(created);
     await expect(paragraph).toHaveText(textBefore);
     expect((await paragraph.locator(example.selector).allTextContents()).join('')).toBe(formattedBefore);
     crossingSelections.push({ kind: example.kind, ...selected });
@@ -219,15 +225,20 @@ export async function runRegressionAcceptance({ page, frame, host, artifacts }) 
 
   // New drafts own their provisional shared paint until Save confirms them.
   const draftLifecycle = [];
-  for (const scenario of ['escape-empty', 'escape-draft', 'blur-empty']) {
+  for (const scenario of ['escape-empty', 'escape-draft', 'blur-empty', 'question-escape-empty']) {
     await reset(guideSource);
     await selectText(paragraph, '阅读器标签页');
-    await toolbar.getByRole('button', { name: '添加旁注', exact: true }).click();
-    const draftEditor = frame.getByRole('textbox', { name: '旁注内容', exact: true });
+    const question = scenario.startsWith('question');
+    await toolbar.getByRole('button', { name: question ? '添加提问' : '添加旁注', exact: true }).click();
+    const draftEditor = frame.getByRole('textbox', { name: question ? '提问内容' : '旁注内容', exact: true });
     await expect(draftEditor).toBeVisible();
     await expect(draftEditor).toBeEnabled();
     await expect(draftEditor).toBeFocused();
     await expect(toolbar).toHaveCount(0);
+    const created = model((await host('snapshot')).source);
+    expectShortIds(created);
+    expect(created.annotations).toHaveLength(2);
+    expect(created.annotationRanges.size).toBe(1);
     if (scenario === 'escape-draft') await draftEditor.fill('This draft must be discarded.');
     if (scenario === 'blur-empty') await heading().click();
     else await draftEditor.press('Escape');
@@ -235,7 +246,7 @@ export async function runRegressionAcceptance({ page, frame, host, artifacts }) 
     const after = (await host('snapshot')).source;
     expect(after).not.toContain('::%%limr%%');
     expect(after.trimEnd()).toBe(guideSource.trimEnd());
-    draftLifecycle.push({ scenario, annotations: 0, boundaryMarkers: 0 });
+    draftLifecycle.push({ scenario, createdIds: created.annotations.map(item => item.id), rangeIds: [...created.annotationRanges.keys()], annotations: 0, boundaryMarkers: 0 });
   }
   await reset(annotatedSource);
   await selectedParagraph.locator('strong').click();
@@ -340,6 +351,7 @@ export async function runRegressionAcceptance({ page, frame, host, artifacts }) 
       expect(parsed.annotations.map(annotation => annotation.id).sort()).toEqual(['h-reused', 'n-reused']);
       for (const annotation of parsed.annotations) expect(anchorQuotes(annotation, after.source)).toEqual(['beta range']);
       expect(parsed.annotations.find(annotation => annotation.id === 'n-reused').data.custom).toBe('preserved');
+      for (const id of parsed.annotationRanges.keys()) if (id !== 'reused') expect(id).toMatch(/^[0-9a-f]{6}$/);
     } else {
       expect(parsed.annotations.map(annotation => annotation.id).sort()).toEqual(['h-other', 'h-shared', 'n-other', 'n-shared']);
       for (const id of ['h-shared', 'n-shared']) expect(anchorQuotes(parsed.annotations.find(annotation => annotation.id === id), after.source)).toEqual(['beta range']);

@@ -1,8 +1,8 @@
 # Customize the LiMR VS Code reader
 
-Use workspace plugins to change styles or add syntax without editing the installed extension bundle. The host uses LiMR 1.2.2. Keep changes in the user's chosen workspace and preserve existing manifest entries.
+Use reader plugins to change styles or add syntax without editing the installed LiMR extension bundle. LiMR for VS Code 1.0.1 exposes API v1 and uses LiMR 1.2.3. For changes scoped to one project, use its workspace manifest and preserve existing entries. For reusable functionality installed through VS Code, create an add-on extension and register its packaged files through the public API.
 
-## Files and loading
+## Workspace files
 
 Create `.limr/plugins/manifest.json` in the workspace root:
 
@@ -15,9 +15,55 @@ Create `.limr/plugins/manifest.json` in the workspace root:
 }
 ```
 
-Paths are relative to `.limr/plugins/`. Each entry has a unique `id` and at least one of `stylesheet` or `module`. Keep all plugin files and resources inside that directory; absolute paths, URLs, and traversal outside it are not supported. Plugins load only in trusted workspaces. A module is executable workspace code, with the webview's access restrictions. Do not add network fetches, credentials, or host file-write assumptions to a presentation plugin.
+Paths are relative to `.limr/plugins/`. Each entry has a unique `id` and at least one of `stylesheet` or `module`. Keep all plugin files and resources inside that directory; absolute paths, URLs, and traversal outside it are not supported. `limr.plugins.manifest` changes the workspace manifest location; it does not configure installed add-ons.
 
-An entry module is a self-contained browser ESM file, or a single ESM bundle. Its default export is a factory receiving the host's `{ React, limr }` and returning a `RendererExtension`. Use the supplied React and LiMR instances; do not import or bundle another copy of either. Bundle additional dependencies into that entrypoint; bare package imports, TS/JSX source, and Node APIs are not supported directly. Convert TS/JSX to browser JavaScript before registering it. Avoid replacing all standard extensions. Reloading checks the manifest and each registered entry file by content hash. Separately imported helper modules do not have independent hot reload; rebuild the entry bundle after changing a helper.
+## Installed VS Code add-ons
+
+Use `extensionDependencies: ["linloir.limr-vscode"]`, `extensionKind: ["workspace"]`, and an activation event such as `onStartupFinished` in the add-on's `package.json`. Install it in the same extension host as LiMR, including the WSL/SSH side of a remote window. The complete [runnable example](https://github.com/Linloir/LiMR-VSCode/tree/main/examples/vscode-reader-addon) requires no build step. Its enable/disable commands demonstrate registration and disposal without changing Markdown.
+
+The [published TypeScript declarations](https://github.com/Linloir/LiMR-VSCode/blob/main/api/index.d.ts) define this host API; this copy is sufficient for a small TypeScript add-on:
+
+```ts
+import * as vscode from 'vscode';
+
+export interface LiMRPluginContribution {
+  readonly id: string;
+  readonly module?: string;
+  readonly stylesheet?: string;
+}
+
+export interface LiMRExtensionApi {
+  readonly apiVersion: 1;
+  readonly viewType: 'limr.reader';
+  registerPlugin(extensionId: string, plugin: LiMRPluginContribution): vscode.Disposable;
+}
+
+export async function activate(context: vscode.ExtensionContext) {
+  const extension = vscode.extensions.getExtension<LiMRExtensionApi>('linloir.limr-vscode');
+  if (!extension) throw new Error('Install LiMR for VS Code 1.0.1 or later.');
+  const api = await extension.activate();
+  if (api?.apiVersion !== 1 || typeof api.registerPlugin !== 'function') {
+    throw new Error('LiMR reader plugin API v1 is required.');
+  }
+  context.subscriptions.push(api.registerPlugin(context.extension.id, {
+    id: 'research-card',
+    module: 'reader.mjs',
+    stylesheet: 'reader.css',
+  }));
+}
+```
+
+Pass the contributing extension's `context.extension.id`. Each contribution needs a unique, stable `id` within that extension, matching `[a-z][a-z0-9-]*`, and at least one of `module` or `stylesheet`. Paths are relative to that extension's root and must stay inside it: no leading `./`, `..` segments, absolute paths, URLs, query strings or fragments. Browser modules must use `.js` or `.mjs`. CSS-only contributions can omit `module`.
+
+Registration returns a disposable synchronously. Invalid descriptors and duplicate extension/id pairs throw; dispose an earlier registration before replacing it. Missing files and module-load failures are reported asynchronously in each reader; the failed entry is skipped without removing other plugins. Registration and disposal refresh existing readers. The contribution can be registered without a workspace folder, so it also works for untitled documents in a trusted window. Uninstalling or disabling an add-on follows VS Code's normal extension lifecycle, which may request a window reload.
+
+## Shared browser contract
+
+Both workspace plugins and installed add-ons load only when the window is trusted and `limr.plugins.enabled` is enabled. The factory receives only the browser React/LiMR surface; API v1 does not add host RPC or file access. A module runs within the webview's restrictions. Keep presentation plugins free of credentials and host file-write assumptions.
+
+An entry module is a self-contained browser ESM file, or a single ESM bundle. Its default export is a factory receiving the host's `{ React, limr }` and returning a `RendererExtension`, directly or asynchronously. Use the supplied React and LiMR instances; do not import or bundle another copy of either. Bundle additional dependencies into that entrypoint; bare package imports, TS/JSX source, and Node APIs are not supported directly. Convert TS/JSX to browser JavaScript before registering it. Avoid replacing all standard extensions. Workspace file changes reload automatically; **LiMR: Reload Reader Plugins** refreshes both sources. Reloading checks registered entry files by content hash. Separately imported helper modules do not have independent hot reload; rebuild the entry bundle after changing a helper.
+
+Loading or factory failures skip only that entry. A component that crashes during rendering makes the entire document fall back to the base reader; its CSS remains until that plugin is disabled. After fixing the plugin, change its entry bundle or disable and re-enable it to retry; reloading unchanged files does not retry a failed factory or render boundary.
 
 ## Style-only changes
 
@@ -57,10 +103,10 @@ This **Markdown** is rendered using the normal reader components.
 :::
 ```
 
-`defineBlock` registers its same-named tag/directive by default. Extension, tag, and directive names must not collide with existing modules. Reuse `children`, `renderChildren`, and `renderValue` from public renderer props to preserve source mapping and selection. Use atomic selection for custom interactive widgets without character-level correspondence.
+`defineBlock` registers its same-named tag/directive by default. The host assigns renderer extension names from entry IDs: `workspace:<id>` or `extension:<lowercase-extension-id>/<id>`. Tag/directive names are not automatically namespaced: choose distinctive names to avoid conflicts with built-ins and other plugins. Reuse `children`, `renderChildren`, and `renderValue` from public renderer props to preserve source mapping and selection. Use atomic selection for custom interactive widgets without character-level correspondence.
 
-For lower-level syntax, annotations, or actions, inspect the public LiMR 1.2.2 declarations and matching package documentation first. `RendererExtension` can contribute `components`, `annotationTypes`, `actions`, and `parameters` as well as syntax. Follow the existing source annotation serializer for source-backed notes; a presentation plugin must not write files itself. Read [the source annotation contract](source-annotations.md) when adding annotation UI or serialization.
+For lower-level syntax, annotations, or actions, inspect the public LiMR 1.2.3 declarations and matching package documentation first. `RendererExtension` can contribute `components`, `annotationTypes`, `actions`, and `parameters` as well as syntax. Follow the existing source annotation serializer for source-backed notes; a presentation plugin must not write files itself. Read [the source annotation contract](source-annotations.md) when adding annotation UI or serialization. Custom reader syntax does not automatically extend Markdown source-editor highlighting.
 
 ## Verify the requested outcome
 
-Run **LiMR: Reload Workspace Plugins** after installing or rebuilding files and inspect plugin-load errors. Check the changed appearance or syntax in light/dark themes and a narrow reader. Confirm ordinary Markdown, source selection, links, and existing annotations still work. For interactive changes, check keyboard focus and that clicks do not unexpectedly blur or save editors. Report the changed manifest/files and the behavior you actually observed. Do not claim real VS Code validation from a build or a standalone HTML preview alone.
+Run **LiMR: Reload Reader Plugins** after installing or rebuilding files and inspect plugin-load errors. For an add-on, verify it actually activates in the intended extension host, registration reaches an open reader, and disposal removes its component and CSS. Check the changed appearance or syntax in light/dark themes and a narrow reader. Confirm ordinary Markdown, source selection, links, and existing annotations still work. For interactive changes, check keyboard focus and that clicks do not unexpectedly blur or save editors. Report the changed manifest/files and the behavior you actually observed. Do not claim real VS Code validation from a build or a standalone HTML preview alone.

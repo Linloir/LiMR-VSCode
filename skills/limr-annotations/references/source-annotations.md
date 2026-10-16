@@ -1,6 +1,6 @@
-# LiMR 1.2.2 source annotation contract
+# LiMR 1.2.3 source annotation contract
 
-The VS Code reader bundles LiMR 1.2.2 and adds `margin-note`, `inline-note`, and `question` types. Annotations belong in the same Markdown document, with no parallel `.limr` annotation database.
+The VS Code reader bundles LiMR 1.2.3 and adds `margin-note`, `inline-note`, and `question` types. Annotations belong in the same Markdown document, with no parallel `.limr` annotation database.
 
 ## Canonical form
 

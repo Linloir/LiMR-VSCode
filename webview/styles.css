@@ -68,6 +68,32 @@ button, select { -webkit-tap-highlight-color: transparent; }
 [data-limr-appearance] .limr-color-swatch:is(:focus,:focus-visible) { outline: 2px solid transparent; outline-offset: 0; }
 [data-limr-appearance] .limr-color-swatch[aria-pressed='true']:is(:focus,:focus-visible) { outline-color: var(--swatch); }
 [data-limr-appearance] .limr-toc a:focus-visible { text-decoration: underline; text-underline-offset: .2em; }
+/* LiMR's copy skin is layered; the host's unlayered button reset otherwise
+   replaces its icon/status colors while leaving a fixed white glass surface. */
+[data-limr-appearance] .limr-copy-button { color: var(--lv-text); background: transparent; }
+[data-limr-appearance] .limr-copy-button:is(:hover,:focus-visible) { background: color-mix(in srgb, var(--lv-text) 10%, transparent); }
+[data-limr-appearance] .limr-copy-button:active { background: color-mix(in srgb, var(--lv-text) 18%, transparent); }
+[data-limr-appearance] .limr-copy-button[data-variant='glass'] {
+  background: color-mix(in srgb, var(--lv-surface) 94%, transparent);
+  box-shadow: 0 1px 5px var(--lv-shadow), inset 0 0 0 1px var(--lv-border);
+}
+[data-limr-appearance] .limr-copy-button[data-variant='glass']:is(:hover,:focus-visible) { background: color-mix(in srgb, var(--lv-surface) 88%, var(--lv-text)); }
+[data-limr-appearance] .limr-copy-button[data-variant='glass']:active { background: color-mix(in srgb, var(--lv-surface) 80%, var(--lv-text)); }
+[data-limr-appearance] .limr-copy-button[data-status='copied'] { color: color-mix(in srgb, var(--lv-success) 80%, var(--lv-text)); }
+[data-limr-appearance] .limr-copy-button[data-status='error'] { color: color-mix(in srgb, var(--lv-error) 80%, var(--lv-text)); }
+/* A small inset keyboard cue stays within this control; mouse focus remains
+   free of VS Code's generic focus frame. Glyph/check animations stay in LiMR. */
+[data-limr-appearance] .limr-copy-button:focus-visible { opacity: 1; box-shadow: inset 0 0 0 1px currentColor; }
+body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button[data-variant] {
+  color: var(--vscode-editor-foreground, var(--lv-text));
+  background: var(--vscode-editorWidget-background, var(--lv-surface));
+  box-shadow: inset 0 0 0 1px var(--vscode-contrastBorder, currentColor);
+}
+body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button:is(:hover,:focus-visible) { background: color-mix(in srgb, var(--vscode-editorWidget-background, var(--lv-surface)) 88%, var(--vscode-editor-foreground, var(--lv-text))); }
+body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button:active { background: color-mix(in srgb, var(--vscode-editorWidget-background, var(--lv-surface)) 80%, var(--vscode-editor-foreground, var(--lv-text))); }
+body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button[data-status='copied'] { color: var(--vscode-testing-iconPassed, var(--lv-text)); }
+body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button[data-status='error'] { color: var(--vscode-errorForeground, var(--lv-text)); }
+body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button:focus-visible { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder, currentColor); }
 .lv-app { display: flex; flex-direction: column; height: 100%; min-width: 0; }
 .lv-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 18px clamp(28px, 3vw, 40px) 50px; scrollbar-color: color-mix(in srgb, var(--lv-secondary) 40%, transparent) transparent; scrollbar-width: thin; }
 .lv-reader { --limr-content-width: var(--lv-content-width, 860px); --limr-reader-width: none; --limr-column-gap: 24px; --limr-sidebar-width: minmax(300px, 1fr); --limr-toc-width: clamp(200px, 16%, 260px); --limr-sticky-top: 0px; --limr-reader-bottom-space: 50px; }

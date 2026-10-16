@@ -12,6 +12,7 @@ import { ReaderScrollSync } from './scroll-sync';
 import { ReaderImages } from './images';
 import { readerFrontmatter } from './frontmatter';
 import { useReaderSidebar } from './sidebar';
+import { useReaderViewState } from './reader-view-state';
 
 interface PendingEdit {
   id: string; baseVersion: number; baseSource: string; source: string;
@@ -29,12 +30,14 @@ export function App() {
   const stateRef = useRef(state), pending = useRef<PendingEdit | null>(null);
   const drafts = useRef(new DraftStore());
   const scrollSync = useRef<ReaderScrollSync | null>(null);
+  const sourceScrollInput = useRef<{ generation: number; epoch?: number }>({ generation: 0 });
   const notify = useCallback((message: string, error = false) => {
     post({ type: 'notify', message, error });
   }, []);
   const locale = state?.settings.locale ?? 'en';
   const workspacePlugins = useWorkspacePlugins(state?.plugins ?? noWorkspacePlugins, notify);
   const sidebarEnabled = useReaderSidebar(scrollRoot, state?.settings.sidebarMode ?? 'content', state?.document.uri);
+  useReaderViewState(scrollRoot, state?.document.uri);
   const updateFileSettings = useCallback((fileOverrides: ReaderFileSettings) => {
     const current = stateRef.current;
     if (!current) return;
@@ -68,6 +71,10 @@ export function App() {
         }
       } else if (message.type === 'notice') notify(message.message, message.error);
       else if (message.type === 'reveal') scrollSync.current?.reveal(message.offset);
+      else if (message.type === 'scrollIntent') {
+        if (message.generation >= sourceScrollInput.current.generation) sourceScrollInput.current = message;
+        scrollSync.current?.sourceInput(message.generation, message.epoch);
+      }
     };
     const dispose = listen(receive); post({ type: 'ready' });
     return dispose;
@@ -152,10 +159,12 @@ export function App() {
   useEffect(() => {
     if (!scrollRoot) return;
     const sync = new ReaderScrollSync(scrollRoot, () => !!stateRef.current?.settings.syncScroll,
-      offset => post({ type: 'revealSource', offset }));
+      (offset, epoch, generation) => post({ type: 'revealSource', offset, epoch, generation }), (active, epoch, generation) => post({ type: 'scrollIntent', active, epoch, generation }));
     scrollSync.current = sync;
+    sync.sourceInput(sourceScrollInput.current.generation, sourceScrollInput.current.epoch);
     return () => { sync.dispose(); scrollSync.current = null; };
   }, [scrollRoot]);
+  useEffect(() => { scrollSync.current?.reset(); }, [state?.settings.syncScroll]);
 
   const imageConfiguration = JSON.stringify([state?.settings.imagePathMode, state?.settings.imageBaseFolder, state?.settings.imageSearchPaths]);
   useLayoutEffect(() => {

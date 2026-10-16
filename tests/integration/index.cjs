@@ -65,6 +65,11 @@ exports.run = async function run() {
       try {
         switch (command.action) {
           case 'snapshot': result = snapshot(); break;
+          case 'extensionInfo': {
+            const addon = vscode.extensions.getExtension(command.extensionId);
+            result = addon ? { id: addon.id, active: addon.isActive, extensionUri: addon.extensionUri.toString(), dependencies: addon.packageJSON.extensionDependencies } : undefined;
+            break;
+          }
           case 'configure':
             for (const [key, value] of Object.entries(command.values)) await vscode.workspace.getConfiguration('limr', uri).update(key, value, vscode.ConfigurationTarget.Workspace);
             result = snapshot(); break;
@@ -86,7 +91,7 @@ exports.run = async function run() {
               const destination = path.resolve(workspace, relative);
               assert.ok(destination.startsWith(workspace + path.sep), 'Fixture writes must stay inside the disposable workspace.');
               await fs.mkdir(path.dirname(destination), { recursive: true });
-              await fs.writeFile(destination, content, 'utf8');
+              await fs.writeFile(destination, command.encoding === 'base64' ? Buffer.from(content, 'base64') : content, 'utf8');
             }
             result = snapshot(); break;
           }

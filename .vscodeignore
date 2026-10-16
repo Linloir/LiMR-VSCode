@@ -18,6 +18,7 @@ coverage/**
 .DS_Store
 Thumbs.db
 *.ts
+!api/index.d.ts
 tsconfig.json
 package-lock.json
 .gitignore

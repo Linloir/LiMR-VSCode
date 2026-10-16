@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { rm, writeFile } from 'node:fs/promises';
+import { readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const source = `# Native source highlighting
@@ -45,6 +45,29 @@ const htmlSamples = [
   { label: 'attribute', line: '<callout title="Native callout">', text: 'title' },
   { label: 'value', line: '<callout title="Native callout">', text: '"Native callout"' },
 ];
+const attributeSamples = [
+  { label: 'translation-attribute', role: 'attribute', line: '<translations default=', text: 'default' },
+  { label: 'translation-value', role: 'value', line: '<translations default=', text: '"both"' },
+  { label: 'figures-id', role: 'attribute', line: '<figures id=', text: 'id' },
+  { label: 'figures-id-value', role: 'value', line: '<figures id=', text: '"fv-objectives"' },
+  ...['min-width', 'max-width', 'min-height', 'max-height'].map(text => ({ label: `figures-${text}`, role: 'attribute', line: '<figures id=', text })),
+  { label: 'figures-min-width-value', role: 'value', line: '<figures id=', text: '"160"' },
+  { label: 'figures-max-width-value', role: 'value', line: '<figures id=', text: '"240"' },
+  { label: 'figures-min-height-value', role: 'value', line: '<figures id=', text: '"120"' },
+  { label: 'figures-max-height-value', role: 'value', line: '<figures id=', text: '"240"', occurrence: 2 },
+  ...['src', 'alt', 'caption'].map(text => ({ label: `figure-${text}`, role: 'attribute', line: '<figure src=', text })),
+  { label: 'figure-src-value', role: 'value', line: '<figure src=', text: '"./papers/feature vectors/图1.png"' },
+  { label: 'figure-alt-value', role: 'value', line: '<figure src=', text: '"中文图示 😀"' },
+  { label: 'figure-caption-value', role: 'value', line: '<figure src=', text: '\'Feature-vector "objectives"\'' },
+  { label: 'list-ref-attribute', role: 'attribute', line: '- Source <ref id=', text: 'id' },
+  { label: 'list-ref-value', role: 'value', line: '- Source <ref id=', text: '"fv-paper"' },
+];
+const attributeControls = [
+  { label: 'prose', line: 'Ordinary prose stays unchanged.', text: 'Ordinary prose stays unchanged.' },
+  { label: 'origin', line: '<origin>Original paragraph.', text: 'Original paragraph.' },
+  { label: 'translation', line: '<translation>中文译文段落。', text: '中文译文段落。' },
+  { label: 'list-prose', line: '- Source <ref id=', text: 'supports this point.' },
+];
 const controls = [
   { label: 'plain', line: 'Ordinary **bold prose**', text: 'Ordinary' },
   { label: 'bold', line: 'Ordinary **bold prose**', text: 'bold prose' },
@@ -64,6 +87,15 @@ const palette = {
   annotation: '#C56B79', highlight: '#C29F47', math: '#6898D1',
 };
 const rgb = hex => `rgb(${[1, 3, 5].map(start => Number.parseInt(hex.slice(start, start + 2), 16)).join(', ')})`;
+const luminance = color => {
+  const channels = color.startsWith('#') ? [1, 3, 5].map(start => Number.parseInt(color.slice(start, start + 2), 16)) : color.match(/[\d.]+/g).slice(0, 3).map(Number);
+  const linear = channels.map(channel => { const value = channel / 255; return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4; });
+  return linear.reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+};
+const contrast = (foreground, background) => {
+  const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+};
 
 // Monaco splits lines across TextMate tokens and decoration spans. Measure each
 // character's actual inherited CSS instead of depending on private span names.
@@ -107,6 +139,7 @@ export async function runSyntaxHighlightingAcceptance({ page, host, artifacts, r
   };
   expect(ready.sourceOnly).toBe(true);
   expect(ready.automaticallyActivated).toBe(true);
+  if (process.env.LIMR_TEST_THEME_DIR) expect(ready.themeInstalled).toBe(true);
   const initial = await host('snapshot');
   expect(initial.groups.flatMap(group => group.tabs).some(tab => tab.custom === 'limr.reader')).toBe(false);
   expect(await host('readConfiguration', { keys: ['syntaxHighlighting.enabled'] })).toEqual({ 'syntaxHighlighting.enabled': true });
@@ -141,13 +174,49 @@ export async function runSyntaxHighlightingAcceptance({ page, host, artifacts, r
     await save({ check: `${mode} theme: paired markers, highlight delimiters and math delimiters have visible colors; disabling restores the native grammar; ordinary Markdown, body text, inline/fenced code and comments are unchanged`, disableObservedMs: Date.now() - disabledAt, off: offTokens, on: onTokens });
   }
 
+  // These real user tag shapes used to receive foreground-colored decorations:
+  // checking custom overrides alone concealed the unusable default palette.
+  const attributeSource = await readFile(new URL('../syntax-attributes.md', import.meta.url), 'utf8');
+  await host('replaceSource', { source: attributeSource });
+  const attributeThemes = [
+    { name: 'Default Dark Modern', mode: 'dark-attributes', className: 'vs-dark', attribute: '#61AFEF', value: '#98C379' },
+    { name: 'Default Light Modern', mode: 'light-attributes', className: 'vs', attribute: '#005A9C', value: '#356A24' },
+    { name: 'Default High Contrast', mode: 'hc-dark-attributes', className: 'hc-black', attribute: '#9CDCFE', value: '#B5CEA8' },
+    { name: 'Default High Contrast Light', mode: 'hc-light-attributes', className: 'hc-light', attribute: '#005A9C', value: '#276319' },
+    ...(ready.themeInstalled ? [{ name: 'One Dark Pro', mode: 'one-dark-pro-attributes', className: 'vs-dark', attribute: '#61AFEF', value: '#98C379' }] : []),
+  ];
+  for (const theme of attributeThemes) {
+    await host('configure', { values: { 'syntaxHighlighting.enabled': false } });
+    await host('configureWorkbench', { values: { colorTheme: theme.name, colorCustomizations: {} } });
+    // Wait for theme application, not just the setting write in the host.
+    await expect(page.locator('.monaco-workbench')).toHaveClass(new RegExp(`(?:^|\\s)${theme.className}(?:\\s|$)`));
+    const before = await colors(page, attributeControls);
+    expect(Object.values(before).every(characters => characters?.length)).toBe(true);
+    await host('configure', { values: { 'syntaxHighlighting.enabled': true } });
+    await expect.poll(async () => {
+      const actual = await colors(page, attributeSamples);
+      return Object.fromEntries(Object.entries(actual).map(([key, characters]) => [key, characters?.length ? [...new Set(characters.map(char => char.color))] : null]));
+    }).toEqual(Object.fromEntries(attributeSamples.map(sample => [sample.label, [rgb(theme[sample.role])]])));
+    expect(await colors(page, attributeControls)).toEqual(before);
+    const background = await page.evaluate(() => getComputedStyle(document.querySelector('.monaco-workbench')).getPropertyValue('--vscode-editor-background').trim());
+    const ratios = Object.fromEntries(['attribute', 'value'].map(role => [role, contrast(theme[role], background)]));
+    expect(ratios.attribute).toBeGreaterThanOrEqual(4.5);
+    expect(ratios.value).toBeGreaterThanOrEqual(4.5);
+    expect(rgb(theme.attribute)).not.toBe(before.prose[0].color);
+    expect(rgb(theme.value)).not.toBe(before.prose[0].color);
+    expect(theme.attribute).not.toBe(theme.value);
+    await screenshot(theme.mode);
+    await save({ check: `${theme.name}: all 20 translation/figures/figure/list-ref attribute and quoted-value samples use distinct readable default colors; prose is unchanged`, background, colors: { attribute: theme.attribute, value: theme.value }, contrast: ratios });
+  }
+  await host('replaceSource', { source });
+
   await host('configureWorkbench', { values: { colorTheme: 'Default Dark Modern', colorCustomizations: Object.fromEntries(Object.entries(palette).map(([role, hex]) => [`limr.syntax.${role}`, hex])) } });
   await host('configure', { values: { 'syntaxHighlighting.enabled': true } });
   await assertPalette();
   await screenshot('custom-colors');
   await save({ check: 'All seven contributed syntax colors reach actual native editor glyphs, including attributes/values and annotation boundaries', palette });
 
-  // LiMR 1.2.2's MDX parser falls back to raw HTML in a document containing an
+  // LiMR 1.2.3's MDX parser falls back to raw HTML in a document containing an
   // HTML comment. Verify JSX in a separate valid document, and keep the literal
   // comment controls above to check that we respect that parser's boundaries.
   await host('replaceSource', { source: source.replace(/<!--[^\n]*-->\n/, '') });

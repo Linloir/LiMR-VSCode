@@ -1,5 +1,6 @@
 import { deleteAnnotations, highlightPalette, highlightSelection, ToolIcon, type ActionContext, type SelectionAction } from '@linloir/limr';
 import { buildAIContext, reusableRangeIds } from '../src/shared/ai-context';
+import { shortAnnotationId } from '../src/shared/annotation-ids';
 import type { ReaderDocument } from '../src/shared/protocol';
 import { copyClipboard } from './bridge';
 
@@ -20,7 +21,7 @@ export function readerActions(options: ActionOptions): SelectionAction[] {
     visible: writable, disabled: () => options.isBusy(),
     run: context => {
       if (!writable(context) || options.isBusy()) return;
-      context.addAnnotation({ id: `${type}-${crypto.randomUUID()}`, type, data: { body: '' },
+      context.addAnnotation({ id: shortAnnotationId(context.document), type, data: { body: '' },
         anchors: context.selection.syntax.ranges.map(range => ({ range, documentId: context.document.id, quote: context.document.source.slice(range.start, range.end) })),
       }, { target: 'source', edit: true });
       context.clearSelection();
