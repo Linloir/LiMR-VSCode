@@ -131,6 +131,32 @@ A request that can be answered from stored results.
 
 Callouts use `> [!type]`, optionally `+` for initially expanded or `-` for initially collapsed. Common types include `note`, `tip`, `warning`, `info`, and `question`. Exercise answer indices are zero-based; `multi="true"` allows multiple answers. A `definition` can use `title` and `content` children for richer Markdown instead of a plain title attribute.
 
+## Paper figures
+
+When authoring LiMR Markdown for papers or research notes, prefer a standalone `figure` for one captioned illustration and `figures` for related panels or comparisons. Use one image per `figure`; preserve the paper's figure number, panel labels, captions, and real image paths. Add meaningful `alt` text. A `caption` attribute suits a short plain caption; a `figcaption` child supports Markdown, formulas, and citation markup. Use an `id` when the text needs an in-page reference. Do not invent figure numbers or findings that the source does not provide.
+
+```markdown
+<figure id="cache-overview" src="./cache-overview.png" alt="Cache lookup before a network request" caption="Figure 1. Cache lookup workflow." />
+
+<figures id="cache-comparison" columns="2">
+
+<figure src="./cache-hit.png" alt="Cache hit" caption="(a) Reuse the stored result." />
+
+<figure src="./cache-miss.png" alt="Cache miss">
+
+<figcaption>**(b)** Send a network request when the result is absent.</figcaption>
+
+</figure>
+
+<figcaption>**Figure 2.** Two cache outcomes.</figcaption>
+
+</figures>
+```
+
+Image paths and captions here are illustrative; use the document's real assets and supplied evidence. Figures also accept nested Markdown images. Keep unrelated illustrations separate. Ordinary Markdown images are appropriate when no figure layout or caption is needed.
+
+## Extra links and video
+
 ```markdown
 <extras>
 
@@ -138,20 +164,10 @@ Callouts use `> [!type]`, optionally `+` for initially expanded or `-` for initi
 
 </extras>
 
-<figures columns="2">
-
-<figure src="./cache-hit.png" alt="Cache hit" caption="A stored result." />
-
-<figure src="./cache-miss.png" alt="Cache miss" caption="A network request." />
-
-<figcaption>Two cache outcomes.</figcaption>
-
-</figures>
-
 <video src="./demo.mp4" provider="native" title="Demonstration" loading="click" />
 ```
 
-Image/video paths are illustrative; retain or supply real assets for the document. Figures also accept nested Markdown images and `caption` / `figcaption` children. `md-video` is a video alias; video `url` takes precedence over `src`.
+Video paths are illustrative; retain or supply real assets for the document. `md-video` is a video alias; video `url` takes precedence over `src`.
 
 ## Component forms and literal examples
 

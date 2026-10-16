@@ -11,6 +11,7 @@ import { PluginBoundary, useWorkspacePlugins } from './plugins';
 import { ReaderScrollSync } from './scroll-sync';
 import { ReaderImages } from './images';
 import { readerFrontmatter } from './frontmatter';
+import { ImagePreviewProvider, readerImagePreview } from './image-preview';
 import { useReaderSidebar } from './sidebar';
 import { useReaderViewState } from './reader-view-state';
 
@@ -116,7 +117,7 @@ export function App() {
   const extensions = useMemo(() => [
     ...standard().filter(extension => extension.name !== 'code-highlight'),
     codeHighlight({ lightTheme: playground ? 'github-light' : 'light-plus', darkTheme: playground ? 'github-dark' : oneDark ? 'one-dark-pro' : 'dark-plus' }),
-    readerFrontmatter(), readingAnnotations(locale), languageTypography(), readerTranslations(),
+    readerFrontmatter(), readingAnnotations(locale), languageTypography(), readerTranslations(), readerImagePreview(),
   ], [oneDark, playground, locale]);
 
   useLayoutEffect(() => {
@@ -147,14 +148,21 @@ export function App() {
     const click = (event: MouseEvent) => {
       const anchor = event.target instanceof Element ? event.target.closest('a') : null;
       const href = anchor?.getAttribute('href');
-      if (!href || event.defaultPrevented) return;
+      if (!href || (event.type === 'auxclick' && event.button !== 1)) return;
+      // VS Code's window listener forwards links even when defaultPrevented.
+      // Also contain anchors already handled by LiMR or a plugin below us.
+      event.stopPropagation();
+      if (event.defaultPrevented) return;
       event.preventDefault();
       if (href.startsWith('#')) {
         let id = href.slice(1); try { id = decodeURIComponent(id); } catch { /* literal anchor */ }
-        document.getElementById(id)?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+        const target = document.getElementById(id) ?? document.getElementById(`${stateRef.current?.document.uri}-${id}`);
+        target?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
       } else post({ type: 'openLink', href });
     };
-    document.addEventListener('click', click); return () => document.removeEventListener('click', click);
+    document.addEventListener('click', click);
+    document.addEventListener('auxclick', click);
+    return () => { document.removeEventListener('click', click); document.removeEventListener('auxclick', click); };
   }, []);
   useEffect(() => {
     if (!scrollRoot) return;
@@ -191,12 +199,14 @@ export function App() {
     <div className="lv-scroll" ref={setScrollRoot} data-testid="reader-scroll">
       <EditorContext.Provider value={editorSession}>
         <TranslationPreferences.Provider value={{ settings: state.settings, update: updateFileSettings }}>
+        <ImagePreviewProvider key={state.document.uri} locale={locale}>
         <PluginBoundary plugins={workspacePlugins} notify={notify}>{plugins => <Reader key={state.document.uri} className={`lv-reader${centeredToc ? ' lv-centered-toc' : ''}`} source={source} documentId={state.document.uri}
           theme={isDark ? 'dark' : 'light'} appearance={playground ? 'classic' : 'vscode'} locale={locale === 'zh-CN' ? chinese : english} extensions={extensions} plugins={plugins}
           actions={actions} annotations={noExternalAnnotations} onSourceChange={editingEnabled ? editSource : undefined}
           typography={state.settings.typography}
           sidebar={sidebarEnabled} sidebarBreakpoint={tocVisible ? 1120 : 900} sidebarCollapse={state.settings.sidebarAutoCollapse} toc={tocVisible}
           scrollRoot={scrollRoot} scrollOffset={18} />}</PluginBoundary>
+        </ImagePreviewProvider>
         </TranslationPreferences.Provider>
       </EditorContext.Provider>
       {!source.trim() && <div className="lv-empty"><ToolIcon name="note" /><p>{locale === 'zh-CN' ? '这份 Markdown 还是空白。' : 'This Markdown document is empty.'}</p><button type="button" onClick={() => post({ type: 'openSource' })}><span className="limr-underline">{locale === 'zh-CN' ? '在编辑器中开始书写' : 'Start writing in the editor'}</span></button></div>}

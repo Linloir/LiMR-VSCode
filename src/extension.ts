@@ -17,7 +17,7 @@ import type { HostMessage, ReaderState, WebviewMessage, ReaderFileSettings, Read
 
 const viewType = 'limr.reader';
 const localized = (uri: vscode.Uri | undefined, zh: string, en: string) => readerLocale(vscode.workspace.getConfiguration('limr', uri).get('language', 'auto')) === 'zh-CN' ? zh : en;
-const isMarkdown = (document: vscode.TextDocument) => document.languageId === 'markdown' || /\.(?:md|markdown)$/i.test(document.uri.path);
+const isMarkdown = (document: vscode.TextDocument) => /^(?:markdown|prompt|instructions|chatagent|skill)$/.test(document.languageId) || /\.(?:md|markdown)$/i.test(document.uri.path);
 interface ReaderScrollTarget {
   offset: number; from: number; last: number; direction: number; smooth: boolean; released: boolean;
   timer: ReturnType<typeof setTimeout>;
@@ -432,10 +432,17 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       }
     }));
   }
-  async openSource(uri: vscode.Uri, offset?: number): Promise<void> {
+  private fileViewColumn(uri: vscode.Uri, readerColumn = vscode.window.tabGroups.activeTabGroup.viewColumn): vscode.ViewColumn {
+    const others = vscode.window.tabGroups.all.filter(group => group.viewColumn !== readerColumn);
+    // Reuse even a background tab in another group; the reader keeps its group.
+    const existing = others.find(group => group.tabs.some(tab =>
+      (tab.input instanceof vscode.TabInputText || tab.input instanceof vscode.TabInputCustom) && tab.input.uri.toString() === uri.toString()));
+    return existing?.viewColumn ?? others.sort((a, b) => Math.abs(a.viewColumn - readerColumn) - Math.abs(b.viewColumn - readerColumn))[0]?.viewColumn ?? vscode.ViewColumn.Beside;
+  }
+  async openSource(uri: vscode.Uri, offset?: number, readerColumn?: vscode.ViewColumn): Promise<void> {
     const document = await vscode.workspace.openTextDocument(uri);
-    const existing = vscode.window.visibleTextEditors.find(editor => editor.document.uri.toString() === uri.toString());
-    const editor = await vscode.window.showTextDocument(document, { viewColumn: existing?.viewColumn ?? vscode.ViewColumn.Beside, preview: false });
+    const existing = readerColumn === undefined ? vscode.window.visibleTextEditors.find(editor => editor.document.uri.toString() === uri.toString()) : undefined;
+    const editor = await vscode.window.showTextDocument(document, { viewColumn: existing?.viewColumn ?? this.fileViewColumn(uri, readerColumn), preview: false });
     if (Number.isSafeInteger(offset)) {
       const position = document.positionAt(Math.max(0, offset!)); editor.selection = new vscode.Selection(position, position);
       editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
@@ -557,7 +564,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
         if (typeof message.text !== 'string') return;
         await vscode.env.clipboard.writeText(message.text);
         void vscode.window.showInformationMessage(this.text(document.uri, 'LiMR：已复制文本上下文，可粘贴给 AI 助手。', 'LiMR: Context copied. Paste it into your AI assistant.')); break;
-      case 'openLink': if (typeof message.href === 'string') await this.openLink(document.uri, message.href); break;
+      case 'openLink': if (typeof message.href === 'string') await this.openLink(document.uri, message.href, panel.viewColumn); break;
     }
   }
   private async applySourceEdit(document: vscode.TextDocument, panel: vscode.WebviewPanel, message: Extract<WebviewMessage, { type: 'edit' }>): Promise<void> {
@@ -576,14 +583,16 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       this.post(panel, { type: 'editResult', requestId: message.requestId, success: false, error: error instanceof Error ? error.message : String(error), state: this.state(document, panel.webview) });
     }
   }
-  private async openLink(documentUri: vscode.Uri, href: string): Promise<void> {
+  private async openLink(documentUri: vscode.Uri, href: string, readerColumn?: vscode.ViewColumn): Promise<void> {
     const link = resolveReaderLink({ documentUri: documentUri.toString(), workspaceUri: vscode.workspace.getWorkspaceFolder(documentUri)?.uri.toString(), href });
     if (link.kind === 'external') { await vscode.env.openExternal(vscode.Uri.parse(link.uri)); return; }
     if (link.kind === 'anchor') return;
     const uri = vscode.Uri.parse(link.uri);
-    if (!/\.(?:md|markdown)$/i.test(uri.path) && link.line === undefined) { await vscode.commands.executeCommand('vscode.open', uri); return; }
+    if (!/\.(?:md|markdown)$/i.test(uri.path) && link.line === undefined) {
+      await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: this.fileViewColumn(uri, readerColumn), preview: false }); return;
+    }
     const doc = await vscode.workspace.openTextDocument(uri);
-    await this.openSource(uri, link.line ? doc.offsetAt(new vscode.Position(link.line - 1, 0)) : undefined);
+    await this.openSource(uri, link.line ? doc.offsetAt(new vscode.Position(link.line - 1, 0)) : undefined, readerColumn);
   }
   private html(webview: vscode.Webview): string {
     const nonce = randomBytes(24).toString('base64');

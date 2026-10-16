@@ -24,7 +24,11 @@
   ],
   "activationEvents": [
     "onCustomEditor:limr.reader",
-    "onLanguage:markdown"
+    "onLanguage:markdown",
+    "onLanguage:prompt",
+    "onLanguage:instructions",
+    "onLanguage:chatagent",
+    "onLanguage:skill"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -60,7 +64,7 @@
         "command": "limr.openPreviewToSide",
         "title": "%limr.openPreviewToSide%",
         "category": "LiMR",
-        "icon": "$(open-preview)"
+        "icon": "$(book)"
       },
       {
         "command": "limr.openSource",
@@ -152,7 +156,7 @@
       "editor/title": [
         {
           "command": "limr.openPreviewToSide",
-          "when": "resourceLangId == markdown && activeCustomEditorId != limr.reader",
+          "when": "(resourceLangId =~ /^(markdown|prompt|instructions|chatagent|skill)$/ || resourceExtname =~ /^\\.(md|markdown)$/i) && activeCustomEditorId != limr.reader",
           "group": "navigation@1",
           "alt": "markdown.showPreviewToSide"
         },
@@ -193,14 +197,14 @@
         },
         {
           "submenu": "limr.previewMenu",
-          "when": "resourceLangId == markdown && activeCustomEditorId != limr.reader",
+          "when": "(resourceLangId =~ /^(markdown|prompt|instructions|chatagent|skill)$/ || resourceExtname =~ /^\\.(md|markdown)$/i) && activeCustomEditorId != limr.reader",
           "group": "3_open"
         }
       ],
       "explorer/context": [
         {
           "command": "limr.openPreviewToSide",
-          "when": "resourceExtname == .md || resourceExtname == .markdown",
+          "when": "resourceExtname =~ /^\\.(md|markdown)$/i",
           "group": "navigation"
         }
       ],
@@ -662,7 +666,7 @@
     "test": "vitest run",
     "test:browser": "npm run test:vscode",
     "test:vscode": "node scripts/test-vscode.mjs",
-    "package": "vsce package --no-dependencies --no-rewrite-relative-links -o artifacts/limr-vscode-1.0.1.vsix",
+    "package": "vsce package --no-dependencies --githubBranch main -o artifacts/limr-vscode-1.0.1.vsix",
     "vscode:prepublish": "npm run build",
     "test:animations": "node scripts/test-vscode.mjs --animations",
     "test:regressions": "node scripts/test-vscode.mjs --regressions",
@@ -670,6 +674,9 @@
     "test:syntax": "node scripts/test-vscode.mjs --syntax-highlighting",
     "test:installed-icon": "node scripts/test-installed-icon.mjs",
     "test:features": "node scripts/test-vscode.mjs --features",
+    "test:navigation": "node scripts/test-vscode.mjs --navigation",
+    "test:image-preview": "node scripts/test-vscode.mjs --image-preview",
+    "test:annotations": "node scripts/test-vscode.mjs --annotations",
     "test:frontmatter": "node scripts/test-vscode.mjs --frontmatter",
     "test:skills": "node scripts/test-vscode.mjs --skills",
     "test:plugins": "node scripts/test-vscode.mjs --extension-plugins",

@@ -1,6 +1,6 @@
 ---
 name: limr-annotations
-description: Read and edit LiMR 1.2.3 Markdown annotations, citations, and paragraph translations, answer copied question context, and customize the VS Code reader with workspace plugins or installed add-on extensions.
+description: Read and author LiMR 1.2.3 Markdown, write answers back as highlighted question annotations across original/translated passages, and customize the VS Code reader with plugins.
 ---
 
 # LiMR annotations and reader customization
@@ -13,6 +13,7 @@ Annotations live in Markdown. Read [the source annotation contract](references/s
 - For other annotations, prefer a nonempty phrase, sentence, or paragraph that explains the note's scope. Avoid isolated punctuation, arbitrary fragments, or a whole section when a shorter complete unit is sufficient. Honor an explicit user selection; choose broader, disjoint, or zero-length ranges when the task calls for them.
 - When several annotations concern the same exact text, reuse its existing named range and add only the new definitions. Do not create duplicate overlapping boundary pairs merely because the annotation type differs. Check every occurrence before reusing an ID.
 - Pair translations by paragraph: keep each complete original paragraph and its translation in one `translations` block. Avoid word-by-word or sentence-by-sentence fragments unless the user requests that granularity; a naturally single-sentence paragraph is still a paragraph.
+- When generating LiMR Markdown for papers or research notes, prefer `figure` for a single captioned image and `figures` for related panels. Preserve real image paths, figure numbers, panel labels, and supplied captions; use `figcaption` for rich Markdown captions. See the syntax guide's [figure examples](references/limr-syntax.md#paper-figures). Ordinary Markdown images remain suitable for uncaptioned images.
 
 ## Read and locate
 
@@ -25,9 +26,12 @@ Annotations live in Markdown. Read [the source annotation contract](references/s
 
 Answer the user's actual question. If no question was supplied, request it and create no annotation yet.
 
-If the user asks to record the question, or a submitted LiMR context explicitly sets `allowSourceEdits: true`, write a `type="question"` definition to that Markdown file. With `allowSourceEdits: false`, answer without automatic writeback unless the user separately requests it. Copying context is not a send-time callback.
+For a reading question tied to an identified Markdown passage, answering with this skill includes writing the result back to that document. A submitted context with `allowSourceEdits: true` requests this writeback; complete it without another confirmation. Honor an explicit request not to edit, and with `allowSourceEdits: false` answer without automatic writeback unless the user separately requests it. Copying context is not a send-time callback.
 
-Keep the original question intact if appending an answer. Reuse existing range IDs for the exact selected text. Give a new question a new annotation ID unless updating a specified question. Preserve other notes and highlight settings. Add an explicit `highlight` definition only when the user wants persistent highlighting and the range has no configured highlight; do not override an existing hidden/color/style choice.
+- After composing the answer, save **both the user's actual question and your answer** in the Markdown body of one `type="question"` annotation, with clearly separated Question/Answer (or 问题/回答) sections. Retain useful explanations, formulas, and supporting links from the answer; do not save only a question or a placeholder. Preserve the original question and earlier answers when extending an existing annotation. Give a new question a new annotation ID unless updating a specified one.
+- Bind that question annotation and an explicit `type="highlight"` annotation to the same meaningful text ranges. Add a visible highlight where no explicit highlight is configured. Reuse exact existing ranges and highlights, preserving their hidden/color/style choices and unrelated notes.
+- If a selected passage is inside `translations`, read **both** its `origin` and `translation`, including whichever side is hidden in the reader. Locate the semantically corresponding phrase or sentence on the other side. Use distinct range IDs for the two spans, and reference both from the **same question annotation ID** and shared highlight definition; do not duplicate the question/answer body. Extend an existing question's anchors when appropriate. Keep the paragraph blocks and wording intact; do not select the surrounding tags or an entire paragraph merely to avoid matching a shorter passage. If the counterpart is absent or genuinely ambiguous, do not invent text or a match; explain the unmatched part and request only the clarification needed.
+- Follow the [bilingual writeback example](references/source-annotations.md#question-writeback-and-bilingual-anchors). Re-read and reparse the result: question and answer must survive, both ranges must resolve, and unrelated text/annotations must remain intact. Report the file and annotation IDs actually written; if writing was unavailable or failed, say so instead of claiming completion.
 
 Optional scalar fields include `agent`, `threadId`, and `turnId`. Set conversation IDs only from reliable current runtime/tool context or explicit user input. Do not infer them from workspace files or fabricate them. A question needs no conversation ID to work; metadata never authorizes contacting a service.
 

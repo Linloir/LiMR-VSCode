@@ -85,6 +85,41 @@ Only the last highlight targeting a range takes effect. Preserve document order 
 
 Put the question in the body, not a `question` attribute. `agent="codex"`, `threadId`, and `turnId` are optional scalar metadata. Use the actual agent name and verified current conversation identifiers only. Preserve existing metadata when editing a body. Never fill unavailable conversation IDs with placeholders or arbitrary UUIDs. New annotation IDs may be UUIDs.
 
+## Question writeback and bilingual anchors
+
+An answered reading question stores the actual question and answer together in one `question` body, plus explicit highlighting on the referenced text. For a translation block, locate the corresponding semantic span in each language and give each side its own range ID. One question definition and one shared highlight reference both IDs. This also works when the reader currently displays only one language.
+
+```markdown
+<translations id="cache-paragraph" default="both">
+
+<origin>
+
+The cache ::%%limr%%{<#cache-origin}avoids repeated network requests::%%limr%%{>#cache-origin}.
+
+</origin>
+
+<translation>
+
+缓存::%%limr%%{<#cache-translation}避免重复的网络请求::%%limr%%{>#cache-translation}。
+
+</translation>
+
+</translations>
+
+:::limr-annotation{#h-cache ranges="cache-origin cache-translation" type="highlight" style="background" color="#E5C07B" hidden="false"}
+:::
+
+:::limr-annotation{#q-cache ranges="cache-origin cache-translation" type="question"}
+### 问题
+为什么缓存可以减少网络请求？
+
+### 回答
+缓存保存先前请求的结果。后续请求命中仍有效的缓存时，可以直接复用该结果，因此不必再次发送网络请求；未命中或缓存过期时仍需请求。
+:::
+```
+
+Reuse a suitable existing range on either side only after checking all of its occurrences. If a counterpart already has an explicit highlight, preserve that definition and its appearance instead of appending an overriding highlight. Add highlighting only for uncovered ranges. When extending a question, retain its ID, metadata, existing anchors, and previous question/answer text; do not create separate copies for the two languages. Multi-range definitions may have other anchors, which must not be removed by this extension. Verify that both nonempty anchors resolve inside their respective language sections after reparsing.
+
 ## Source changes
 
 1. Read the latest source. An additional annotation on an exact existing range only needs a definition.

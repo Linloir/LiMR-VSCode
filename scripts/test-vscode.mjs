@@ -20,6 +20,7 @@ import { runSkillAcceptance } from '../tests/browser/skills.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillSuite = process.env.LIMR_TEST_SUITE === 'skills' || process.argv.includes('--skills');
 const syntaxSuite = process.env.LIMR_TEST_SUITE === 'syntax-highlighting' || process.argv.includes('--syntax-highlighting');
+const navigationSuite = process.env.LIMR_TEST_SUITE === 'navigation' || process.argv.includes('--navigation');
 const extensionPluginSuite = process.env.LIMR_TEST_SUITE === 'extension-plugins' || process.argv.includes('--extension-plugins');
 const artifacts = process.env.LIMR_TEST_ARTIFACTS ? path.resolve(root, process.env.LIMR_TEST_ARTIFACTS) : path.join(root, 'artifacts', 'test-vscode');
 const temporary = await mkdtemp(path.join(process.env.LIMR_TEST_TEMP_ROOT ?? os.tmpdir(), 'limr-vscode-test-'));
@@ -27,7 +28,7 @@ const ipc = path.join(temporary, 'ipc');
 const workspace = path.join(temporary, 'workspace');
 const userData = path.join(temporary, 'profile');
 const extensionDirectory = path.join(temporary, 'extensions');
-const fixture = path.join(workspace, 'reader.md');
+const fixture = path.join(workspace, navigationSuite ? 'SKILL.md' : 'reader.md');
 const source = '# LiMR acceptance\n\nBefore **selected words** after. 中文字体测试。\n\n- [ ] An editable task\n\n```typescript\nconst answer = 42;\n```\n';
 await Promise.all([mkdir(ipc), mkdir(workspace), mkdir(path.join(userData, 'User'), { recursive: true }), mkdir(extensionDirectory), mkdir(artifacts, { recursive: true })]);
 // A failed rerun must not leave a previous success report at the current path.
@@ -126,7 +127,15 @@ if (skillSuite) {
 const port = await new Promise(resolve => { const server = createServer(); server.listen(0, '127.0.0.1', () => { const port = server.address().port; server.close(() => resolve(port)); }); });
 const output = [];
 const environment = { ...process.env, LIMR_TEST_IPC: ipc, LIMR_TEST_DOCUMENT: fixture, LIMR_TEST_THEME: theme,
-  ...(syntaxSuite ? { LIMR_TEST_SOURCE_ONLY: '1' } : {}) };
+  ...(syntaxSuite || navigationSuite ? { LIMR_TEST_SOURCE_ONLY: '1' } : {}) };
+const externalOpens = path.join(temporary, 'external-opens.jsonl');
+if (navigationSuite) {
+  // Observe real openExternal requests without launching the user's browser.
+  const bin = path.join(temporary, 'bin'); await mkdir(bin);
+  await writeFile(externalOpens, '');
+  await writeFile(path.join(bin, 'xdg-open'), `#!${process.execPath}\nrequire('node:fs').appendFileSync(${JSON.stringify(externalOpens)}, JSON.stringify(process.argv.slice(2)) + '\\n');\n`, { mode: 0o755 });
+  environment.PATH = `${bin}${path.delimiter}${environment.PATH}`;
+}
 if (process.env.LIMR_TEST_FONT_DIR) {
   const escapeXml = value => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
   const fontConfig = path.join(temporary, 'fonts.conf');
@@ -179,13 +188,16 @@ try {
   console.log(`Extension host ready: ${JSON.stringify(ready)}`);
   const page = await until(async () => browser.contexts().flatMap(context => context.pages()).find(page => page.url().includes('workbench')));
   await page.setViewportSize({ width: 1920, height: 1080 });
-  const frame = syntaxSuite ? undefined : await until(async () => { for (const frame of page.frames()) if (await frame.locator('.limr-reader').count().catch(() => 0)) return frame; }, 60_000);
+  const frame = syntaxSuite || navigationSuite ? undefined : await until(async () => { for (const frame of page.frames()) if (await frame.locator('.limr-reader').count().catch(() => 0)) return frame; }, 60_000);
   await page.bringToFront();
   for (const target of (process.env.LIMR_TEST_NO_FOCUS_EMULATION ? [] : [page, ...(frame ? [frame] : [])])) {
     const session = await page.context().newCDPSession(target).catch(() => undefined);
     if (session) await session.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   }
   const runAcceptance = skillSuite ? runSkillAcceptance
+    : process.env.LIMR_TEST_SUITE === 'annotations' || process.argv.includes('--annotations') ? (await import('../tests/browser/annotations.mjs')).runAnnotationAcceptance
+    : navigationSuite ? (await import('../tests/browser/navigation.mjs')).runNavigationAcceptance
+    : process.env.LIMR_TEST_SUITE === 'image-preview' || process.argv.includes('--image-preview') ? (await import('../tests/browser/image-preview.mjs')).runImagePreviewAcceptance
     : syntaxSuite ? (await import('../tests/browser/syntax-highlighting.mjs')).runSyntaxHighlightingAcceptance
     : extensionPluginSuite ? (await import('../tests/browser/extension-plugins.mjs')).runExtensionPluginsAcceptance
     : process.env.LIMR_TEST_SUITE === 'images' || process.argv.includes('--images') ? (await import('../tests/browser/images.mjs')).runImageAcceptance
@@ -199,7 +211,7 @@ try {
     : process.env.LIMR_TEST_SUITE === 'sidebar-motion' ? runSidebarMotionAcceptance
     : process.env.LIMR_TEST_SUITE === 'block-motion' ? runBlockMotion
     : process.env.LIMR_TEST_SUITE === 'animations' || process.argv.includes('--animations') ? runAnimationAcceptance : runReaderAcceptance;
-  const evidence = await runAcceptance({ browser, page, frame, host, source, fixture, artifacts, theme, ready });
+  const evidence = await runAcceptance({ browser, page, frame, host, source, fixture, artifacts, theme, ready, externalOpens });
   await writeFile(path.join(artifacts, 'result.json'), JSON.stringify({ ...ready, theme, fixture, build, suite: runAcceptance.name, clientUserAgent: await page.evaluate(() => navigator.userAgent), evidence }, null, 2));
   await Promise.all(['failure.png', 'failure.log'].map(name => rm(path.join(artifacts, name), { force: true })));
   await host('finish');

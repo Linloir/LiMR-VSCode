@@ -37,14 +37,15 @@ exports.run = async function run() {
     assert.ok(vscode.window.tabGroups.all.length >= 2, 'Source and reader are open in separate editor groups.');
     assert.ok(vscode.window.tabGroups.all.some(group => group.tabs.some(tab => tab.input instanceof vscode.TabInputCustom && tab.input.viewType === 'limr.reader')));
   }
-  await writeJson(path.join(directory, 'ready.json'), { version: vscode.version, platform: process.platform, remoteName: vscode.env.remoteName, trusted: vscode.workspace.isTrusted, groups: vscode.window.tabGroups.all.length, theme: vscode.workspace.getConfiguration('workbench').get('colorTheme'), themeInstalled: !!vscode.extensions.getExtension('zhuangtongfa.material-theme'), sourceOnly, automaticallyActivated: sourceOnly && extension.isActive });
+  await writeJson(path.join(directory, 'ready.json'), { version: vscode.version, platform: process.platform, remoteName: vscode.env.remoteName, trusted: vscode.workspace.isTrusted, groups: vscode.window.tabGroups.all.length, theme: vscode.workspace.getConfiguration('workbench').get('colorTheme'), themeInstalled: !!vscode.extensions.getExtension('zhuangtongfa.material-theme'), sourceOnly, language: document.languageId, automaticallyActivated: sourceOnly && extension.isActive });
 
   const snapshot = () => ({
     source: document.getText(), version: document.version, isDirty: document.isDirty,
     editingEnabled: vscode.workspace.getConfiguration('limr', uri).get('editingEnabled'),
     activeCustom: vscode.window.tabGroups.activeTabGroup.activeTab?.input instanceof vscode.TabInputCustom ? vscode.window.tabGroups.activeTabGroup.activeTab.input.viewType : undefined,
     visibleRanges: vscode.window.visibleTextEditors.filter(editor => editor.document.uri.toString() === uri.toString()).flatMap(editor => editor.visibleRanges.map(range => ({ start: range.start.line, end: range.end.line }))),
-    groups: vscode.window.tabGroups.all.map(group => ({ viewColumn: group.viewColumn, tabs: group.tabs.map(tab => ({ label: tab.label, custom: tab.input instanceof vscode.TabInputCustom ? tab.input.viewType : undefined, webview: tab.input instanceof vscode.TabInputWebview ? tab.input.viewType : undefined })) })),
+    activeEditor: vscode.window.activeTextEditor && { uri: vscode.window.activeTextEditor.document.uri.toString(), language: vscode.window.activeTextEditor.document.languageId, line: vscode.window.activeTextEditor.selection.active.line },
+    groups: vscode.window.tabGroups.all.map(group => ({ viewColumn: group.viewColumn, active: group.isActive, tabs: group.tabs.map(tab => ({ label: tab.label, active: tab.isActive, uri: tab.input.uri?.toString(), custom: tab.input instanceof vscode.TabInputCustom ? tab.input.viewType : undefined, webview: tab.input instanceof vscode.TabInputWebview ? tab.input.viewType : undefined })) })),
   });
   let scrollSeries;
   const scrollEvents = [];
@@ -102,7 +103,7 @@ exports.run = async function run() {
             for (const [key, value] of Object.entries(command.values)) await vscode.workspace.getConfiguration('editor', document).update(key, value, vscode.ConfigurationTarget.Workspace);
             result = snapshot(); break;
           case 'command': {
-            const execution = vscode.commands.executeCommand(command.command, uri);
+            const execution = vscode.commands.executeCommand(command.command, ...(command.args ?? [uri]));
             if (command.wait === false) { execution.then(undefined, error => console.error(error)); result = { started: true }; }
             else { await execution; result = snapshot(); }
             break;
@@ -127,11 +128,20 @@ exports.run = async function run() {
             result = { ...snapshot(), scratch: { uri: scratch.uri.toString(), language: scratch.languageId, source: scratch.getText() } }; break;
           }
           case 'activateSource': await vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.One, preview: false }); result = snapshot(); break;
+          case 'openRelativeSource': {
+            const folder = vscode.workspace.getWorkspaceFolder(uri)?.uri ?? vscode.Uri.file(path.dirname(uri.fsPath));
+            const target = vscode.Uri.joinPath(folder, command.relative);
+            assert.ok(target.fsPath.startsWith(folder.fsPath + path.sep), 'Source fixtures must stay inside the disposable workspace.');
+            let doc = await vscode.workspace.openTextDocument(target);
+            if (command.language) doc = await vscode.languages.setTextDocumentLanguage(doc, command.language);
+            await vscode.window.showTextDocument(doc, { viewColumn: command.viewColumn ?? vscode.ViewColumn.One, preview: false });
+            result = snapshot(); break;
+          }
           case 'openRelativeReader': {
             const folder = vscode.workspace.getWorkspaceFolder(uri)?.uri ?? vscode.Uri.file(path.dirname(uri.fsPath));
             const target = vscode.Uri.joinPath(folder, command.relative);
             assert.ok(target.fsPath.startsWith(folder.fsPath + path.sep), 'Reader fixtures must stay inside the disposable workspace.');
-            await vscode.commands.executeCommand('vscode.openWith', target, 'limr.reader', { viewColumn: vscode.ViewColumn.Two, preview: false });
+            await vscode.commands.executeCommand('vscode.openWith', target, 'limr.reader', { viewColumn: command.viewColumn ?? vscode.ViewColumn.Two, preview: false });
             result = snapshot(); break;
           }
           case 'reopenReader': {

@@ -2,135 +2,250 @@
 
 <img src="media/limr-icon.png" alt="LiMR" width="96" />
 
-[English](README.en.md)
+[English](#english) · [LiMR GitHub](https://github.com/Linloir/LiMR) · [在线 Playground](https://linloir.github.io/LiMR/) · [扩展源码](https://github.com/Linloir/LiMR-VSCode)
 
-基于 **@linloir/limr 1.2.3** 的 Markdown 阅读器。源代码编辑器与阅读界面可以并排显示；旁注、提问和高亮直接保存在 Markdown 中，可随 Git 追踪。
+## 这是什么
 
-## 安装与打开
+LiMR 是一个注重阅读体验的 Markdown 阅读器。这个扩展将 [LiMR](https://github.com/Linloir/LiMR) 带进 VS Code，让技术文档、学习笔记、论文摘录和 `SKILL.md` 都有舒适的阅读界面，源码与阅读器可以并排使用。
 
-使用扩展面板的 **从 VSIX 安装…** 选择 `limr-vscode-1.0.1.vsix`。打开 `.md` 或 `.markdown` 文件，点击编辑器右上角的阅读器按钮，或执行：
+- **开箱即用的外观**：内置中文衬线字体与等宽代码字体，提供浅色、深色及跟随 VS Code 的主题；正文宽度、目录和旁注栏随可用空间调整。
+- **丰富的内容表达**：支持代码高亮、数学公式、Mermaid 图表，以及提示、定义、引用来源、段落翻译等特殊语法块。文件开头的 YAML 元信息自动展示为信息卡片。
+- **直接写回 Markdown 的标注**：划选文字可添加高亮、旁注与提问，保存在原文件中，支持 VS Code 保存、撤销与 Git 追踪。默认只读，按需开启编辑。
+- **点击图片预览**：在阅读器内查看大图，切换适应窗口或原始大小；支持普通图片、引用式图片和 figure 图片，按 Esc、关闭按钮或背景退出。
+- **可调整的阅读方式**：字体、行距、正文宽度、目录、翻译显示和排版均可配置；源码与阅读器支持滚动同步。
+- **简易的扩展能力**：用工作区 CSS 调整外观，用 JavaScript 模块添加组件、语法、标注或操作；也可以做成独立的 VS Code 附加扩展。
 
-- `LiMR: Open Reader to the Side`：源码与阅读器双栏并排。
-- `LiMR: Open Markdown Reader`：在当前栏打开阅读器。
-- 文件标签页的 **重新打开编辑器的方式… → LiMR Reader**：切换当前文件的阅读方式，也可以设置为默认。
+LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 `@linloir/limr 1.2.3`。你可以在 [Playground](https://linloir.github.io/LiMR/) 体验阅读与编辑，在 [语法文档](https://linloir.github.io/LiMR/#/docs/zh-CN/syntax) 查看更多内容模块。
 
-### Remote-WSL
+## 开始使用与配置
 
-在已经连接 **WSL: Ubuntu** 的窗口安装 VSIX。LiMR 是 `workspace` 扩展：文件操作在 WSL 扩展宿主执行，Webview 在 Windows VS Code 客户端显示，通常只需安装到 WSL 一侧。
+1. 打开 `.md`、`.markdown` 或 `SKILL.md`，点击编辑器右上角的 **书本图标**，在旁边打开 LiMR。也可在命令面板执行 **LiMR: Open Reader to the Side**；**LiMR: Open Markdown Reader** 在当前栏打开。
+2. 用阅读器工具栏切换主题、排版与翻译显示。需要添加标注或修改任务复选框时，点击编辑按钮开启编辑；更改沿用 VS Code 的保存与撤销操作。
+3. 点击设置按钮，或执行 **LiMR: Reader Settings**。在 VS Code 设置中搜索 `@ext:linloir.limr-vscode`，选择“用户”可调整个人默认值，选择“工作区”仅对当前项目生效。
 
-在该窗口的 WSL 终端中也可执行：
+网页链接直接交给浏览器打开。文件链接优先使用其他分栏中已有的目标文件，其次复用其他分栏；只有一个分栏时才新建旁栏。同一文档内的标题链接在阅读器中滚动。
 
-```bash
-code --install-extension ./artifacts/limr-vscode-1.0.1.vsix
+### 常见设置
+
+| 设置 | 默认值 | 含义与用法 |
+| --- | --- | --- |
+| `limr.theme` | `"playground"` | 使用 LiMR 配色并跟随 VS Code 明暗；`"auto"` 使用当前 VS Code 主题的实际颜色。也可固定为 `playground-light`、`playground-dark`、`vscode-light`、`vscode-dark`、`one-dark-pro` 或 `one-dark-pro-darker`。 |
+| `limr.editingEnabled` | `false` | 开启后可从阅读器添加、修改、删除标注和操作任务复选框；需信任工作区。 |
+| `limr.bodyFontFamily` / `limr.bodyFontSize` | `""` / `16` | 正文字体和字号（px）。空字体使用内置 Noto Serif SC Variable。 |
+| `limr.chineseFontFamily` / `limr.chineseFontSize` | `""` / `0` | 单独设置中文字体和字号；空字体、字号 0 跟随正文。`limr.otherFontFamily` / `limr.otherFontSize` 同样控制其他文字。 |
+| `limr.codeFontFamily` / `limr.codeFontSize` | `""` / `14` | 代码字体和字号（px）；空字体使用内置 Maple Mono NF CN。 |
+| `limr.lineHeight` / `limr.maxWidth` | `1.8` / `860` | 正文行高倍数与最大宽度（px）；偏好紧凑阅读可适当调小。 |
+| `limr.typography` | `"standard"` | `standard` 标准排版；`justify` 两端对齐；`knuth-plass` 使用段落级断行优化。 |
+| `limr.sidebarMode` | `"content"` | `content` 有旁注时显示；`always` 始终启用；`hidden` 隐藏。窄窗口通过浮层查看标注。 |
+| `limr.sidebarAutoCollapse` | `true` | 自动折叠密集的旁注条目；关闭后逐项排布。 |
+| `limr.tocMode` | `"always"` | `always` 宽屏显示侧目录、窄屏显示折叠目录；`wide` 仅宽屏显示；`hidden` 隐藏。 |
+| `limr.translationMode` | `"paragraph"` | `paragraph` 遵循各段配置；`bilingual` 原译对照；`original` 仅原文；`translated` 仅译文。用于已有翻译内容，不自动翻译。 |
+| `limr.syncScroll` | `true` | 源码与阅读器双向同步滚动。 |
+| `limr.previewButtonMode` | `"separate"` | `separate` 同时显示 LiMR 书本按钮与内置预览按钮；`merged` 只保留 LiMR 入口，Alt 点击打开内置预览，也可在“更多操作 → Markdown 预览”中选择。 |
+| `limr.language` | `"auto"` | 阅读器与对话框跟随 VS Code 语言，也可指定 `zh-CN` 或 `en`。原生命令和设置名称遵循 VS Code 界面语言。 |
+| `limr.topBarButtons` / `limr.bottomBarButtons` | 顶栏全部；底栏编辑、排版、翻译 | 选择显示的操作。可用 **LiMR: Choose Top Bar Buttons** / **Choose Status Bar Buttons** 多选调整。 |
+| `limr.images.pathMode` | `"auto"` | 图片先按 Markdown 所在目录解析，找不到再查所属工作区。`file` 仅文件目录；`workspace` 仅工作区；`folder` 使用 `limr.images.baseFolder` 指定的目录。 |
+| `limr.images.searchPaths` | `[]` | 图片策略未命中后依次尝试的额外目录；显式 `../` 路径保持原位置，不搜索替代图片。 |
+| `limr.syntaxHighlighting.enabled` | `true` | 在 Markdown 源码中补充 LiMR 内置语法的颜色。 |
+| `limr.plugins.enabled` / `limr.plugins.manifest` | `true` / `".limr/plugins/manifest.json"` | 启用阅读器插件，并指定工作区插件清单；插件仅在已信任的窗口加载。 |
+| `limr.skills.promptOnStartup` | `true` | 是否提醒安装用于 AI 协作的 Skill；可按用户或工作区关闭。 |
+
+例如，在用户设置或项目的 `.vscode/settings.json` 中加入：
+
+```json
+{
+  "limr.theme": "playground",
+  "limr.bodyFontSize": 17,
+  "limr.lineHeight": 1.8,
+  "limr.maxWidth": 800,
+  "limr.tocMode": "wide",
+  "limr.sidebarMode": "content",
+  "limr.previewButtonMode": "separate"
+}
 ```
 
-请确认 `code --list-extensions` 的输出标题为对应的 WSL 环境；如果 VS Code 提示重新加载窗口，按提示执行。**Developer: Show Running Extensions** 可以检查运行位置。开发时在 WSL 窗口打开此仓库，运行 `npm ci && npm run build` 后按 F5。
+这会稍微放大正文、缩窄阅读宽度，并只在宽屏显示目录。切换颜色主题不会重置字体。图片的固定目录和额外目录支持绝对路径、`file:` URI、`~`，相对目录基于当前文件所属工作区；未打开工作区时基于文件目录。
 
-## 阅读与编辑
+排版与翻译还支持“仅当前文件”的覆盖：执行 **LiMR: Choose Typography** 或 **LiMR: Choose Translation Display** 后选择作用范围。覆盖在下次打开时保留，不改写 Markdown；**LiMR: Reset Current File Reading Settings** 可恢复默认。
 
-阅读区直接展示文档。主题、编辑权限、设置和 AI Skill 入口位于 **VS Code 原生编辑器工具栏**，阅读状态显示在 **VS Code 原生状态栏**。
+## 用 AI 自定义外观与能力
 
-默认只读。使用编辑器工具栏的编辑按钮、命令 **LiMR: Toggle Markdown Editing** 或 `limr.editingEnabled` 控制是否允许从阅读器修改 Markdown。开启后可：
+在阅读器工具栏的 AI 菜单中查看指引，或执行 **LiMR: Install AI Skill…**，将随扩展提供的 `limr-annotations` Skill 安装到助手的全局或工作区目录。它包含标注写法、内置语法，以及样式和模块的扩展约定，可用于 Codex、Claude Code 等支持 Skill 的助手。
 
-- 划选文字，添加高亮、旁注或提问；同一范围可以绑定多条 annotation。
-- 在悬浮卡片、侧栏条目中使用 **编辑／删除** 文本按钮；按钮带悬浮下划线动画。
-- 点击高亮后的工具栏提供 **删除**，一次移除这段文字关联的注释和高亮；同一注释关联的其他范围仍保留。
-- 修改 Markdown 任务列表的复选框。
-- 在原生编辑器使用 Undo/Redo、保存和 Auto Save。阅读器只更新同一份 VS Code 文档，不另建数据库。
+你可以把需求直接交给 AI，例如：
 
-笔记编辑器离开编辑状态时提交；宿主拒绝过期修改时保留草稿并提示。外部编辑和 AI 修改会同步回阅读器。未启用编辑或未信任工作区时，阅读器不会创建临时高亮或写入 Markdown。
+> 使用 limr-annotations，给当前项目添加适合长文阅读的 LiMR 样式：标题使用蓝色强调，段落间距稍微增大，并适配浅色、深色主题和窄分栏。
 
-注释使用 LiMR 1.2.3 的成对范围边界 `::%%limr%%{<#r1}正文::%%limr%%{>#r1}`，以及 `:::limr-annotation` 定义块。支持跨格式、跨段落与交叠范围；解析和写入统一使用 LiMR 的公开接口。旧版内联标记不再支持。删除时会清理不再被引用的范围边界；空白新标注取消时也会撤销临时边界。
+> 使用 limr-annotations，增加一个 `research-card` 模块，用来展示实验结论，卡片内部继续支持 Markdown。保留已有插件，并提供一份示例文档。
 
-默认“自动”模式下，图片首先按 Markdown 所在目录解析；找不到时，仅再尝试当前文件所属的工作区根目录。支持 `../`、工作区根路径、绝对路径、`file:`、Windows／WSL 路径以及带空格、中文和编码字符的文件名。明确指定层级的 `../` 路径按所选起点精确解析，不再使用附加目录；不会扫描静态目录或按同名文件猜测替代图片。
+### 只改样式
 
-## 主题与字体
+在工作区创建 `.limr/plugins/manifest.json`，引用同目录下的 CSS；已有清单时追加条目：
 
-默认 **Playground（跟随 VS Code 明暗）**，使用 LiMR Playground 的字体与阅读配色，根据 VS Code 当前主题选择浅色或深色外观。通过原生编辑器工具栏或 **LiMR: Choose Reader Theme**，也可以固定选择 **Playground Light／Dark**，或选择 **VS Code Light、VS Code Dark、One Dark Pro、One Dark Pro Darker**。**跟随 VS Code** 选项则采用当前主题的实际颜色与自定义覆盖。代码高亮随明暗主题切换。
-
-默认正文使用随扩展打包的 **Noto Serif SC Variable**，回退到 Georgia／serif，字号 16px、行高 1.8；代码使用 **Maple Mono NF CN**，字号 14px。切换颜色主题不会改变字体设置。
-
-正文遵循最大宽度设置。显示旁注栏时，额外宽度分配给旁注；关闭旁注栏或窗口不足以显示旁注栏时，正文相对整个阅读区居中。目录在宽屏左侧留白中显示，空间不足时切换为折叠目录。两侧保留适度边距，顶部使用紧凑间距。
-
-通过原生编辑器工具栏的设置按钮或 `LiMR: Reader Settings` 调整：
-
-| 设置 | 用途 |
-| --- | --- |
-| `limr.bodyFontFamily` / `bodyFontSize` | 拉丁文字正文的字体和字号；空字体使用 Playground 默认字体 |
-| `limr.chineseFontFamily` / `chineseFontSize` | 中文字体和字号；字号 0 跟随正文 |
-| `limr.otherFontFamily` / `otherFontSize` | 其他文字的字体和字号 |
-| `limr.codeFontFamily` / `codeFontSize` | 行内代码与代码块字体和字号；空字体使用 Playground 默认代码字体 |
-| `limr.lineHeight` / `maxWidth` | 正文行高与最大宽度 |
-| `limr.sidebarMode` | 旁注侧栏：`always` 始终启用、`content` 有内容时启用（默认）、`hidden` 关闭；空侧栏不占空间，正文居中，窄窗口通过浮层阅读标注 |
-| `limr.sidebarAutoCollapse` | 自动折叠密集的侧栏条目（默认开启）；关闭后逐项排布，不再合并折叠，不改变单条卡片正文的展开状态 |
-| `limr.tocMode` | `always` 始终、`wide` 仅宽度允许、`hidden` 隐藏；`wide` 在窄屏不插入顶部目录 |
-| `limr.typography` | 默认排版：`standard` 标准、`justify` 两端对齐、`knuth-plass` |
-| `limr.translationMode` | 默认翻译：`bilingual` 对照、`original` 原文、`translated` 译文、`paragraph` 按照段落配置 |
-| `limr.language` | `auto` 跟随 VS Code 语言、`zh-CN`、`en` |
-| `limr.topBarButtons` / `bottomBarButtons` | 分别选择顶栏和状态栏显示的操作 |
-| `limr.previewButtonMode` | `separate` 独立按钮；`merged` 合并为默认打开 LiMR 的预览入口 |
-| `limr.skills.promptOnStartup` | 首次安装 Skill 提醒，可在用户或工作区级别关闭 |
-| `limr.plugins.enabled` / `plugins.manifest` | 加载工作区与附加扩展提供的阅读器插件；仅在已信任窗口启用，`manifest` 只指定工作区清单 |
-| `limr.syncScroll` | 源码与阅读器的滚动同步 |
-| `limr.syntaxHighlighting.enabled` | Markdown 原文编辑器中的 LiMR 补充语法颜色，默认开启，切换即时生效 |
-| `limr.images.pathMode` | 图片相对路径：`auto` 先查 Markdown 目录再查所属工作区（默认）、`file` 仅 Markdown 目录、`workspace` 仅所属工作区、`folder` 固定目录 |
-| `limr.images.baseFolder` | `folder` 模式的固定目录；留空时不自动猜测 |
-| `limr.images.searchPaths` | 所选策略未命中后按顺序尝试的额外目录，首个命中即停止；默认 `[]` |
-
-图片配置可设为用户默认或工作区覆盖。固定目录和额外目录支持绝对路径、`file:` URI、`~`；相对目录基于当前文件所属工作区，未打开工作区时基于 Markdown 所在目录。显式 `../` 路径保持精确位置，不转为其他目录猜测；不会按文件名搜索，也不会隐式尝试 `public`、`static` 或其它工作区。
-
-通过 `LiMR: Choose Typography` / `LiMR: Choose Translation Display` 可选“当前文件”“当前文件恢复默认”“默认配置”。当前文件覆盖保存在 VS Code 工作区状态中，关闭再打开仍然有效，不改写正文。翻译块在统一展示模式下切换任一段，会先保留其它段的显示状态，然后仅把当前文件改为“按照段落配置”。`LiMR: Reset Current File Reading Settings` 清除该文件的排版及翻译覆盖。
-
-`LiMR: Choose Top Bar Buttons` / `LiMR: Choose Status Bar Buttons` 提供多选设置。合并预览按钮后，普通点击打开 LiMR，按住 Alt（Linux/Windows 也支持 Shift）点击打开系统预览；编辑器“更多”菜单中的“Markdown 预览”可选择两者。VS Code 没有供扩展任意改造其它扩展按钮的公共接口，因此此设置使用内置 Markdown 的 `hasCustomMarkdownPreview` 整合入口，保留系统预览命令，不覆盖其处理器。
-
-阅读器与命令对话框使用 `limr.language`；VS Code 原生命令名称和设置标签遵循 VS Code 自身的界面语言。
-
-原文高亮覆盖 LiMR 1.2.3 内置组件标签、指令及静态属性、有效标注定义与成对边界、`==高亮==`、`^[行内脚注]`、数学分隔符和引用块中的 `[!类型]`。保留普通 Markdown、代码与注释的现有颜色；被真实标注定义引用的成对边界即使位于代码中也会高亮，与阅读器解析一致。阅读器插件新增的自定义语法不自动加入。此设置适用于本地、远程及未保存的 Markdown；关闭会立即移除补充颜色。颜色跟随当前主题，可在 `workbench.colorCustomizations` 中覆盖 `limr.syntax.punctuation`、`tag`、`attribute`、`value`、`annotation`、`highlight`、`math`（每项均以 `limr.syntax.` 开头）。
-
-## 样式与语法插件
-
-文件开头由 `---` 包围的 YAML 元信息会自动显示为文档信息卡片：突出名称与描述，并展示其它字段、列表和嵌套信息。“查看原始元信息”可展开完整原文。此能力默认启用，也适用于 `SKILL.md`；不会改写文件，不需要配置工作区插件。无法解析的元信息保留原文显示。
-
-在工作区创建 `.limr/plugins/manifest.json`，将 CSS 或 ESM 模块列入 `plugins`。模块通过 `export default ({ React, limr }) => RendererExtension` 复用阅读器现有 React/LiMR，可添加语法、组件、标注和操作；无需修改插件源码。工作区文件修改自动重新加载，也可运行 `LiMR: Reload Reader Plugins`。解析或加载失败会保留基础阅读器并提示错误。
-
-也可将能力做成独立的 VS Code 扩展，安装后自动注册到 LiMR。附加扩展声明 `extensionDependencies: ["linloir.limr-vscode"]` 与 `extensionKind: ["workspace"]`，激活 LiMR 后调用公开的 `registerPlugin(context.extension.id, { id, module, stylesheet })`，并通过 `context.subscriptions` 释放注册。模块和样式路径相对附加扩展目录，不需要工作区清单；注册和释放会立即刷新已打开的阅读器。参见 [API v1 类型定义](api/index.d.ts) 与 [无需构建的完整示例](examples/vscode-reader-addon)。两类插件都受 `limr.plugins.enabled` 和窗口信任状态控制；Remote-WSL 下请将附加扩展与 LiMR 安装到同一 WSL 扩展宿主。
-
-完整例子见 [扩展指引](skills/limr-annotations/references/reader-plugins.md)。已安装的 Skill 包含同一指引，可直接让 AI 修改样式或添加语法。
-
-## 向 AI 提问
-
-划选文字，点击 **提问上下文**。悬浮提示会说明：复制后粘贴到 Codex 或其他 AI 助手，再输入自己的问题。
-
-剪贴板包含文件路径、原始 UTF-16 范围、起止行列、原文及相邻片段、已有标注 ID 和写回说明。支持富文本的剪贴板同时包含 Codex 文件 mention HTML；受客户端权限限制时回退为完整纯文本。该 HTML 与已核对的 Codex 编辑器格式兼容，但不是 OpenAI 承诺稳定的公开接口。
-
-激活阅读器标签页，从原生工具栏的 AI 子菜单查看指南、安装 Skill 或复制安装指引。`LiMR: Install AI Skill…` 支持全局、当前工作区和自选目录；`LiMR: Install AI Skill Globally…` 直接选择全局安装。Codex 使用 `~/.agents/skills/limr-annotations` 或工作区 `.agents/skills/limr-annotations`；Claude Code 使用对应的 `.claude/skills` 目录。首次启动会提示安装；尚未安装全局 Skill 时，每个新工作区仍会提示，可选择以后不再提醒或仅关闭当前工作区提醒。用户作出安装选择后才创建 Skill 文件。
-
-详细说明见 [AI Annotation Guide](docs/ai-guide.md)。插件不自动发送 AI 请求；对话关联由用户粘贴上下文后，AI 按 Skill 规则回写原文件。只能写入实际已知的会话 ID。
-
-## 开发
-
-建议 Node.js 22.12+。
-
-使用 npm 上的固定版本 `@linloir/limr@1.2.3`，运行 `npm ci` 按锁文件安装；无需准备相邻仓库或本地 tarball。
-
-```bash
-npm ci
-npm run typecheck
-npm test
-npm run build
-npm run test:vscode
-npm run test:animations
-npm run test:regressions
-npm run test:features
-npm run package
+```json
+{
+  "plugins": [
+    { "id": "reading-style", "stylesheet": "reading.css" }
+  ]
+}
 ```
 
-`test:vscode` 使用独立的 VS Code 配置、扩展目录和临时工作区，启动真实 Electron 编辑器并通过 Playwright 检查 Webview。设置 `VSCODE_TEST_VERSION` 可指定测试版本；`LIMR_TEST_THEME_DIR` 可使用本机 One Dark Pro 主题目录。Linux/WSLg 需要可用显示服务。
+`reading.css` 可以从很小的调整开始：
 
-`test:animations` 在同样的真实编辑器中采样动画播放过程，检查工具栏、浮层、高亮、侧栏和阅读控件的中间帧与结束状态；证据和截图保存在 `artifacts` 中。
+```css
+.limr-reader h1,
+.limr-reader h2 {
+  color: var(--vscode-textLink-foreground);
+}
+```
 
-`test:regressions` 检查混合格式选区、工具栏宽度、浮卡切换、焦点样式、批量删除与 Undo，以及宽窄窗口布局。
+保存工作区插件文件后阅读器会自动重新加载，也可执行 **LiMR: Reload Reader Plugins**。
 
-`test:plugins` 在独立配置中加载真正的附加扩展，检查注册、释放、开关与故障隔离。`test:scroll` 检查双栏滚动与复杂块边界；`test:translations` 覆盖原译源码逆序及三种翻译显示模式；`test:syntax` 检查原文高亮与主题颜色。先运行 `npm run package`，再运行 `npm run test:installed-icon`，可在独立配置中安装 VSIX，核对扩展列表和详情页实际加载的图标。
+### 添加模块或发布附加扩展
 
-打包产物为 `artifacts/limr-vscode-1.0.1.vsix`。运行资源全部随 VSIX 打包，不依赖开发服务器或 CDN；Markdown 自己引用的远程图片、视频仍可能联网。
+在清单中增加 `{ "id": "research-card", "module": "research-card.mjs" }`，模块复用阅读器提供的 React 和 LiMR：
+
+```js
+export default ({ React, limr }) => limr.defineBlock({
+  name: 'research-card',
+  component: ({ children }) => React.createElement(
+    'aside', { className: 'research-card' }, children
+  ),
+});
+```
+
+在 Markdown 中使用 `:::research-card`、卡片正文和结束的 `:::`，即可显示这个组件。可继续用 CSS 美化卡片，或让 AI 按公开接口增加语法、标注类型和操作。
+
+需要在多个项目复用时，可将模块打包为独立的 VS Code 附加扩展，通过 `registerPlugin` 注册，安装后即可使用。参见 [插件指引](skills/limr-annotations/references/reader-plugins.md)、[API 类型定义](api/index.d.ts) 和 [完整附加扩展示例](examples/vscode-reader-addon)。Remote-WSL / SSH 下，附加扩展应与 LiMR 位于同一扩展宿主。
+
+### 围绕文档提问与标注
+
+划选原文，点击 **提问上下文**，再粘贴给 AI 并输入问题。开启编辑后，Skill 要求助手在回答后把问题、回答和高亮写回 Markdown；翻译块中的原文与译文对应片段共用同一条问答标注。生成论文类文档时，建议使用 `figure` / `figures` 展示带图注的图片。扩展本身不调用模型；AI 对 Markdown 的修改会同步显示。详细用法见 [AI 指引](docs/ai-guide.md)。
+
+开发与构建请参阅 [开发说明](docs/development.md)。
+
+---
+
+## English
+
+[简体中文](#limr-for-vs-code) · [LiMR GitHub](https://github.com/Linloir/LiMR) · [Playground](https://linloir.github.io/LiMR/) · [Extension source](https://github.com/Linloir/LiMR-VSCode)
+
+## What is LiMR?
+
+LiMR is a Markdown reader designed for comfortable reading. This extension brings [LiMR](https://github.com/Linloir/LiMR) into VS Code for technical documentation, study notes, research excerpts, and `SKILL.md`, with source and reader side by side.
+
+- **Polished defaults**: bundled Chinese serif and monospace code fonts, light and dark palettes, and VS Code theme integration. Article width, contents, and annotation panels adapt to the available space.
+- **Rich content**: syntax highlighting, math, Mermaid diagrams, and blocks for callouts, definitions, citations, and paragraph translations. YAML frontmatter appears as a document information card.
+- **Annotations in your Markdown**: select text to add highlights, notes, and questions. Changes stay in the original file and work with VS Code save, undo, and Git. Reading is read-only by default; enable editing when needed.
+- **Click to preview images**: inspect Markdown, reference, and figure images inside the reader, switch between fit and actual size, and close with Escape, the close button, or the backdrop.
+- **Reading preferences**: configure fonts, spacing, article width, contents, translation display, and paragraph layout. Source and reader can scroll together.
+- **Simple extensibility**: use workspace CSS to change appearance and JavaScript modules to add components, syntax, annotations, or actions. Reusable modules can also ship as VS Code add-ons.
+
+LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.2.3`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
+
+## Get started and configure
+
+1. Open a `.md`, `.markdown`, or `SKILL.md` file and click the **book icon** in the editor title bar to open LiMR beside it. The Command Palette also offers **LiMR: Open Reader to the Side** and **LiMR: Open Markdown Reader** for the current group.
+2. Use the reader toolbar to choose a theme, typography, or translation display. Enable editing with the edit button to add annotations or change task checkboxes; use VS Code's usual save and undo actions.
+3. Click settings or run **LiMR: Reader Settings**. Search VS Code Settings for `@ext:linloir.limr-vscode`. Choose **User** for personal defaults or **Workspace** for project settings.
+
+Web links open directly in your browser. File links reuse the target file in another editor group when available, otherwise use another existing group. A side group is created only when there is no other group. Heading links within the current document scroll inside the reader.
+
+### Common settings
+
+| Setting | Default | Meaning and use |
+| --- | --- | --- |
+| `limr.theme` | `"playground"` | LiMR colors following VS Code light/dark mode. `"auto"` uses the active VS Code theme's actual colors. Fixed choices: `playground-light`, `playground-dark`, `vscode-light`, `vscode-dark`, `one-dark-pro`, `one-dark-pro-darker`. |
+| `limr.editingEnabled` | `false` | Allow annotation changes and task checkbox edits in the reader; requires workspace trust. |
+| `limr.bodyFontFamily` / `limr.bodyFontSize` | `""` / `16` | Body font and size in px. An empty family uses bundled Noto Serif SC Variable. |
+| `limr.chineseFontFamily` / `limr.chineseFontSize` | `""` / `0` | Separate Chinese font and size; an empty family and size 0 inherit the body settings. `limr.otherFontFamily` / `limr.otherFontSize` do the same for other scripts. |
+| `limr.codeFontFamily` / `limr.codeFontSize` | `""` / `14` | Code font and size in px; an empty family uses bundled Maple Mono NF CN. |
+| `limr.lineHeight` / `limr.maxWidth` | `1.8` / `860` | Body line-height multiplier and maximum width in px. Reduce them for a more compact layout. |
+| `limr.typography` | `"standard"` | `standard` normal layout; `justify` justified text; `knuth-plass` paragraph-wide line-breaking optimization. |
+| `limr.sidebarMode` | `"content"` | `content` shows the sidebar when notes exist; `always` always enables it; `hidden` hides it. Narrow readers display annotations in overlays. |
+| `limr.sidebarAutoCollapse` | `true` | Fold crowded sidebar items automatically; turn off to lay them out individually. |
+| `limr.tocMode` | `"always"` | `always` shows side contents on wide screens and collapsible contents on narrow ones; `wide` shows only side contents; `hidden` hides both. |
+| `limr.translationMode` | `"paragraph"` | `paragraph` follows each block; `bilingual` shows both versions; `original` or `translated` shows one. Displays existing translations; does not generate them. |
+| `limr.syncScroll` | `true` | Synchronize scrolling between source and reader in both directions. |
+| `limr.previewButtonMode` | `"separate"` | `separate` shows the LiMR book and built-in preview buttons; `merged` keeps one LiMR entry. Alt-click opens the built-in preview; both choices are also in **More Actions → Markdown Preview**. |
+| `limr.language` | `"auto"` | Reader and dialogs follow VS Code language, or use `zh-CN` / `en`. Native command and setting names follow VS Code's display language. |
+| `limr.topBarButtons` / `limr.bottomBarButtons` | All title actions; editing, typography, translation in status bar | Select visible actions with **LiMR: Choose Top Bar Buttons** / **Choose Status Bar Buttons**. |
+| `limr.images.pathMode` | `"auto"` | Try the Markdown directory, then its workspace. `file` uses only the file directory; `workspace` uses its workspace; `folder` uses `limr.images.baseFolder`. |
+| `limr.images.searchPaths` | `[]` | Extra directories tried in order after the image strategy misses. Explicit `../` paths keep their exact location without searching for replacements. |
+| `limr.syntaxHighlighting.enabled` | `true` | Add colors for built-in LiMR syntax in Markdown source editors. |
+| `limr.plugins.enabled` / `limr.plugins.manifest` | `true` / `".limr/plugins/manifest.json"` | Enable reader plugins and select the workspace manifest. Plugins load only in trusted windows. |
+| `limr.skills.promptOnStartup` | `true` | Offer the AI collaboration skill; disable at user or workspace scope if desired. |
+
+For example, add this to User Settings JSON or your project's `.vscode/settings.json`:
+
+```json
+{
+  "limr.theme": "playground",
+  "limr.bodyFontSize": 17,
+  "limr.lineHeight": 1.8,
+  "limr.maxWidth": 800,
+  "limr.tocMode": "wide",
+  "limr.sidebarMode": "content",
+  "limr.previewButtonMode": "separate"
+}
+```
+
+This slightly enlarges body text, narrows the article, and shows contents only in wide readers. Switching color themes preserves font settings. Fixed and additional image directories accept absolute paths, `file:` URIs, and `~`; relative directories start at the file's workspace, or its directory when no workspace is open.
+
+Typography and translation support per-file overrides through **LiMR: Choose Typography** and **LiMR: Choose Translation Display**. Overrides persist across reopening without rewriting Markdown. **LiMR: Reset Current File Reading Settings** restores the defaults.
+
+## Customize appearance and capabilities with AI
+
+Open the toolbar's AI menu for guidance, or run **LiMR: Install AI Skill…** to install the bundled `limr-annotations` skill in your assistant's global or workspace directory. It includes annotation rules, built-in syntax, and the style/module extension contract for assistants such as Codex and Claude Code.
+
+Try requests like these:
+
+> Use limr-annotations to add a LiMR reading style for this project: blue heading accents and slightly more paragraph spacing. Support light and dark themes and narrow editor groups.
+
+> Use limr-annotations to add a `research-card` module for experiment conclusions, keeping Markdown content inside each card. Preserve existing plugins and include an example document.
+
+### Change styles
+
+Create `.limr/plugins/manifest.json` in the workspace and reference CSS in the same directory. Append entries if a manifest already exists:
+
+```json
+{
+  "plugins": [
+    { "id": "reading-style", "stylesheet": "reading.css" }
+  ]
+}
+```
+
+Start with a small `reading.css`:
+
+```css
+.limr-reader h1,
+.limr-reader h2 {
+  color: var(--vscode-textLink-foreground);
+}
+```
+
+Workspace plugin files reload automatically after saving. **LiMR: Reload Reader Plugins** also refreshes them.
+
+### Add modules or distribute an add-on
+
+Add `{ "id": "research-card", "module": "research-card.mjs" }` to the manifest. The module reuses the reader's React and LiMR:
+
+```js
+export default ({ React, limr }) => limr.defineBlock({
+  name: 'research-card',
+  component: ({ children }) => React.createElement(
+    'aside', { className: 'research-card' }, children
+  ),
+});
+```
+
+Use `:::research-card`, the card's Markdown body, and a closing `:::` in your document. Add CSS for its appearance, or ask your assistant to build syntax, annotation types, and actions using the public interfaces.
+
+For reuse across projects, package modules as a separate VS Code add-on and register them through `registerPlugin`. See the [plugin guide](skills/limr-annotations/references/reader-plugins.md), [API declarations](api/index.d.ts), and [complete add-on example](examples/vscode-reader-addon). In Remote-WSL / SSH, install add-ons in the same extension host as LiMR.
+
+### Ask questions and annotate documents
+
+Select text, choose **Question context**, then paste into your assistant and add your question. With editing enabled, the skill requires writing the question, answer, and highlighting back to Markdown. Corresponding original/translated passages share one question annotation. For papers, it recommends `figure` / `figures` for captioned images. The extension does not call an AI model; changes your assistant makes to Markdown appear in the reader. See the [AI guide](docs/ai-guide.en.md).
+
+For extension development and builds, see the [development guide](docs/development.md).

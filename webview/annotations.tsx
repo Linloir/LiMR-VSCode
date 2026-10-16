@@ -125,7 +125,7 @@ function NoteContent({ annotation, data, editing, presentation }: AnnotationCont
 function NotePreview({ annotation, data }: AnnotationSidebarPreviewProps<NoteData>) {
   const zh = useChinese();
   const text = bodyOf(data).replace(/\s+/g, ' ').trim();
-  return <div className="lv-note-preview" data-limr-card-interactive="true">
+  return <div className="lv-note-preview">
     <span className="lv-note-summary">{text || (zh ? '暂无内容' : 'No content yet')}</span>
     <NoteActions annotation={annotation} />
   </div>;

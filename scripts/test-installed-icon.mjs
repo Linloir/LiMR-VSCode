@@ -1,5 +1,5 @@
-// Verify the packaged icon through the real installed-extension list and details
-// page. Uses a disposable profile, never the user's installed extensions.
+// Verify the packaged icons and README through the real extension list and
+// details page. Uses a disposable profile, never the user's installed extensions.
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 import { downloadAndUnzipVSCode, resolveCliPathFromVSCodeExecutablePath } from '@vscode/test-electron';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -98,12 +98,34 @@ try {
   await row.click();
   const details = await checkIcon(page.locator('.extension-editor .header img').first());
   await page.screenshot({ path: path.join(artifacts, 'extension-details.png') });
+  const readme = await until(async () => {
+    for (const frame of page.frames()) if (await frame.getByRole('heading', { name: '这是什么', exact: true }).count().catch(() => 0)) return frame;
+  });
+  // Images must be real, remotely loadable resources in the installed README.
+  const readmeImage = await readme.getByRole('img', { name: 'LiMR', exact: true }).evaluate(async image => {
+    await image.decode();
+    return { src: image.currentSrc, width: image.naturalWidth, height: image.naturalHeight };
+  });
+  assert.equal(readmeImage.width, 512); assert.equal(readmeImage.height, 512);
+  assert.match(readmeImage.src, /^https:\/\/(?:github\.com\/Linloir\/LiMR-VSCode\/raw|raw\.githubusercontent\.com\/Linloir\/LiMR-VSCode)\/main\//);
+  const links = await readme.locator('a[href]').evaluateAll(elements => elements.map(element => ({ label: element.textContent, href: element.getAttribute('href') })));
+  assert.ok(links.every(link => /^(https:\/\/|#)/.test(link.href)), 'Packaged README links must be absolute HTTPS or same-page anchors.');
+  assert.ok(links.some(link => link.href === 'https://github.com/Linloir/LiMR'));
+  assert.ok(links.some(link => link.href === 'https://linloir.github.io/LiMR/'));
+  await readme.getByRole('link', { name: 'English', exact: true }).click();
+  await expect(readme.getByRole('heading', { name: 'English', exact: true })).toBeInViewport();
+  await expect(readme.getByRole('heading', { name: 'What is LiMR?', exact: true })).toBeInViewport();
+  await page.screenshot({ path: path.join(artifacts, 'readme-english.png') });
+  await readme.getByRole('link', { name: '简体中文', exact: true }).click();
+  await expect(readme.getByRole('heading', { name: 'LiMR for VS Code', exact: true })).toBeInViewport();
+  await page.screenshot({ path: path.join(artifacts, 'readme-chinese.png') });
   await writeFile(path.join(artifacts, 'result.json'), JSON.stringify({ version: manifest.version,
     vsixSha256: createHash('sha256').update(await readFile(vsix)).digest('hex'),
     icon: manifest.icon, iconSha256: createHash('sha256').update(iconBytes).digest('hex'),
-    installedThroughVsix: true, extensionDevelopmentPath: false, list, details }, null, 2));
+    installedThroughVsix: true, extensionDevelopmentPath: false, list, details,
+    readme: { image: readmeImage, links, englishNavigation: true, chineseNavigation: true } }, null, 2));
   await Promise.all(['failure.png', 'failure.log', 'failure-dom.html'].map(name => rm(path.join(artifacts, name), { force: true })));
-  console.log(`Installed extension icon passed: ${path.relative(root, artifacts)}`);
+  console.log(`Installed extension icons and README passed: ${path.relative(root, artifacts)}`);
 } catch (error) {
   await page?.screenshot({ path: path.join(artifacts, 'failure.png') }).catch(() => {});
   if (page) await writeFile(path.join(artifacts, 'failure-dom.html'), await page.content().catch(() => ''));
