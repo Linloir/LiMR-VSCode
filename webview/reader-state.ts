@@ -5,6 +5,7 @@ export function applyReaderConfiguration(current: ReaderState | null, message: E
   if (!current || current.document.uri !== message.document.uri) return current;
   return {
     ...message.configuration,
+    loadError: current.loadError,
     document: current.document.version === message.document.version
       ? { ...message.document, source: current.document.source }
       : current.document,

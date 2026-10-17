@@ -5,6 +5,7 @@ const directlyReadable = /^(?:https?:|data:|blob:|vscode-webview-resource:|vscod
 // React can retain the same image node across a reader-setting update. Keep
 // original source provenance without putting implementation state in Markdown.
 const imageSources = new WeakMap<HTMLImageElement, ImageState>();
+const maxCachedImages = 512;
 let generation = 0;
 
 /** Resolve image paths through the extension host, including images produced by
@@ -23,7 +24,10 @@ export class ReaderImages {
     this.observer = new MutationObserver(records => {
       for (const record of records) {
         if (record.type === 'attributes') this.resolve(record.target as HTMLImageElement);
-        else for (const node of record.addedNodes) if (node instanceof Element) this.scan(node);
+        else {
+          for (const node of record.removedNodes) if (node instanceof Element) this.release(node);
+          for (const node of record.addedNodes) if (node instanceof Element) this.scan(node);
+        }
       }
     });
     this.observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
@@ -36,6 +40,7 @@ export class ReaderImages {
     this.requests.delete(reply.requestId); this.bySource.delete(request.source);
     if (reply.uri) {
       this.cache.set(request.source, reply.uri);
+      if (this.cache.size > maxCachedImages) this.cache.delete(this.cache.keys().next().value!);
       for (const image of request.images) this.apply(image, request.source, reply.uri);
     } else for (const image of request.images) {
       const state = this.states.get(image), current = image.getAttribute('src')?.trim() ?? '';
@@ -58,6 +63,15 @@ export class ReaderImages {
     if (element instanceof HTMLImageElement) this.resolve(element);
     for (const image of element.querySelectorAll('img')) this.resolve(image);
   }
+  private release(element: Element) {
+    const release = (image: HTMLImageElement) => {
+      if (this.root.contains(image)) return; // A move within the live reader.
+      const state = this.states.get(image);
+      if (state) this.bySource.get(state.source)?.images.delete(image);
+    };
+    if (element instanceof HTMLImageElement) release(element);
+    for (const image of element.querySelectorAll('img')) release(image);
+  }
   private resolve(image: HTMLImageElement) {
     if (!(image instanceof HTMLImageElement) || !this.root.contains(image)) return;
     const current = image.getAttribute('src')?.trim() ?? '';
@@ -76,7 +90,9 @@ export class ReaderImages {
     this.states.get(image)!.resolved = '';
     image.removeAttribute('src');
     if (this.cache.has(source)) {
-      const uri = this.cache.get(source); if (uri) this.apply(image, source, uri);
+      const uri = this.cache.get(source)!;
+      this.cache.delete(source); this.cache.set(source, uri);
+      this.apply(image, source, uri);
       return;
     }
     const existing = this.bySource.get(source);

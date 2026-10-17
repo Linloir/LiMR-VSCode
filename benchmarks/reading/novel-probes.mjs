@@ -5,7 +5,7 @@ export function installNovelObservers({ handoff = 'none' } = {}) {
   const state = window.__limrNovel = { handoff, frames: [], prefix: null, beforeReady: null, afterReady: [], errors: [], reveals: [], actions: [] };
   const root = () => document.querySelector('.lv-scroll');
   const complete = () => document.querySelector('.lv-app')?.dataset.readerReady === 'true';
-  const provisional = () => !!document.querySelector('.limr-document-loading[data-provisional="true"]');
+  const provisional = () => !!document.querySelector('.lv-load-progress') && !!document.querySelector('.limr-reader');
   const visible = node => {
     if (!node || node.closest('[inert],[data-window-parked],[data-limr-ignore]')) return false;
     const r = node.getBoundingClientRect(), viewport = root()?.getBoundingClientRect();

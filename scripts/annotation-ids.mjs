@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const allocator = fileURLToPath(new URL('../src/shared/annotation-ids.ts', import.meta.url));
 const symbol = '__limrShortAnnotationId';
-// LiMR 1.2.3 has no ID allocator hook. Adapt only its four verified creation expressions,
+// LiMR 1.2.3/1.3.x have no ID allocator hook. Adapt only their four verified creation expressions,
 // before bundling, to preserve automatic-highlight ownership and cancellation.
 // Never rewrite serialized source or replace crypto.randomUUID globally.
 const replacements = [
@@ -24,8 +24,8 @@ export function shortAnnotationIdsPlugin() {
       build.onStart(async () => {
         patched.clear(); loaded.clear();
         const manifest = require.resolve('@linloir/limr/package.json');
-        if (JSON.parse(await readFile(manifest, 'utf8')).version !== '1.2.3') {
-          throw new Error('The LiMR short-ID adapter requires reviewed @linloir/limr version 1.2.3.');
+        if (!['1.2.3', '1.3.0', '1.3.1'].includes(JSON.parse(await readFile(manifest, 'utf8')).version)) {
+          throw new Error('The LiMR short-ID adapter requires reviewed @linloir/limr version 1.2.3, 1.3.0 or 1.3.1.');
         }
         const directory = path.join(path.dirname(manifest), 'dist');
         const files = await Promise.all((await readdir(directory)).filter(file => file.endsWith('.js')).map(async file => {

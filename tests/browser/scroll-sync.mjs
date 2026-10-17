@@ -16,7 +16,10 @@ export async function runScrollSyncAcceptance({ page, frame, host, artifacts }) 
   await host('replaceSource', { source });
   await host('layout', { sourceSize: .5 });
   await expect(frame.locator('.limr-reader h1')).toHaveText('Continuous scroll acceptance');
-  await expect(frame.locator('.limr-reader-content > article > p')).toHaveCount(600);
+  await expect(frame.locator('.lv-app')).toHaveAttribute('data-reader-ready', 'true', { timeout: 30_000 });
+  await expect(frame.locator('[data-limr-windowed]')).toHaveCount(1);
+  await expect.poll(() => frame.locator('.limr-reader-content article p').count()).toBeGreaterThan(0);
+  expect((await host('snapshot')).source).toBe(source);
   await frame.evaluate(() => document.fonts.ready);
   await frame.locator('.lv-scroll').evaluate(element => element.scrollTop = 0);
   await host('scrollSource', { line: 0 });

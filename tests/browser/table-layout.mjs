@@ -105,10 +105,35 @@ function threeLineBoundary(cell) {
 
 export async function runTableLayoutAcceptance({ page, frame, host, artifacts }) {
   const evidence = [], errors = [], workers = [];
-  const sections = (process.env.LIMR_TEST_TABLE_SECTIONS ?? 'layout,images,translation').split(',');
-  expect(sections.length > 0 && sections.every(value => ['layout', 'images', 'translation'].includes(value))).toBe(true);
+  const sections = (process.env.LIMR_TEST_TABLE_SECTIONS ?? 'toggle,layout,images,translation').split(',');
+  expect(sections.length > 0 && sections.every(value => ['toggle', 'layout', 'images', 'translation'].includes(value))).toBe(true);
   page.on('pageerror', error => errors.push(error.message)); page.on('worker', worker => workers.push(worker.url()));
   const save = async check => { evidence.push(check); await writeFile(path.join(artifacts, 'checks.json'), JSON.stringify(evidence, null, 2)); };
+  if (sections.includes('toggle')) {
+    expect((await host('readConfiguration', { keys: ['tableLayout.enabled'] }))['tableLayout.enabled']).toBe(true);
+    await host('configure', { values: { tocMode: 'hidden', sidebarMode: 'content', syncScroll: false } });
+    for (const large of [false, true]) {
+      const source = '# Table switch\n\n| Long heading ' + 'content '.repeat(30) + '| Value |\n| :--- | ---: |\n'
+        + Array.from({ length: 40 }, (_, i) => `| Row ${i} | ${i} |`).join('\n') + (large ? padding : '');
+      await host('replaceSource', { source });
+      await expect(frame.locator('.lv-app')).toHaveAttribute('data-reader-ready', 'true', { timeout: 30_000 });
+      await frame.locator('.lv-scroll').evaluate(root => { root.scrollTop = 0; });
+      await expect(frame.locator('.limr-table-layout')).toHaveAttribute('data-table-ready', 'true');
+      const before = workers.length;
+      for (let index = 0; index < 2; index++) {
+        await host('configure', { values: { 'tableLayout.enabled': false } });
+        const native = frame.locator('[data-table-layout="native"]');
+        await expect(native).toBeVisible(); await expect(native.locator('tbody tr')).toHaveCount(40);
+        await expect(native.locator('tbody tr').first().locator('td').last()).toHaveCSS('text-align', 'right');
+        await expect(frame.locator('.limr-table-layout,.limr-table-cell-reveal,[data-type="table-cell-overflow"]')).toHaveCount(0);
+        await host('configure', { values: { 'tableLayout.enabled': true } });
+        await expect(native).toHaveCount(0);
+        await expect(frame.locator('.limr-table-layout')).toHaveAttribute('data-table-ready', 'true');
+      }
+      expect(workers.length).toBe(before); expect((await host('snapshot')).source).toBe(source);
+      await save({ check: 'Table optimization defaults on and toggles both ways without reparsing or changing Markdown', large, workers: before });
+    }
+  }
   for (const command of ['workbench.action.closeSidebar', 'workbench.action.closeAuxiliaryBar', 'workbench.action.closePanel']) await host('command', { command, args: [] });
   await page.setViewportSize({ width: 2200, height: 1100 }); await host('layout', { sourceSize: .1 });
   await host('configure', { values: { language: 'en', theme: 'playground-dark', typography: 'standard', editingEnabled: false, loadingMode: 'blocking', tocMode: 'hidden', sidebarMode: 'hidden', syncScroll: false, 'plugins.enabled': false } });

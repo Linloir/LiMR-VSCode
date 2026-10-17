@@ -76,17 +76,25 @@ export async function runFeatureAcceptance({ page, frame, host, artifacts }) {
     await expect(heading()).toBeVisible();
     await heading().click();
   }
+  let preferencePicks = 0;
+  async function openPreference(command) {
+    const typography = command === 'limr.chooseTypography';
+    // Use real native controls: an IPC command can race a guest's delayed
+    // focus notification and dismiss the QuickPick it has just opened.
+    if (++preferencePicks % 2) await visibleToolbarButton(typography ? 'Choose Typography' : 'Choose Translation Display').click();
+    else await page.locator(`.statusbar-item:has(.codicon-${typography ? 'text-size' : 'globe'})`).click();
+  }
   async function pick(command, scope, value) {
-    await host('command', { command, wait: false });
+    await openPreference(command);
     const input = page.locator('.quick-input-widget');
     await expect(input).toBeVisible();
-    await capturePicker(`${command}-scope-zh`, ['仅对本文件生效；关闭后仍保留，不修改 Markdown。']);
-    await page.locator('.quick-input-list').getByText(scope, { exact: true }).click();
+    await capturePicker(`${command}-modes-zh`, command === 'limr.chooseTypography'
+      ? ['自然换行、左侧对齐，保留普通 Markdown 的阅读排版。', '整体优化段落断行，让两端对齐时的行间疏密更均匀。']
+      : ['所有翻译块同时展示原文和译文。', '各段分别使用已保存的显示方式；未调整的段落遵循正文中的配置。']);
+    await page.locator('.quick-input-list').getByText(value ?? scope, { exact: true }).click();
     if (value) {
-      await capturePicker(`${command}-modes-zh`, command === 'limr.chooseTypography'
-        ? ['自然换行、左侧对齐，保留普通 Markdown 的阅读排版。', '整体优化段落断行，让两端对齐时的行间疏密更均匀。']
-        : ['所有翻译块同时展示原文和译文。', '各段分别使用已保存的显示方式；未调整的段落遵循正文中的配置。']);
-      await page.locator('.quick-input-list').getByText(value, { exact: true }).click();
+      await capturePicker(`${command}-scope-zh`, ['仅对本文件生效；关闭后仍保留，不修改 Markdown。']);
+      await page.locator('.quick-input-list').getByText(scope, { exact: true }).click();
     }
     await expect(input).not.toBeVisible();
     await heading().click();
@@ -180,11 +188,12 @@ export async function runFeatureAcceptance({ page, frame, host, artifacts }) {
   await save({ check: 'Translation defaults and per-file modes work in read-only documents; switching one paragraph snapshots the others, persists across reopen, preserves keyboard focus and never edits Markdown or defaults', defaults });
 
   // Inspect the selected default while the current file has a different mode.
-  await host('command', { command: 'limr.chooseTypography', wait: false });
+  await openPreference('limr.chooseTypography');
   await expect(page.locator('.quick-input-widget')).toBeVisible();
-  await page.locator('.quick-input-list').getByText('默认配置', { exact: true }).click();
-  await expect(page.locator('.quick-input-list .monaco-list-row').filter({ has: page.getByText('两端对齐', { exact: true }) })).toContainText('当前');
-  await expect(page.locator('.quick-input-list .monaco-list-row').filter({ has: page.getByText('标准', { exact: true }) })).not.toContainText('当前');
+  await expect(page.locator('.quick-input-list .monaco-list-row').filter({ has: page.getByText('两端对齐', { exact: true }) })).toContainText('默认');
+  await expect(page.locator('.quick-input-list .monaco-list-row').filter({ has: page.getByText('两端对齐', { exact: true }) })).not.toContainText('当前');
+  await expect(page.locator('.quick-input-list .monaco-list-row').filter({ has: page.getByText('标准', { exact: true }) })).toContainText('当前');
+  await expect(page.locator('.quick-input-list .monaco-list-row').filter({ has: page.getByText('当前文件恢复默认', { exact: true }) })).toContainText('默认：两端对齐');
   await screenshot('default-current-indicator');
   await page.keyboard.press('Escape');
 
@@ -193,10 +202,10 @@ export async function runFeatureAcceptance({ page, frame, host, artifacts }) {
   await expect(frame.locator('html')).toHaveAttribute('lang', 'en');
   await expect(translations().first().locator('[data-translation-switch]')).toHaveAttribute('aria-label', /Showing bilingual/);
   await expect(page.locator('.statusbar-item').filter({ hasText: 'LiMR · Read only' })).toBeVisible();
-  await host('command', { command: 'limr.chooseTranslationMode', wait: false });
-  await capturePicker('translation-scope-en', ['Only affects this file; saved across sessions. Markdown is unchanged.']);
-  await page.locator('.quick-input-list').getByText('This file', { exact: true }).click();
+  await openPreference('limr.chooseTranslationMode');
   await capturePicker('translation-modes-en', ['Show both the original and translation in every translation block.']);
+  await page.locator('.quick-input-list').getByText('Bilingual', { exact: true }).click();
+  await capturePicker('translation-scope-en', ['Only affects this file; saved across sessions. Markdown is unchanged.']);
   await page.keyboard.press('Escape');
   await host('command', { command: 'limr.chooseTheme', wait: false });
   await capturePicker('theme-en', ['Use LiMR reading colors and switch light/dark with VS Code.']);

@@ -112,7 +112,13 @@ export class ReaderScrollSync {
       if (!reader) return;
       if (this.pendingReveal !== undefined) {
         const offset = this.pendingReveal; this.pendingReveal = undefined;
-        reader.restoreReadingPosition({ source: offset, offset: anchor });
+        // Source offset zero means the scroll boundary, not the first glyph's
+        // baseline (which is a few pixels below the padding for plain text).
+        // Retire any pending virtual seek with a clamped start request before
+        // setting the physical boundary, so its refinement cannot pull us back.
+        reader.restoreReadingPosition({ source: offset, offset: offset === 0 ? this.root.scrollHeight : anchor });
+        if (offset === 0) this.root.scrollTo({ top: 0, behavior: 'instant' });
+        this.appliedScrollTop = this.root.scrollTop;
         this.lastOffset = undefined;
       } else if (this.readerInput) {
         const position = reader.getReadingPosition();

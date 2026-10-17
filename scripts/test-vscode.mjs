@@ -112,10 +112,17 @@ const candidate = await readFile(path.join(extensionPath, 'reading-build.json'),
   if (error.code !== 'ENOENT') throw error;
 });
 if (candidate) assert.deepEqual(assets, candidate.assets, 'Frozen candidate assets must match their build manifest.');
+const productManifest = JSON.parse(await readFile(path.join(extensionPath, 'package.json'), 'utf8'));
+const coreManifest = await readFile(path.join(extensionPath, 'node_modules/@linloir/limr/package.json'), 'utf8').then(JSON.parse).catch(error => {
+  if (error.code !== 'ENOENT') throw error;
+});
+const coreVersion = candidate?.coreVersion ?? coreManifest?.version ?? productManifest.dependencies['@linloir/limr'];
+assert.match(coreVersion, /^\d+\.\d+\.\d+$/, 'Packaged products must pin an exact core version.');
 const build = {
   extensionPath,
-  extensionVersion: JSON.parse(await readFile(path.join(extensionPath, 'package.json'), 'utf8')).version,
-  limrVersion: candidate?.coreVersion ?? JSON.parse(await readFile(path.join(extensionPath, 'node_modules/@linloir/limr/package.json'), 'utf8')).version,
+  extensionVersion: productManifest.version,
+  limrVersion: coreVersion,
+  coreVersionSource: candidate ? 'frozen build' : coreManifest ? 'node_modules' : 'packaged dependency pin; compare bundled asset hashes',
   sha256: Object.fromEntries(['extension.cjs', 'syntax-worker.cjs', 'webview/main.js', 'webview/main.css', 'webview/reader-worker.js'].map(file => [`dist/${file}`, assets[file]])),
   assets,
   ...(candidate ? { candidate: { sourceSHA256: candidate.sourceSHA256, coreSHA256: candidate.coreSHA256, builtAt: candidate.builtAt } } : {}),
@@ -218,12 +225,15 @@ try {
     : process.env.LIMR_TEST_SUITE === 'annotations' || process.argv.includes('--annotations') ? (await import('../tests/browser/annotations.mjs')).runAnnotationAcceptance
     : navigationSuite ? (await import('../tests/browser/navigation.mjs')).runNavigationAcceptance
     : process.env.LIMR_TEST_SUITE === 'image-preview' || process.argv.includes('--image-preview') ? (await import('../tests/browser/image-preview.mjs')).runImagePreviewAcceptance
+    : process.argv.includes('--limits') ? (await import('../tests/browser/load-limits.mjs')).runLoadLimitsAcceptance
+    : process.env.LIMR_TEST_SUITE === 'loading' || process.argv.includes('--loading') ? (await import('../tests/browser/loading.mjs')).runLoadingAcceptance
     : process.env.LIMR_TEST_SUITE === 'table-layout' || process.argv.includes('--table-layout') ? (await import('../tests/browser/table-layout.mjs')).runTableLayoutAcceptance
     : syntaxSuite ? (await import('../tests/browser/syntax-highlighting.mjs')).runSyntaxHighlightingAcceptance
     : extensionPluginSuite ? (await import('../tests/browser/extension-plugins.mjs')).runExtensionPluginsAcceptance
     : largePluginSuite ? (await import('../tests/browser/large-plugins.mjs')).runLargePluginsAcceptance
     : process.env.LIMR_TEST_SUITE === 'images' || process.argv.includes('--images') ? (await import('../tests/browser/images.mjs')).runImageAcceptance
     : process.env.LIMR_TEST_SUITE === 'sidebar-mode' || process.argv.includes('--sidebar-mode') ? (await import('../tests/browser/sidebar-mode.mjs')).runSidebarModeAcceptance
+    : process.argv.includes('--scroll-refresh') ? (await import('../tests/browser/scroll-refresh.mjs')).runScrollRefreshAcceptance
     : process.env.LIMR_TEST_SUITE === 'scroll-sync' || process.argv.includes('--scroll-sync') ? (await import('../tests/browser/scroll-sync.mjs')).runScrollSyncAcceptance
     : process.env.LIMR_TEST_SUITE === 'scroll-jitter' || process.argv.includes('--scroll-jitter') ? (await import('../tests/browser/scroll-jitter.mjs')).runScrollJitterAcceptance
     : process.env.LIMR_TEST_SUITE === 'translation-scroll' || process.argv.includes('--translation-scroll') ? (await import('../tests/browser/translation-scroll.mjs')).runTranslationScrollAcceptance

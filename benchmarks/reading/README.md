@@ -159,3 +159,5 @@ For either acceptance command, `LIMR_TEST_EXTENSION_PATH=/absolute/path/to/froze
 结果为 `report.md`、完整 `report.json`，以及每个案例的 `result.json`、截图和 `electron.log`。报告包含生产资源 hash（包括 parser worker）、实际加载资源 hash、输入 hash、扩展与 core 版本、源码/core 指纹、VS Code 版本、系统与模式。失败会保留证据并返回非零退出码；Ctrl-C 会终止本案例的隔离 Electron 进程组。
 
 Reports include a concise Markdown table, full JSON, per-case raw evidence/screenshots/logs, input and built/loaded asset hashes, source/core fingerprints and runtime versions. Failed cases remain visible and return a nonzero exit status. Ctrl-C terminates the disposable Electron process group.
+
+`BENCH_MEMORY=1` samples Linux process-tree RSS once per second. Reports include the peak and per-process samples. Shared pages count once per process; these totals are not unique physical memory or JavaScript heap. Compare identical hardware, GPU policy and fixtures. Large source-arrival observations record binary versus JSON transport without decoding an extra copy.

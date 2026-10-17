@@ -82,12 +82,13 @@ describe('source editor decoration lifecycle', () => {
     const doc = document(), left = editor(doc), right = editor(doc); state.editors = [left, right]; start(); reply();
     expect([painted(left), painted(right)]).toEqual([1, 1]);
     const next = document('untitled:Untitled-1'); state.editors.push(editor(next)); state.events.get('visible')!([]);
-    toggle(false); vi.runAllTimers();
+    toggle(false); vi.advanceTimersByTime(150);
     expect([painted(left), painted(right)]).toEqual([0, 0]);
     expect(next.getText).not.toHaveBeenCalled();
-    toggle(true); vi.runAllTimers(); toggle(false); reply();
+    toggle(true); vi.advanceTimersByTime(150); toggle(false); reply();
     expect(state.editors.every(view => painted(view as ReturnType<typeof editor>) === 0)).toBe(true);
-    expect(state.workers[0].posted).toHaveLength(2); // No disabled queued untitled parse.
+    expect(state.workers.flatMap(worker => worker.posted)).toHaveLength(2); // No disabled queued untitled parse.
+    expect(state.workers.every(worker => worker.terminate.mock.calls.length === 1)).toBe(true);
   });
   it('debounces edits and discards results from an earlier document version', () => {
     const doc = document(), view = editor(doc); state.editors = [view]; start();
@@ -95,7 +96,7 @@ describe('source editor decoration lifecycle', () => {
     for (let version = 2; version <= 4; version++) {
       Object.assign(doc, { version }); state.events.get('change')!({ document: doc, contentChanges: [{}] });
     }
-    vi.runAllTimers(); reply(spans, original);
+    vi.advanceTimersByTime(150); reply(spans, original);
     expect(painted(view)).toBe(0);
     expect(state.workers[0].posted.map(request => request.version)).toEqual([1, 4]);
     reply(); expect(painted(view)).toBe(1);
@@ -105,10 +106,11 @@ describe('source editor decoration lifecycle', () => {
     const original = state.workers[0].posted[0];
     Object.assign(old, { isClosed: true }); state.events.get('close')!(old);
     const replacement = document(), view = editor(replacement); state.editors = [view]; state.events.get('visible')!([]);
-    vi.runAllTimers(); reply(spans, original);
+    vi.advanceTimersByTime(150); reply(spans, original);
     expect(painted(view)).toBe(0);
-    expect(state.workers[0].posted).toHaveLength(2);
-    reply(); expect(painted(view)).toBe(1);
+    expect(state.workers[0].terminate).toHaveBeenCalledOnce();
+    const worker = state.workers.at(-1)!;
+    worker.listeners.get('message')!({ ...worker.posted.at(-1), tokens: spans }); expect(painted(view)).toBe(1);
   });
   it('supports untitled and remote Markdown, then clears when the language changes', () => {
     for (const uri of ['untitled:Untitled-1', 'vscode-remote://wsl+Ubuntu/home/test.md']) {
@@ -123,9 +125,21 @@ describe('source editor decoration lifecycle', () => {
   it('does no scanning while disabled and disposes the worker and pending timers', () => {
     const doc = document(); state.editors = [editor(doc)]; state.enabled = false; start();
     expect(doc.getText).not.toHaveBeenCalled(); expect(state.workers).toHaveLength(0);
-    toggle(true); vi.runAllTimers(); service!.dispose(); service = undefined;
+    toggle(true); vi.advanceTimersByTime(150); service!.dispose(); service = undefined;
     expect(state.workers[0].terminate).toHaveBeenCalledOnce(); expect(state.events.size).toBe(0);
     reply(); // A result racing shutdown is harmless.
+  });
+  it('skips supplementary parsing above 4 MiB characters without reading the buffer', () => {
+    const doc = document(); Object.assign(doc, { lineCount: 50_000 });
+    state.editors = [editor(doc)]; start();
+    expect(doc.getText).not.toHaveBeenCalled(); expect(state.workers).toHaveLength(0);
+  });
+  it('terminates a hidden document worker and a worker exceeding 60 seconds', () => {
+    const doc = document(); state.editors = [editor(doc)]; start();
+    state.editors = []; state.events.get('visible')!([]);
+    expect(state.workers[0].terminate).toHaveBeenCalledOnce();
+    state.editors = [editor(doc)]; state.events.get('visible')!([]); vi.advanceTimersByTime(150);
+    vi.advanceTimersByTime(60_000); expect(state.workers[1].terminate).toHaveBeenCalledOnce();
   });
   it('binary-searches large cached arrays and respects exact end boundaries', () => {
     const all: SyntaxToken[] = Array.from({ length: 100_000 }, (_, index) => ({ start: index * 10, end: index * 10 + 3, kind: 'tag' }));

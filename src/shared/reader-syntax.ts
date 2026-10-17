@@ -46,9 +46,16 @@ function scriptFor(character: string, previous: Script): Script {
   if (letterOrSymbolCharacter.test(character)) return 'other';
   return previous;
 }
-function point(source: string, offset: number, origin: SourcePoint): SourcePoint {
-  const preceding = source.slice(0, offset), lines = preceding.split(/\r\n|\r|\n/);
-  return { offset: origin.offset + offset, line: origin.line + lines.length - 1, column: lines.length > 1 ? lines.at(-1)!.length + 1 : origin.column + preceding.length };
+function sourcePoints(source: string, origin: SourcePoint): (offset: number) => SourcePoint {
+  // One line index per leaf, not a growing prefix copy/split for every script
+  // boundary. Mixed-script paragraphs otherwise take quadratic time and GC.
+  const breaks = [...source.matchAll(/\r\n|\r|\n/g)].map(match => ({ start: match.index!, end: match.index! + match[0].length }));
+  return offset => {
+    let low = 0, high = breaks.length;
+    while (low < high) { const middle = (low + high) >>> 1; if (breaks[middle].start < offset) low = middle + 1; else high = middle; }
+    return { offset: origin.offset + offset, line: origin.line + low,
+      column: low ? offset - Math.min(offset, breaks[low - 1].end) + 1 : origin.column + offset };
+  };
 }
 
 /** Split text before source bindings are created. The wrapper never owns a
@@ -76,10 +83,11 @@ export function languageTypographySyntax(): SyntaxExtension {
             else pieces.push({ start: offset, end: offset + character.length, script });
             offset += character.length; previous = script;
           }
+          const point = sourcePoints(raw, child.position.start);
           return pieces.map(piece => {
             const position = {
-              start: point(raw, mapping ? mapping.starts[piece.start] - start : piece.start, child.position!.start),
-              end: point(raw, mapping ? mapping.ends[piece.end - 1] - start : piece.end, child.position!.start),
+              start: point(mapping ? mapping.starts[piece.start] - start : piece.start),
+              end: point(mapping ? mapping.ends[piece.end - 1] - start : piece.end),
             };
             const leaf: MarkdownNode = { ...child, value: value.slice(piece.start, piece.end), position };
             return { type: 'lv-script', lvScript: piece.script, position, children: [leaf] } as MarkdownNode;

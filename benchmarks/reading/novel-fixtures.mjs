@@ -19,15 +19,25 @@ for (const mib of sizes) {
     const body = Buffer.from(text); hash.update(body); bytes += body.length; chars += text.length;
     if (!stream.write(body)) await once(stream, 'drain');
   };
+  const ending = '# Final chapter\n\nTHE-END-OF-THE-COMPLETE-BOOK\n';
+  const target = mib * 1024 * 1024;
   await append('# Start\n\n');
-  while (bytes < mib * 1024 * 1024) {
+  while (bytes < target - Buffer.byteLength(ending)) {
     // Distinct source offsets/text make an accidental top/middle/tail repeat
     // detectable; paragraphs stay independent and contain no translation UI.
     const chunk = [];
     for (let index = 0; index < 64; index++) chunk.push(`Paragraph ${++paragraphs}. ${phrase.repeat(6)}\n\n`);
-    await append(chunk.join(''));
+    const body = chunk.join('');
+    if (bytes + Buffer.byteLength(body) + Buffer.byteLength(ending) > target) {
+      // Exact byte boundaries matter for the 75 MiB host limit. Fill with an
+      // ASCII paragraph and preserve the final heading/sentinel.
+      const remaining = target - bytes - Buffer.byteLength(ending);
+      await append(remaining >= 2 ? 'x'.repeat(remaining - 2) + '\n\n' : '\n'.repeat(remaining));
+      break;
+    }
+    await append(body);
   }
-  await append('# Final chapter\n\nTHE-END-OF-THE-COMPLETE-BOOK\n');
+  await append(ending);
   stream.end(); await finished(stream);
   reports.push({ name, requestedMiB: mib, bytes, chars, paragraphs, sha256: hash.digest('hex') });
 }

@@ -14,6 +14,9 @@ export const readerWorkerRegistry: WorkerExtensionRegistry = {
  * typography maps each text leaf independently and shares no cross-block data.
  * Unknown add-ons never inherit this capability from the host. */
 export const readerWorkerOptions: DocumentWorkerHandlerOptions = {
+  // The shipped standard factory is unchanged. Core still excludes custom
+  // registry IDs from packed transport; their exact graph contract is kept.
+  packedSnapshots: true,
   independentProseExtensions: Object.freeze(Object.values(readerSyntaxIds)),
   // Separate permission for fresh, isolated parses of incomplete Markdown.
   // Final semantics may differ; this does not permit arbitrary graph packets.

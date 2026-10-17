@@ -10,7 +10,7 @@ export function installObservers() {
   });
   const onMessage = event => {
     const message = event.data;
-    if (message?.type === 'state') state.messages.push({ at: performance.now(), type: 'state', chars: message.state?.document?.source?.length, version: message.state?.document?.version, settings: message.state?.settings });
+    if (message?.type === 'state') state.messages.push({ at: performance.now(), type: 'state', chars: message.sourceCharacters ?? message.state?.document?.source?.length, transport: message.sourceBytes instanceof ArrayBuffer ? "binary" : "json", version: message.state?.document?.version, settings: message.state?.settings });
     else if (message?.type === 'configuration') state.messages.push({ at: performance.now(), type: message.type, settings: message.configuration?.settings });
     else if (message?.type === 'reveal' || message?.type === 'scrollIntent') state.messages.push({ at: performance.now(), type: message.type,
       offset: message.offset, generation: message.generation, epoch: message.epoch, active: message.active,

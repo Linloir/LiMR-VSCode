@@ -15,6 +15,7 @@ import { ReaderImages } from './images';
 import { readerFrontmatter } from './frontmatter';
 import { useReaderViewState } from './reader-view-state';
 import { applyReaderConfiguration } from './reader-state';
+import { loadErrorMessage, fitsPreviewLimit } from '../src/shared/load-limits';
 
 interface PendingEdit {
   id: string; baseVersion: number; baseSource: string; source: string;
@@ -51,6 +52,15 @@ export function App() {
   const workspacePlugins = useWorkspacePlugins(state?.plugins ?? noWorkspacePlugins, notify);
   const readerReady = useMemo(() => readerContent?.uri === state?.document.uri && readerContent?.source === source && !!readerContent?.complete, [readerContent, state?.document.uri, source]);
   readerReadyRef.current = readerReady;
+  useEffect(() => {
+    // Echoed reader edits and unchanged-text editor revisions can reuse a
+    // completed engine without a new AsyncReader session notification.
+    const commands = readerCommands.current;
+    if (readerReady && state && !state.loadError && commands?.isDocumentComplete()
+      && commands.document.getSnapshot().source === state.document.source)
+      post({ type: 'loadProgress', progress: { uri: state.document.uri, version: state.document.version,
+        requestId: 'rendered', status: 'ready', phase: 'ready', percent: 100 } });
+  }, [readerReady, state?.document.uri, state?.document.version, state?.loadError]);
   const sidebarEnabled = state?.settings.sidebarMode === 'always' || state?.settings.sidebarMode === 'content' && readerContent?.uri === state?.document.uri && !!readerContent?.hasContent;
   useReaderViewState(scrollRoot, state?.document.uri, readerReady, readerCommands);
   const updateFileSettings = useCallback((fileOverrides: ReaderFileSettings, translationEpoch?: number, documentVersion?: number) => {
@@ -66,6 +76,7 @@ export function App() {
   const translationRequest = useMemo(() => state ? { uri: state.document.uri, version: state.document.version, source } : undefined,
     [state?.document.uri, state?.document.version, source]);
   const { parameters, onDocument: translationDocument, cancel: cancelPendingTranslation } = useTranslationParameters(state?.settings, updateFileSettings, translationRequest, state?.translationEpoch ?? 0);
+  const readerParameters = useMemo(() => ({ ...parameters, tableLayout: state?.settings.tableLayoutEnabled === false ? false as const : undefined }), [parameters, state?.settings.tableLayoutEnabled]);
   const readerAvailable = useCallback((commands: ReaderCommands, document: DocumentSnapshot, hasContent: boolean) => {
     readerCommands.current = commands;
     const complete = commands.isDocumentComplete();
@@ -86,12 +97,18 @@ export function App() {
     const next = current?.document.uri === incoming.document.uri && current.document.version > incoming.document.version
       ? { ...incoming, document: current.document } : incoming;
     stateRef.current = next; setState(next);
+    if (next.loadError) setReaderContent(null);
     const edit = pending.current;
     if (force || !edit || next.document.version > edit.baseVersion || next.document.source !== edit.baseSource) setSource(next.document.source);
   }, []);
   useEffect(() => {
     const receive = (message: HostMessage) => {
-      if (message.type === 'state') applyState(message.state);
+      if (message.type === 'state') {
+        const incoming = message.sourceBytes instanceof ArrayBuffer
+          ? { ...message.state, document: { ...message.state.document,
+            source: new TextDecoder('utf-8', { ignoreBOM: true }).decode(message.sourceBytes) } } : message.state;
+        applyState(incoming);
+      }
       else if (message.type === 'translationIntent') { if (message.uri === stateRef.current?.document.uri) cancelPendingTranslation(message.epoch); }
       else if (message.type === 'configuration') {
         const next = applyReaderConfiguration(stateRef.current, message);
@@ -123,6 +140,9 @@ export function App() {
   const editSource = useCallback((nextSource: string, change: SourceChange): boolean => {
     const current = stateRef.current;
     if (!current?.settings.editingEnabled || !current.trusted || pending.current) return false;
+    if (!fitsPreviewLimit(nextSource)) {
+      notify(loadErrorMessage('too-large', current.settings.locale), true); return false;
+    }
     if (change.document.source !== current.document.source) {
       notify(current.settings.locale === 'zh-CN' ? 'Markdown 已在编辑器中更新。请在同步后重试。' : 'Markdown changed in the editor. Please retry after synchronization.', true); return false;
     }
@@ -153,11 +173,17 @@ export function App() {
     ? state?.themeKind === 'dark' || state?.themeKind === 'high-contrast'
     : selectedTheme !== 'vscode-light' && selectedTheme !== 'playground-light';
   const oneDark = selectedTheme.startsWith('one-dark') || selectedTheme === 'auto' && /one dark pro/i.test(state?.themeName ?? '');
-  const extensions = useMemo(() => [
+  // Parser instances survive palette/locale changes. Only the view-only layer
+  // below changes, so AsyncReader keeps its completed engine and reading state.
+  const parserExtensions = useMemo(() => [
     ...standard().filter(extension => extension.name !== 'code-highlight'),
-    readerCodeHighlight({ lightTheme: playground ? 'github-light' : 'light-plus', darkTheme: playground ? 'github-dark' : oneDark ? 'one-dark-pro' : 'dark-plus' }),
-    readerFrontmatter(), readingAnnotations(locale), languageTypography(),
-  ], [oneDark, playground, locale]);
+    readerCodeHighlight(), readerFrontmatter(), readingAnnotations(), languageTypography(),
+  ], []);
+  const extensions = useMemo(() => {
+    const code = readerCodeHighlight({ lightTheme: playground ? 'github-light' : 'light-plus', darkTheme: playground ? 'github-dark' : oneDark ? 'one-dark-pro' : 'dark-plus' });
+    return [...parserExtensions, { name: 'vscode-reader-presentation', components: code.components,
+      virtualization: code.virtualization, annotationTypes: readingAnnotations(locale).annotationTypes }];
+  }, [parserExtensions, oneDark, playground, locale]);
 
   useLayoutEffect(() => {
     if (!state) return;
@@ -214,6 +240,7 @@ export function App() {
     return () => { sync.dispose(); scrollSync.current = null; };
   }, [scrollRoot]);
   useEffect(() => { scrollSync.current?.reset(); }, [state?.settings.syncScroll]);
+  useLayoutEffect(() => { if (readerReady) scrollSync.current?.refresh(); }, [readerReady]);
 
   const imageConfiguration = JSON.stringify([state?.settings.imagePathMode, state?.settings.imageBaseFolder, state?.settings.imageSearchPaths]);
   useLayoutEffect(() => {
@@ -238,15 +265,19 @@ export function App() {
   const tocVisible = state.settings.tocMode === 'always' || state.settings.tocMode === 'wide' && sideTocAvailable;
   return <div className={`lv-app${busy ? ' is-saving' : ''}`} data-testid="reader-app" data-editing={editingEnabled} data-reader-ready={readerReady} aria-busy={busy || !readerReady}>
     <div className="lv-scroll" ref={setScrollRoot} data-testid="reader-scroll">
-      <EditorContext.Provider value={editorSession}>
+      {state.loadError ? <div className="lv-load-error" role="alert">
+        <span>{loadErrorMessage(state.loadError, locale)}</span>
+        {state.loadError === 'timeout' && <button type="button" onClick={() => post({ type: 'retryLoad' })}>{locale === 'zh-CN' ? '重试' : 'Retry'}</button>}
+        <button type="button" onClick={() => post({ type: 'openSource' })}>{locale === 'zh-CN' ? '打开源码' : 'Open source'}</button>
+      </div> : <EditorContext.Provider value={editorSession}>
         <PluginBoundary plugins={workspacePlugins} notify={notify}>{plugins => <MemoReader key={state.document.uri} className={`lv-reader${centeredToc ? ' lv-centered-toc' : ''}`} source={source} documentId={state.document.uri}
           theme={isDark ? 'dark' : 'light'} appearance={playground ? 'classic' : 'vscode'} locale={locale === 'zh-CN' ? chinese : english} extensions={extensions} plugins={plugins}
           actions={actions} annotations={noExternalAnnotations} onSourceChange={editingEnabled ? editSource : undefined}
-          typography={state.settings.typography} parameters={parameters} loadingMode={state.settings.loadingMode}
+          typography={state.settings.typography} parameters={readerParameters} loadingMode={state.settings.loadingMode} documentVersion={state.document.version}
           sidebar={sidebarEnabled} sidebarBreakpoint={tocVisible ? 1120 : 900} sidebarCollapse={state.settings.sidebarAutoCollapse} toc={tocVisible}
           scrollRoot={scrollRoot} scrollOffset={18}><ReaderIntegration onReader={readerAvailable} onDispose={readerDisposed} /></MemoReader>}</PluginBoundary>
-      </EditorContext.Provider>
-      {!source.trim() && <div className="lv-empty"><ToolIcon name="note" /><p>{locale === 'zh-CN' ? '这份 Markdown 还是空白。' : 'This Markdown document is empty.'}</p><button type="button" onClick={() => post({ type: 'openSource' })}><span className="limr-underline">{locale === 'zh-CN' ? '在编辑器中开始书写' : 'Start writing in the editor'}</span></button></div>}
+      </EditorContext.Provider>}
+      {!state.loadError && !source.trim() && <div className="lv-empty"><ToolIcon name="note" /><p>{locale === 'zh-CN' ? '这份 Markdown 还是空白。' : 'This Markdown document is empty.'}</p><button type="button" onClick={() => post({ type: 'openSource' })}><span className="limr-underline">{locale === 'zh-CN' ? '在编辑器中开始书写' : 'Start writing in the editor'}</span></button></div>}
     </div>
   </div>;
 }

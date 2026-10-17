@@ -11,11 +11,11 @@ LiMR is a Markdown reader designed for comfortable reading. This extension bring
 - **Polished defaults**: bundled Chinese serif and monospace code fonts, light and dark palettes, and VS Code theme integration. Article width, contents, and annotation panels adapt to the available space.
 - **Rich content**: syntax highlighting, math, Mermaid diagrams, and blocks for callouts, definitions, citations, and paragraph translations. YAML frontmatter appears as a document information card.
 - **Annotations in your Markdown**: select text to add highlights, notes, and questions. Changes stay in the original file and work with VS Code save, undo, and Git. Reading is read-only by default; enable editing when needed.
-- **Click to preview images**: inspect Markdown, reference, and figure images inside the reader, switch between fit and actual size, and close with Escape, the close button, or the backdrop.
+- **Click to preview images**: LiMR's native preview supports fit, actual size, fill, zoom, dragging, and copying image pixels for Markdown, reference, and figure images. Close with Escape, the close button, or the backdrop. Copying requires clipboard permission and a readable image resource.
 - **Reading preferences**: configure fonts, spacing, article width, contents, translation display, and paragraph layout. Source and reader can scroll together.
 - **Simple extensibility**: use workspace CSS to change appearance and JavaScript modules to add components, syntax, annotations, or actions. Reusable modules can also ship as VS Code add-ons.
 
-LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.2.3`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
+LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.1`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
 
 ## Get started and configure
 
@@ -36,7 +36,8 @@ Web links open directly in your browser. File links reuse the target file in ano
 | `limr.codeFontFamily` / `limr.codeFontSize` | `""` / `14` | Code font and size in px; an empty family uses bundled Maple Mono NF CN. |
 | `limr.lineHeight` / `limr.maxWidth` | `1.8` / `860` | Body line-height multiplier and maximum width in px. Reduce them for a more compact layout. |
 | `limr.typography` | `"standard"` | `standard` normal layout; `justify` justified text; `knuth-plass` paragraph-wide line-breaking optimization. |
-| `limr.loadingMode` | `"blocking"` | Wait for a complete long document before reading. `progressive` can show an independently parseable opening while loading continues, preserving your reading position when complete. |
+| `limr.tableLayout.enabled` | `true` | Optimize table layout; disable for native tables with less measurement work on long tables. |
+| `limr.loadingMode` | `"progressive"` | Show a read-only preview while the complete document parses in the background, preserving your reading position when ready. Choose `blocking` to wait before showing content. Some plugins require complete loading. |
 | `limr.sidebarMode` | `"content"` | `content` shows the sidebar when notes exist; `always` always enables it; `hidden` hides it. Narrow readers display annotations in overlays. |
 | `limr.sidebarAutoCollapse` | `true` | Fold crowded sidebar items automatically; turn off to lay them out individually. |
 | `limr.tocMode` | `"always"` | `always` shows side contents on wide screens and collapsible contents on narrow ones; `wide` shows only side contents; `hidden` hides both. |
@@ -50,6 +51,10 @@ Web links open directly in your browser. File links reuse the target file in ano
 | `limr.syntaxHighlighting.enabled` | `true` | Add colors for built-in LiMR syntax in Markdown source editors. |
 | `limr.plugins.enabled` / `limr.plugins.manifest` | `true` / `".limr/plugins/manifest.json"` | Enable reader plugins and select the workspace manifest. Plugins load only in trusted windows. |
 | `limr.skills.promptOnStartup` | `true` | Offer the AI collaboration skill; disable at user or workspace scope if desired. |
+
+A thin bar below the editor tabs and a native status-bar percentage show loading progress. Click the status item to cancel; after cancellation or an error, click it to retry. The top bar uses VS Code's progress color inside the reader because the public extension API does not expose the editor group's native progress widget.
+
+Previews accept up to **75 MiB** of UTF-8 editor text, including unsaved edits, with a **60-second** deadline per load. Oversized text never enters the reader; a timeout releases the guest and parser worker, with Retry and Open source actions. Large text uses VS Code binary messages. Above 4 Mi UTF-16 characters, supplementary LiMR source decorations are skipped while VS Code’s Markdown highlighting remains available, avoiding a second full syntax tree in split view.
 
 For example, add this to User Settings JSON or your project's `.vscode/settings.json`:
 
@@ -67,7 +72,7 @@ For example, add this to User Settings JSON or your project's `.vscode/settings.
 
 This slightly enlarges body text, narrows the article, and shows contents only in wide readers. Switching color themes preserves font settings. Fixed and additional image directories accept absolute paths, `file:` URIs, and `~`; relative directories start at the file's workspace, or its directory when no workspace is open.
 
-Typography and translation support per-file overrides through **LiMR: Choose Typography** and **LiMR: Choose Translation Display**. Overrides persist across reopening without rewriting Markdown. **LiMR: Reset Current File Reading Settings** restores the defaults.
+Typography and translation support per-file overrides through **LiMR: Choose Typography** and **LiMR: Choose Translation Display**. Choose a value first, then apply it to this file or the default settings. The first menu shows the current and default values; “Reset this file to default” clears the override immediately, including paragraph overrides for translation. Defaults follow VS Code user/workspace/folder precedence, with the actual scope shown in the menu. Overrides persist across reopening without rewriting Markdown. **LiMR: Reset Current File Reading Settings** restores the defaults.
 
 ## Customize appearance and capabilities with AI
 
@@ -117,7 +122,7 @@ export default ({ React, limr }) => limr.defineBlock({
 
 Use `:::research-card`, the card's Markdown body, and a closing `:::` in your document. Add CSS for its appearance, or ask your assistant to build syntax, annotation types, and actions using the public interfaces.
 
-The host retains manifest namespaces for extension `name` without mutating the factory's original object; workspace plugins and add-ons may return the same extension name. Authored tag/directive names, component keys and annotation types remain unchanged, so actual syntax names must still avoid conflicts. Wrapped custom syntax uses main-thread compatibility parsing; pure view plugins do not disable the default syntax worker. Windowed rendering has a separate contract, so large-document performance is not guaranteed for every plugin; see the [compatibility contract](skills/limr-annotations/references/reader-plugins.md#large-document-compatibility).
+The host retains manifest namespaces for extension `name` without mutating the factory's original object; workspace plugins and add-ons may return the same extension name. Authored tag/directive names, component keys and annotation types remain unchanged, so actual syntax names must still avoid conflicts. Pure view plugins keep the default syntax worker. Custom syntax uses main-thread compatibility parsing only below 64 Ki UTF-16 characters; larger documents report missing worker compatibility explicitly. Windowed rendering has a separate contract, so large-document performance is not guaranteed for every plugin; see the [compatibility contract](skills/limr-annotations/references/reader-plugins.md#large-document-compatibility).
 
 For reuse across projects, package modules as a separate VS Code add-on and register them through `registerPlugin`. See the [plugin guide](skills/limr-annotations/references/reader-plugins.md), [API declarations](api/index.d.ts), and [complete add-on example](examples/vscode-reader-addon). In Remote-WSL / SSH, install add-ons in the same extension host as LiMR.
 

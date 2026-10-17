@@ -40,8 +40,19 @@ export interface ReaderSettings {
   bottomBarButtons: ReaderButton[];
   fileOverrides: ReaderFileSettings;
   syncScroll: boolean;
-  /** Complete loading is the default; progressive mode may show a safe prefix. */
+  tableLayoutEnabled: boolean;
+  /** Preview first by default; blocking waits for the complete document. */
   loadingMode?: 'blocking' | 'progressive';
+}
+/** Small host-facing state: never transfer an engine, AST, source or controls. */
+export interface ReaderLoadProgress {
+  uri: string;
+  version: number;
+  requestId: string;
+  status: 'loading' | 'ready' | 'cancelled' | 'error';
+  phase: 'read' | 'parse' | 'index' | 'ready';
+  percent: number;
+  error?: string;
 }
 export interface ReaderDocument {
   uri: string;
@@ -53,6 +64,7 @@ export interface ReaderDocument {
   isDirty: boolean;
 }
 export interface ReaderState {
+  loadError?: import('./load-limits').ReaderLoadError;
   /** Host-local ordering for provisional translation preferences. */
   translationEpoch?: number;
   document: ReaderDocument;
@@ -67,8 +79,9 @@ export interface SourceEdit { range: { start: number; end: number }; text: strin
 /** View preferences never carry another copy of the Markdown buffer. */
 export type ReaderConfiguration = Omit<ReaderState, 'document'>;
 export type HostMessage =
+  | { type: 'loadingAction'; requestId: string; action: 'cancel' | 'retry' }
   | { type: 'translationIntent'; uri: string; epoch: number }
-  | { type: 'state'; state: ReaderState }
+  | { type: 'state'; state: ReaderState; sourceBytes?: ArrayBuffer; sourceCharacters?: number }
   | { type: 'configuration'; configuration: ReaderConfiguration; document: Omit<ReaderDocument, 'source'> }
   | { type: 'imageResolved'; requestId: string; src: string; uri?: string; reason?: 'missing' | 'ambiguous' | 'unsupported' }
   | { type: 'editResult'; requestId: string; success: boolean; state: ReaderState; error?: string }
@@ -76,6 +89,8 @@ export type HostMessage =
   | { type: 'scrollIntent'; active: false; generation: number; epoch?: number }
   | { type: 'notice'; message: string; error?: boolean };
 export type WebviewMessage =
+  | { type: 'retryLoad' }
+  | { type: 'loadProgress'; progress: ReaderLoadProgress }
   | { type: 'ready' }
   | { type: 'resolveImage'; requestId: string; src: string }
   | { type: 'notify'; message: string; error?: boolean }

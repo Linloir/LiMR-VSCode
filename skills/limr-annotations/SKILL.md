@@ -1,11 +1,11 @@
 ---
 name: limr-annotations
-description: Read and author LiMR 1.2.3 Markdown, write answers back as highlighted question annotations across original/translated passages, and customize the VS Code reader with plugins.
+description: Read and author LiMR 1.3.0 Markdown, write answers back as highlighted question annotations across original/translated passages, and customize the VS Code reader with plugins.
 ---
 
 # LiMR annotations and reader customization
 
-Annotations live in Markdown. Read [the source annotation contract](references/source-annotations.md) before creating or changing them. For citations, translations, or other built-in syntax, read [the offline LiMR 1.2.3 syntax guide](references/limr-syntax.md), which also links to official documentation. To customize the VS Code reader or create an installable extension that adds styles or syntax, read [the reader plugin contract](references/reader-plugins.md), including the public registration API and runnable add-on example. These references ship with this skill; no separate skill, AI API key, message hook, or annotation database is needed.
+Annotations live in Markdown. Read [the source annotation contract](references/source-annotations.md) before creating or changing them. For citations, translations, or other built-in syntax, read [the offline LiMR 1.3.0 syntax guide](references/limr-syntax.md), which also links to official documentation. To customize the VS Code reader or create an installable extension that adds styles or syntax, read [the reader plugin contract](references/reader-plugins.md), including the public registration API and runnable add-on example. These references ship with this skill; no separate skill, AI API key, message hook, or annotation database is needed.
 
 ## Choose useful text units
 

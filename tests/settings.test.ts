@@ -17,6 +17,18 @@ import { readerLocale, readerSettings } from '../src/settings';
 describe('reader preferences', () => {
   beforeEach(() => { values.config = {}; values.language = 'en'; });
   const uri = { scheme: 'file' } as Parameters<typeof readerSettings>[0];
+  it('enables optimized tables by default and honors the native layout opt-out', () => {
+    expect(readerSettings(uri).tableLayoutEnabled).toBe(true);
+    values.config['tableLayout.enabled'] = false;
+    expect(readerSettings(uri).tableLayoutEnabled).toBe(false);
+  });
+  it('previews large documents by default and preserves an explicit blocking preference', () => {
+    expect(readerSettings(uri).loadingMode).toBe('progressive');
+    values.config.loadingMode = 'blocking';
+    expect(readerSettings(uri).loadingMode).toBe('blocking');
+    values.config.loadingMode = 'invalid';
+    expect(readerSettings(uri).loadingMode).toBe('progressive');
+  });
 
   it('follows VS Code language unless the reader language is explicit', () => {
     values.language = 'zh-tw';

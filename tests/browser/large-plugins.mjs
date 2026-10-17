@@ -135,22 +135,15 @@ export async function runLargePluginsAcceptance({ page, host, artifacts }) {
   await save({ check: 'Workspace and installed add-on with the same built-in factory name both render; matched copy contracts preserve windowing and the full document completes in a real worker', sourceChars: pureSource.length, installed, worker: pureWorker });
 
   await invoke('syntax', true);
-  await expect.poll(async () => (await reader()).getByRole('heading', { name: 'Namespaced pure view plugins', exact: true }).getAttribute('data-large-realm').catch(() => null)).toBe('document');
-  const syntaxSource = sourceFor('Namespaced custom syntax compatibility', true);
-  await host('replaceSource', { source: syntaxSource });
-  const syntax = await checkReady(syntaxSource, 'Namespaced custom syntax compatibility');
-  await expect(syntax.heading).toHaveAttribute('data-large-realm', 'document');
-  const custom = syntax.current.locator('[data-large-custom="yes"]');
-  await expect(custom).toContainText('Authored custom syntax survives compatibility parsing.');
-  await expect(custom).toHaveAttribute('data-large-realm', 'document');
-  const compatibility = await observed();
-  expect(compatibility.workers.some(worker => worker.requests.some(request => request.chars === syntaxSource.length))).toBe(false);
-  expect(compatibility.errors).toEqual([]);
-  await page.screenshot({ path: path.join(artifacts, 'large-plugins-compatibility.png') });
-  await save({ check: 'A wrapped registered custom syntax factory runs its exact transform in the document realm, renders authored syntax and stays windowed; its unmatched registration is never posted to the host worker', sourceChars: syntaxSource.length, realm: await custom.getAttribute('data-large-realm'), matchingWorkerRequests: 0 });
-
+  await expect((await reader()).locator('.lv-load-error')).toContainText('matching worker registration');
+  expect((await observed()).errors).toEqual([]);
+  await save({ check: 'Large unregistered syntax fails explicitly, preserving the interruptible worker requirement and source' });
+  // Small custom documents still run their exact grammar and transform.
+  await host('replaceSource', { source: '# Small plugin document\n\n:::large-plugin-note\nAuthored syntax remains available.\n:::\n' });
+  await expect((await reader()).getByRole('heading', { name: 'Small plugin document' })).toBeVisible();
+  await expect((await reader()).getByRole('heading', { name: 'Small plugin document' })).toHaveAttribute('data-large-realm', 'document');
+  await expect((await reader()).locator('[data-large-custom="yes"]')).toContainText('Authored syntax remains available.');
   await invoke('syntax', false);
-  await expect.poll(async () => (await reader()).getByRole('heading', { name: 'Namespaced custom syntax compatibility', exact: true }).getAttribute('data-large-realm').catch(() => null)).toBe('');
   const restoredSource = sourceFor('Worker restored after syntax disposal');
   await host('replaceSource', { source: restoredSource });
   await checkReady(restoredSource, 'Worker restored after syntax disposal');

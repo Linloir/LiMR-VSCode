@@ -2,7 +2,7 @@
 
 [English](ai-guide.en.md) · [Skill 原文](../skills/limr-annotations/SKILL.md)
 
-LiMR 把提问上下文复制到剪贴板，交给你选择的 AI 助手；不需要 API Key 或消息 Hook。标注保存在 Markdown 中，可以跟随文档提交 Git。附带的 Skill 同时说明 LiMR 1.2.3 标注语法，以及 VS Code 阅读器的样式和语法插件开发方法。
+LiMR 把提问上下文复制到剪贴板，交给你选择的 AI 助手；不需要 API Key 或消息 Hook。标注保存在 Markdown 中，可以跟随文档提交 Git。附带的 Skill 同时说明 LiMR 1.3.0 标注语法，以及 VS Code 阅读器的样式和语法插件开发方法。
 
 ## 安装 Skill
 
@@ -53,7 +53,7 @@ LiMR 把提问上下文复制到剪贴板，交给你选择的 AI 助手；不�
 
 标注使用成对边界 `::%%limr%%{<#r1}` / `::%%limr%%{>#r1}` 和 `:::limr-annotation` 定义，支持跨段、嵌套和交错范围。优先选择有意义、非空且不过长的文本；同一段文本上的多个标注复用命名范围，只增加定义。引用优先用 `<ref>` 包裹文献名称或它支持的完整句子，翻译优先按完整段落配对；有明确需求时仍可使用零长度标记或更细的翻译粒度。完整规则见 [Skill 标注参考](../skills/limr-annotations/references/source-annotations.md)。
 
-Skill 同时安装[离线 LiMR 1.2.3 语法指南](../skills/limr-annotations/references/limr-syntax.md)，包括引用、段落翻译、脚注和常用组件的例子，并提供官方文档入口。无需额外安装其他 Skill，也不依赖工作区中存在 LiMR 源码。
+Skill 同时安装[离线 LiMR 1.3.0 语法指南](../skills/limr-annotations/references/limr-syntax.md)，包括引用、段落翻译、脚注和常用组件的例子，并提供官方文档入口。无需额外安装其他 Skill，也不依赖工作区中存在 LiMR 源码。
 
 生成论文或研究笔记的 LiMR Markdown 时，Skill 建议用 `figure` 展示带图注的单张图片，用 `figures` 组织相关子图；保留真实图片路径、图号、子图标签和图注，需要富文本图注时使用 `figcaption`。
 

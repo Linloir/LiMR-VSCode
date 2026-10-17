@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { layoutProtocol, waitForWorkbenchLayout } from './layout-gate.mjs';
 import { captureGPU } from './gpu-info.mjs';
+import { sampleProcessMemory } from './process-memory.mjs';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { access, cp, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
@@ -126,6 +127,7 @@ async function runCase(item, ordinal) {
   process.once('SIGINT', onInterrupt); process.once('SIGTERM', onTerminate);
   let browser, page, frame, requestId = 0, finished = false;
   const result = { ...item, label, valid: false, complete: false, settings, directory, measurements: {}, layoutValidation: [], issues: [] };
+  const stopMemory = process.env.BENCH_MEMORY === '1' ? sampleProcessMemory(child.pid) : undefined;
   async function until(read, timeout = 60_000) {
     const start = Date.now(); let lastError;
     while (Date.now() - start < timeout) {
@@ -519,6 +521,7 @@ async function runCase(item, ordinal) {
     result.error = error.stack ?? String(error);
     await page?.screenshot({ path: path.join(directory, 'failure.png') }).catch(() => {});
   } finally {
+    result.memory = stopMemory?.();
     if (browser) {
       result.gpuEnd = await captureGPU(browser, 'after-reading-phases');
       if (!result.gpuEnd.observed) result.issues.push('Final GPU state was not observed.');

@@ -70,6 +70,27 @@ describe('language-specific reader typography', () => {
     }
   });
 
+  it('preserves exact line/column points in mixed-script paragraphs with entities and mixed newlines', () => {
+    const source = ('Latin中文😀 Ω &amp; escaped \\* text\n中A\r\n\r\n').repeat(120);
+    const document = createDocument(source, { extensions }).getSnapshot();
+    let wrappers = 0;
+    const point = (offset: number) => {
+      const lines = source.slice(0, offset).split(/\r\n|\r|\n/);
+      return { offset, line: lines.length, column: lines.at(-1)!.length + 1 };
+    };
+    const visit = (node: MarkdownNode) => {
+      if (node.type === 'lv-script') {
+        wrappers++;
+        expect(node.position!.start).toEqual(point(node.position!.start.offset));
+        expect(node.position!.end).toEqual(point(node.position!.end.offset));
+        expect(node.position).toBe(node.children![0].position);
+      }
+      node.children?.forEach(visit);
+    };
+    document.blocks.forEach(block => visit(block.node));
+    expect(wrappers).toBeGreaterThan(500);
+  });
+
   it.each([
     { raw: '&amp; 中文' },
     { raw: '\\*中文' },

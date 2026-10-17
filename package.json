@@ -2,7 +2,7 @@
   "name": "limr-vscode",
   "displayName": "LiMR — Markdown Reader",
   "description": "Read and annotate Markdown beside your editor with LiMR. Inline notes, highlights, AI context, and VS Code themes.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "publisher": "linloir",
   "license": "MIT",
   "engines": {
@@ -86,6 +86,12 @@
         "toggled": "limr.readerEditing"
       },
       {
+        "command": "limr.toggleEditingLocked",
+        "title": "%limr.toggleEditing%",
+        "category": "LiMR",
+        "icon": "$(lock)"
+      },
+      {
         "command": "limr.openSettings",
         "title": "%limr.openSettings%",
         "category": "LiMR",
@@ -166,8 +172,13 @@
           "group": "navigation@1"
         },
         {
+          "command": "limr.toggleEditingLocked",
+          "when": "activeCustomEditorId == limr.reader && limr.show.editing && !limr.readerEditing",
+          "group": "navigation@2"
+        },
+        {
           "command": "limr.toggleEditing",
-          "when": "activeCustomEditorId == limr.reader && limr.show.editing",
+          "when": "activeCustomEditorId == limr.reader && limr.show.editing && limr.readerEditing",
           "group": "navigation@2"
         },
         {
@@ -242,6 +253,12 @@
         {
           "command": "markdown.showPreview",
           "group": "2_builtin@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "limr.toggleEditingLocked",
+          "when": "false"
         }
       ]
     },
@@ -572,13 +589,19 @@
           "scope": "resource",
           "description": "%limr.syntaxHighlighting.enabled.description%"
         },
+        "limr.tableLayout.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "%limr.tableLayout.enabled.description%",
+          "scope": "resource"
+        },
         "limr.loadingMode": {
           "type": "string",
           "enum": [
             "blocking",
             "progressive"
           ],
-          "default": "blocking",
+          "default": "progressive",
           "description": "%limr.loadingMode.description%",
           "enumDescriptions": [
             "%limr.loadingMode.option.blocking%",
@@ -680,7 +703,7 @@
     "test": "vitest run",
     "test:browser": "npm run test:vscode",
     "test:vscode": "node scripts/test-vscode.mjs",
-    "package": "vsce package --no-dependencies --githubBranch main -o artifacts/limr-vscode-1.0.1.vsix",
+    "package": "vsce package --no-dependencies --githubBranch main -o artifacts/limr-vscode-1.0.2.vsix",
     "vscode:prepublish": "npm run build",
     "test:animations": "node scripts/test-vscode.mjs --animations",
     "test:regressions": "node scripts/test-vscode.mjs --regressions",
@@ -698,7 +721,7 @@
   },
   "dependencies": {
     "@fontsource-variable/noto-serif-sc": "5.3.1",
-    "@linloir/limr": "1.2.3",
+    "@linloir/limr": "1.3.1",
     "js-yaml": "4.3.2",
     "mdast-util-math": "3.0.0",
     "micromark-extension-math": "3.1.0",

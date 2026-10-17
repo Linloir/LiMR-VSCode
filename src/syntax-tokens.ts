@@ -8,7 +8,7 @@ export const syntaxKinds = ['punctuation', 'tag', 'attribute', 'value', 'annotat
 export type SyntaxKind = typeof syntaxKinds[number];
 export interface SyntaxToken extends SourceRange { kind: SyntaxKind }
 
-// The standard 1.2.3 parser vocabulary, without browser components or renderers.
+// The standard 1.3.0 parser vocabulary, without browser components or renderers.
 // Tags are also valid directive names; the reverse does not hold.
 export const syntaxTags = ['callout', 'definition', 'title', 'content', 'question', 'question-content', 'question-hint',
   'question-answer', 'question-sel-grp', 'question-sel', 'extras', 'extra', 'video', 'md-video', 'figures', 'figure',

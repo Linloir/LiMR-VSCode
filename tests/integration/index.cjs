@@ -108,11 +108,25 @@ exports.run = async function run() {
             else { await execution; result = snapshot(); }
             break;
           }
+          case 'editSource': {
+            const edit = new vscode.WorkspaceEdit();
+            edit.replace(uri, new vscode.Range(document.positionAt(command.start), document.positionAt(command.end ?? command.start)), command.text);
+            assert.equal(await vscode.workspace.applyEdit(edit), true);
+            result = snapshot(); break;
+          }
           case 'replaceSource': {
             const edit = new vscode.WorkspaceEdit();
             edit.replace(uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), command.source);
             assert.equal(await vscode.workspace.applyEdit(edit), true);
             result = snapshot(); break;
+          }
+          case 'replaceGeneratedSource': {
+            assert.ok(Number.isSafeInteger(command.bytes) && command.bytes <= 76 * 1024 * 1024);
+            const source = '中'.repeat(Math.floor(command.bytes / 3)) + 'a'.repeat(command.bytes % 3);
+            const edit = new vscode.WorkspaceEdit();
+            edit.replace(uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), source);
+            assert.equal(await vscode.workspace.applyEdit(edit), true);
+            result = { version: document.version, chars: document.getText().length, bytes: Buffer.byteLength(document.getText()) }; break;
           }
           case 'undo':
           case 'redo':

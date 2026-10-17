@@ -4,6 +4,6 @@ import { readerWorkerOptions, readerWorkerRegistry } from '../src/shared/reader-
 const handle = createDocumentWorkerHandler(readerWorkerRegistry, readerWorkerOptions);
 const scope = globalThis as unknown as {
   addEventListener(type: 'message', listener: (event: MessageEvent<DocumentWorkerRequest>) => void): void;
-  postMessage(message: DocumentWorkerResponse): void;
+  postMessage(message: DocumentWorkerResponse, transfer: Transferable[]): void;
 };
-scope.addEventListener('message', event => { void handle(event.data, response => scope.postMessage(response)); });
+scope.addEventListener('message', event => { void handle(event.data, (response, transfer) => scope.postMessage(response, transfer ?? [])); });

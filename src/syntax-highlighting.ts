@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 import { Worker } from 'node:worker_threads';
 import type { SyntaxKind, SyntaxToken } from './syntax-tokens';
+import { MAX_HIGHLIGHT_CHARS, MAX_LOAD_MS } from './shared/load-limits';
 
 const kinds: readonly SyntaxKind[] = ['punctuation', 'tag', 'attribute', 'value', 'annotation', 'highlight', 'math'];
 interface HighlightResult { uri: string; version: number; tokens: SyntaxToken[]; error?: string }
-interface HighlightRequest { uri: string; version: number; source: string }
-interface PendingRequest extends HighlightRequest { document: vscode.TextDocument }
+interface PendingRequest { uri: string; version: number; document: vscode.TextDocument }
 interface CachedResult extends HighlightResult { document: vscode.TextDocument }
 
 /** Binary-search the cached token list; scrolling never invokes the parser. */
@@ -29,6 +29,7 @@ export class SourceSyntaxHighlighting implements vscode.Disposable {
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
   private worker: Worker | undefined;
   private active: PendingRequest | undefined;
+  private workerTimer: ReturnType<typeof setTimeout> | undefined;
   private disposed = false;
 
   constructor(private readonly workerPath: string) {
@@ -43,6 +44,7 @@ export class SourceSyntaxHighlighting implements vscode.Disposable {
       vscode.workspace.onDidCloseTextDocument(document => {
         const uri = document.uri.toString();
         clearTimeout(this.timers.get(uri)); this.timers.delete(uri); this.queued.delete(uri); this.cache.delete(uri);
+        if (this.active?.document === document) { this.stopWorker(); this.dispatch(); }
         for (const editor of vscode.window.visibleTextEditors) if (editor.document === document) this.clear(editor);
       }),
       vscode.workspace.onDidChangeConfiguration(event => {
@@ -52,7 +54,9 @@ export class SourceSyntaxHighlighting implements vscode.Disposable {
     this.refreshVisible();
   }
   private enabled(document: vscode.TextDocument) {
-    return document.languageId === 'markdown' && vscode.workspace.getConfiguration('limr', document).get<boolean>('syntaxHighlighting.enabled', true);
+    return document.languageId === 'markdown'
+      && document.offsetAt(new vscode.Position(document.lineCount, 0)) <= MAX_HIGHLIGHT_CHARS
+      && vscode.workspace.getConfiguration('limr', document).get<boolean>('syntaxHighlighting.enabled', true);
   }
   private clear(editor: vscode.TextEditor) { for (const decoration of this.decorations.values()) editor.setDecorations(decoration, []); }
   private refreshVisible() {
@@ -61,6 +65,8 @@ export class SourceSyntaxHighlighting implements vscode.Disposable {
     // token arrays or pending source copies indefinitely.
     for (const uri of this.cache.keys()) if (!visible.has(uri)) this.cache.delete(uri);
     for (const uri of this.queued.keys()) if (!visible.has(uri)) this.queued.delete(uri);
+    if (this.active && (!visible.has(this.active.uri) || !this.enabled(this.active.document))) this.stopWorker();
+    if (this.worker && !vscode.window.visibleTextEditors.some(editor => this.enabled(editor.document))) this.stopWorker();
     for (const editor of vscode.window.visibleTextEditors) {
       if (!this.enabled(editor.document)) {
         const uri = editor.document.uri.toString();
@@ -70,7 +76,9 @@ export class SourceSyntaxHighlighting implements vscode.Disposable {
     }
   }
   private schedule(document: vscode.TextDocument, delay = 120) {
-    if (this.disposed || !this.enabled(document) || !vscode.window.visibleTextEditors.some(editor => editor.document === document)) return;
+    if (this.disposed) return;
+    if (!this.enabled(document)) { this.refreshVisible(); return; }
+    if (!vscode.window.visibleTextEditors.some(editor => editor.document === document)) return;
     const uri = document.uri.toString(), version = document.version;
     if (this.cache.get(uri)?.document === document && this.cache.get(uri)?.version === version
       || this.active?.document === document && this.active.version === version
@@ -81,7 +89,7 @@ export class SourceSyntaxHighlighting implements vscode.Disposable {
     this.timers.set(uri, setTimeout(() => {
       this.timers.delete(uri);
       if (document.isClosed || !this.enabled(document) || !vscode.window.visibleTextEditors.some(editor => editor.document === document)) return;
-      this.queued.set(uri, { uri, version: document.version, source: document.getText(), document });
+      this.queued.set(uri, { uri, version: document.version, document });
       this.dispatch();
     }, delay));
   }
@@ -92,6 +100,7 @@ export class SourceSyntaxHighlighting implements vscode.Disposable {
       worker.on('message', (result: HighlightResult) => {
         if (this.disposed || this.worker !== worker) return;
         const request = this.active;
+        clearTimeout(this.workerTimer);
         this.active = undefined;
         const editors = vscode.window.visibleTextEditors.filter(editor => editor.document === request?.document && !editor.document.isClosed
           && request.uri === result.uri && request.version === result.version
@@ -105,6 +114,7 @@ export class SourceSyntaxHighlighting implements vscode.Disposable {
       });
       const failed = (error: unknown) => {
         if (this.disposed || this.worker !== worker) return;
+        clearTimeout(this.workerTimer);
         this.worker = undefined; this.active = undefined;
         console.error('LiMR source highlighting worker:', error);
         // Do not restart a crashing worker in a loop; a subsequent document edit
@@ -115,8 +125,15 @@ export class SourceSyntaxHighlighting implements vscode.Disposable {
       worker.on('exit', code => failed(new Error(`Worker exited with code ${code}`)));
     }
     const request = this.queued.values().next().value!;
+    request.version = request.document.version;
     this.queued.delete(request.uri); this.active = request;
-    this.worker.postMessage({ uri: request.uri, version: request.version, source: request.source });
+    this.workerTimer = setTimeout(() => { this.stopWorker(); this.dispatch(); }, MAX_LOAD_MS);
+    this.worker.postMessage({ uri: request.uri, version: request.version, source: request.document.getText() });
+  }
+  private stopWorker() {
+    const worker = this.worker;
+    this.worker = undefined; this.active = undefined; clearTimeout(this.workerTimer);
+    void worker?.terminate();
   }
   private paint(editor: vscode.TextEditor) {
     if (this.disposed) return;
@@ -141,6 +158,6 @@ export class SourceSyntaxHighlighting implements vscode.Disposable {
     for (const timer of this.timers.values()) clearTimeout(timer);
     this.timers.clear(); this.queued.clear(); this.cache.clear();
     for (const decoration of this.decorations.values()) decoration.dispose();
-    void this.worker?.terminate(); this.worker = undefined;
+    this.stopWorker();
   }
 }

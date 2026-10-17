@@ -15,7 +15,7 @@ class ImageFixture extends ElementFixture {
 }
 let mutation: (records: unknown[]) => void;
 const changed = (image: ImageFixture) => mutation([{ type: 'attributes', target: image }]);
-const added = (image: ImageFixture) => mutation([{ type: 'childList', addedNodes: [image] }]);
+const added = (image: ImageFixture) => mutation([{ type: 'childList', addedNodes: [image], removedNodes: [] }]);
 function setup(...sources: string[]) {
   const root = new ElementFixture(); root.images = sources.map(source => new ImageFixture(source));
   const send = vi.fn(), resolver = new ReaderImages(root as unknown as HTMLElement, send);
@@ -81,6 +81,24 @@ describe('local image bridge lifecycle', () => {
     const preview = new ImageFixture(root.images[0].src); root.images.push(preview); added(preview);
     expect(preview.src).toBe('https://resource/preview.svg');
     expect(send).toHaveBeenCalledTimes(1);
+  });
+  it('releases unmounted images during slow lookups and bounds the successful URL cache', () => {
+    const { root, send, resolver, reply } = setup('./slow.svg');
+    const removed = root.images.shift()!;
+    mutation([{ type: 'childList', addedNodes: [], removedNodes: [removed] }]);
+    // Pending transport may outlive a DOM window, but may not retain its nodes.
+    expect((resolver as any).bySource.get('./slow.svg').images.size).toBe(0);
+    reply(0, 'https://resource/slow.svg');
+    for (let index = 0; index < 520; index++) {
+      const image = new ImageFixture(`./${index}.svg`); root.images = [image]; added(image);
+      reply(index + 1, `https://resource/${index}.svg`);
+    }
+    const recent = new ImageFixture('./519.svg'); root.images = [recent]; added(recent);
+    expect(recent.src).toBe('https://resource/519.svg');
+    expect(send).toHaveBeenCalledTimes(521);
+    const oldest = new ImageFixture('./0.svg'); root.images = [oldest]; added(oldest);
+    expect(send).toHaveBeenCalledTimes(522);
+    resolver.dispose();
   });
   it('leaves browser-readable URLs alone while resolving explicit local URL forms', () => {
     const { send } = setup('https://example.test/a.png', 'http://localhost/a.png', 'data:image/png;base64,AAAA', 'blob:some-id', '//example.test/a.png', './a.png', '/a.png', 'file:///a.png');

@@ -77,7 +77,8 @@
   "limr.syntax.annotation.description": "Markdown 原文中的 LiMR 已生效的标注范围边界及内联脚注标记颜色。",
   "limr.syntax.highlight.description": "Markdown 原文中的 LiMR 内联高亮分隔符颜色。",
   "limr.syntax.math.description": "Markdown 原文中的 LiMR 公式分隔符颜色。",
-  "limr.loadingMode.description": "大 Markdown 文件的加载方式。",
+  "limr.loadingMode.description": "大文档的加载方式。解析进度显示在编辑器页签下方和 VS Code 底部状态栏。 预览文档最大 75 MiB，每次加载最多 60 秒。",
+  "limr.tableLayout.enabled.description": "启用表格优化布局算法，优化列宽和较长单元格的展示。默认开启；关闭后使用原生表格布局，减少长表格的测量开销。",
   "limr.loadingMode.option.blocking": "完整加载后开始阅读。",
-  "limr.loadingMode.option.progressive": "在后续内容加载时先展示可安全阅读的开头。部分 Markdown 或插件仍需完整加载。"
+  "limr.loadingMode.option.progressive": "优先预览（默认）：先展示只读的开头内容，后台继续解析全文。部分插件需要等待完整加载。"
 }

@@ -236,8 +236,8 @@ export async function runReaderAcceptance({ page, frame, host, source, artifacts
   evidence.push({ check: 'Turning editing off immediately removes mutation actions; normal document Save succeeds' });
 
   await reset('# LiMR acceptance\n\n![Local sample](sample.svg)\n\nInline math $E = mc^2$.\n\n```mermaid\nflowchart LR\n  Read --> Annotate\n```\n');
-  await expect(frame.getByRole('img', { name: 'Local sample', exact: true })).toBeVisible();
-  await expect.poll(() => frame.getByRole('img', { name: 'Local sample', exact: true }).evaluate(element => element.naturalWidth)).toBe(120);
+  await expect(frame.getByAltText('Local sample', { exact: true })).toBeVisible();
+  await expect.poll(() => frame.getByAltText('Local sample', { exact: true }).evaluate(element => element.naturalWidth)).toBe(120);
   await expect(frame.locator('.katex')).toBeVisible();
   await expect(frame.locator('.limr-mermaid-block')).toHaveAttribute('data-mermaid-state', 'ready', { timeout: 20_000 });
   await expect(frame.locator('.limr-mermaid-canvas svg')).toBeVisible();

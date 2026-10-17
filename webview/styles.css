@@ -99,6 +99,16 @@ body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button[data-
 body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button[data-status='error'] { color: var(--vscode-errorForeground, var(--lv-text)); }
 body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button:focus-visible { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder, currentColor); }
 .lv-app { display: flex; flex-direction: column; height: 100%; min-width: 0; }
+/* Public VS Code APIs expose status-bar progress, not the editor group's
+   progress widget. Keep this theme-colored equivalent flush below the tabs. */
+.lv-load-progress { position: fixed; inset: 0 0 auto; height: 2px; overflow: hidden; z-index: 2000; pointer-events: none; }
+.lv-load-progress > span { display: block; width: 25%; height: 100%; background: var(--vscode-progressBar-background, #0078d4); animation: lv-loading-slide 2s linear infinite; }
+@keyframes lv-loading-slide { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
+@media (prefers-reduced-motion: reduce) { .lv-load-progress > span { animation: none; width: var(--lv-load-fraction); } }
+@media print { .lv-load-progress, .lv-load-error { display: none; } }
+.lv-load-error { display: flex; align-items: baseline; justify-content: center; flex-wrap: wrap; gap: 12px; padding: 18px; color: var(--lv-secondary); overflow-wrap: anywhere; }
+.lv-load-error button { background: var(--lv-surface); border: 1px solid var(--lv-border); padding: 4px 12px; border-radius: 4px; }
+.lv-load-error button:focus-visible { outline: 1px solid var(--vscode-focusBorder, var(--lv-link)); }
 .lv-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 18px clamp(28px, 3vw, 40px) 50px; scrollbar-color: color-mix(in srgb, var(--lv-secondary) 40%, transparent) transparent; scrollbar-width: thin; }
 .lv-reader { --limr-content-width: var(--lv-content-width, 860px); --limr-reader-width: none; --limr-column-gap: 24px; --limr-sidebar-width: minmax(300px, 1fr); --limr-toc-width: clamp(200px, 16%, 260px); --limr-sticky-top: 0px; --limr-reader-bottom-space: 50px; }
 /* The body keeps its reading measure. Extra editor width belongs to the notes
@@ -138,6 +148,24 @@ body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button:focus
   --limr-selection: var(--lv-selection); --limr-shadow: var(--lv-shadow); --limr-success: var(--lv-success); --limr-error: var(--lv-error);
   --limr-note-bg: var(--lv-surface); --limr-question-bg: var(--lv-surface); --limr-definition-bg: var(--lv-surface);
 }
+/* Core snapshots inherited tokens onto its portal. Override that snapshot so
+   changing between two dark host palettes also updates an already open image. */
+.limr-image-preview[data-limr-appearance] {
+  --limr-text: var(--lv-text) !important; --limr-secondary: var(--lv-secondary) !important;
+  --limr-background: var(--lv-background) !important; --limr-surface: var(--lv-surface) !important;
+  --limr-border: var(--lv-border) !important; --limr-link: var(--lv-link) !important;
+  --limr-success: var(--lv-success) !important; --limr-error: var(--lv-error) !important;
+  --limr-font-text: var(--lv-font-body) !important;
+}
+/* Unlayered host resets otherwise win over the new native toolbar skin. */
+.limr-image-preview-toolbar > button { color: var(--limr-secondary); background: transparent; }
+.limr-image-preview-toolbar > button:enabled:hover { color: var(--limr-text); background: color-mix(in srgb, var(--limr-text) 9%, transparent); }
+.limr-image-preview-toolbar > button:enabled:active { background: color-mix(in srgb, var(--limr-text) 15%, transparent); }
+.limr-image-preview-toolbar > button[data-status='copied'] { color: var(--limr-success); }
+.limr-image-preview-toolbar > button[data-status='error'] { color: var(--limr-error); }
+body[data-reader-contrast='high'] .limr-image-preview-toolbar { background: var(--vscode-editorWidget-background, var(--lv-surface)); box-shadow: inset 0 0 0 1px var(--vscode-contrastBorder, var(--lv-text)); }
+body[data-reader-contrast='high'] .limr-image-preview-toolbar > button { color: var(--vscode-editor-foreground, var(--lv-text)); }
+body[data-reader-contrast='high'] .limr-image-preview-toolbar > button:focus-visible { outline-color: var(--vscode-focusBorder, var(--lv-link)); }
 .lv-script-latin { font-family: var(--lv-font-body); }
 .lv-script-chinese { font-family: var(--lv-font-chinese); font-size: calc(1em * var(--lv-chinese-ratio, 1)); }
 .lv-script-other { font-family: var(--lv-font-other); font-size: calc(1em * var(--lv-other-ratio, 1)); }

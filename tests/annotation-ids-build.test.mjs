@@ -46,7 +46,7 @@ afterAll(async () => { vi.unstubAllGlobals(); if (directory) await rm(directory,
 
 const compact = /^[0-9a-f]{6}$/;
 const rangeOf = snapshot => [...snapshot.annotationRanges.values()][0][0].range;
-describe('LiMR 1.2.3 production bundle annotation ID integration', () => {
+describe('reviewed LiMR production bundle annotation ID integration', () => {
   it.each(['lv-margin-note', 'lv-question', 'highlight'])('keeps all-numeric IDs as strings through the actual %s creation and edit lifecycle', action => {
     const values = [[0x00, 0x00, 0x00], [0x12, 0x34, 0x56], [0x23, 0x45, 0x67]];
     const random = vi.spyOn(crypto, 'getRandomValues').mockImplementation(bytes => {

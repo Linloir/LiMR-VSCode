@@ -13,7 +13,10 @@ import { resolveReaderLink } from './links';
 import { resolveReaderImage } from './images';
 import { SourceSyntaxHighlighting } from './syntax-highlighting';
 import { ScrollThrottle } from './shared/scroll-sync';
-import type { HostMessage, ReaderState, WebviewMessage, ReaderFileSettings, ReaderButton } from './shared/protocol';
+import type { HostMessage, ReaderState, WebviewMessage, ReaderFileSettings, ReaderButton, ReaderLoadProgress } from './shared/protocol';
+import { isReaderLoadProgress, loadProgressLabel } from './shared/loading';
+import { LoadWatchdog, MAX_DOCUMENT_BYTES, loadErrorMessage } from './shared/load-limits';
+import { previewBuffer, readerStateMessage } from './reader-buffer';
 
 const viewType = 'limr.reader';
 const localized = (uri: vscode.Uri | undefined, zh: string, en: string) => readerLocale(vscode.workspace.getConfiguration('limr', uri).get('language', 'auto')) === 'zh-CN' ? zh : en;
@@ -34,7 +37,7 @@ function settingScope(uri: vscode.Uri | undefined, key: string) {
     detail: t('保存到当前工作区的默认设置。', 'Saved as this workspace’s default.'),
   };
   return {
-    label: t('用户默认', 'User default'),
+    label: t('全局默认', 'Global default'),
     detail: t('保存到用户设置，作为所有工作区的默认值。', 'Saved as the default for all workspaces.'),
   };
 }
@@ -55,6 +58,11 @@ export function activate(context: vscode.ExtensionContext): LiMRExtensionApi {
   const open = async (uri: vscode.Uri | undefined, beside: boolean) => {
     const target = resource(uri);
     if (!target) { await vscode.window.showInformationMessage(localized(undefined, '请先打开一个 Markdown 文件。', 'Open a Markdown file first.')); return; }
+    // An existing buffer (including unsaved edits) is checked by the provider.
+    if (!vscode.workspace.textDocuments.some(document => document.uri.toString() === target.toString())
+      && target.scheme !== 'untitled' && vscode.workspace.fs.isWritableFileSystem(target.scheme) !== undefined
+      && (await vscode.workspace.fs.stat(target)).size > MAX_DOCUMENT_BYTES)
+      throw new Error(loadErrorMessage('too-large', readerSettings(target).locale));
     const document = await vscode.workspace.openTextDocument(target);
     if (!isMarkdown(document)) { await vscode.window.showInformationMessage(localized(target, 'LiMR 支持 .md 和 .markdown 文件。', 'LiMR supports .md and .markdown files.')); return; }
     if (beside) {
@@ -67,6 +75,7 @@ export function activate(context: vscode.ExtensionContext): LiMRExtensionApi {
   command('limr.openPreviewToSide', (uri?: vscode.Uri) => open(uri, true));
   command('limr.openSource', async (uri?: vscode.Uri) => { const target = resource(uri); if (target) await provider.openSource(target); });
   command('limr.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:linloir.limr-vscode'));
+  command('limr.loadingAction', () => provider.loadingAction());
   command('limr.chooseTheme', async () => {
     const uri = resource();
     const t = (zh: string, en: string) => localized(uri, zh, en);
@@ -93,6 +102,9 @@ export function activate(context: vscode.ExtensionContext): LiMRExtensionApi {
     if (!vscode.workspace.isTrusted) { await vscode.window.showWarningMessage(localized(uri, '请先信任工作区，再启用 Markdown 编辑。', 'Trust this workspace before enabling Markdown editing.')); return; }
     await setReaderSetting(uri, 'editingEnabled', !readerSettings(uri).editingEnabled);
   });
+  // Manifest toggled icons are not supported by the extension contribution
+  // parser. Two mutually exclusive menu entries share the same command action.
+  command('limr.toggleEditingLocked', () => vscode.commands.executeCommand('limr.toggleEditing'));
   command('limr.chooseTypography', () => provider.choosePreference('typography', resource()));
   command('limr.chooseTranslationMode', () => provider.choosePreference('translationMode', resource()));
   command('limr.configureTopBar', () => provider.chooseButtons('topBarButtons', resource()));
@@ -109,7 +121,7 @@ export function activate(context: vscode.ExtensionContext): LiMRExtensionApi {
 
 class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposable {
   private readonly panels = new Map<vscode.WebviewPanel, vscode.TextDocument>();
-  private readonly sentDocuments = new Map<vscode.WebviewPanel, { uri: string; version: number }>();
+  private readonly sentDocuments = new Map<vscode.WebviewPanel, { uri: string; version: number; aligned?: boolean }>();
   private readonly subscriptions: vscode.Disposable[] = [];
   private readonly pending = new Map<string, Promise<void>>();
   private readonly plugins = new Map<vscode.WebviewPanel, NonNullable<ReaderState['plugins']>>();
@@ -121,6 +133,10 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   private readonly translationEpochs = new Map<string, number>();
   private mergedPreview: boolean | undefined;
   private readonly status = vscode.window.createStatusBarItem('limr.reader', vscode.StatusBarAlignment.Right, 105);
+  private readonly loadingStatus = vscode.window.createStatusBarItem('limr.loading', vscode.StatusBarAlignment.Right, 106);
+  private readonly loadProgress = new Map<vscode.WebviewPanel, ReaderLoadProgress>();
+  private readonly timedOut = new Map<vscode.WebviewPanel, number>();
+  private readonly loadWatchdog = new LoadWatchdog<vscode.WebviewPanel>((panel, version) => this.loadTimedOut(panel, version));
   private pluginTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly readerScrollTargets = new Map<vscode.TextEditor, ReaderScrollTarget>();
   private readonly readerScrollOwners = new Map<string, { panel: vscode.WebviewPanel; epoch: number }>();
@@ -135,6 +151,8 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   constructor(private readonly context: vscode.ExtensionContext, private readonly pluginRegistry: PluginRegistry) {
     this.status.name = 'LiMR Reader';
     this.status.command = 'limr.toggleEditing';
+    this.loadingStatus.name = 'LiMR loading';
+    this.loadingStatus.command = 'limr.loadingAction';
     for (const [index, name] of ['typography', 'translation', 'theme', 'settings'].entries()) {
       const item = vscode.window.createStatusBarItem(`limr.${name}`, vscode.StatusBarAlignment.Right, 104 - index);
       item.name = `LiMR ${name}`;
@@ -154,6 +172,8 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     this.subscriptions.push(watcher, watcher.onDidChange(onPluginFile), watcher.onDidCreate(onPluginFile), watcher.onDidDelete(onPluginFile));
     this.subscriptions.push(
       this.status,
+      this.loadingStatus,
+      this.loadWatchdog,
       pluginRegistry.onDidChange(() => { void this.reloadPlugins(); }),
       vscode.workspace.onDidChangeTextDocument(event => { if (event.contentChanges.length) this.broadcast(event.document); }),
       vscode.workspace.onDidSaveTextDocument(document => this.broadcast(document)),
@@ -245,7 +265,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     this.readerScrollOwners.clear();
     this.readerScrollTargets.forEach((_, editor) => this.clearReaderScrollTarget(editor));
   }
-  dispose() { this.sourceScroll.dispose(); this.readerScrollOwners.clear(); this.sourceScrollGenerations.clear(); this.readerScrollTargets.forEach((_, editor) => this.clearReaderScrollTarget(editor)); clearTimeout(this.pluginTimer); this.subscriptions.forEach(item => item.dispose()); this.panels.clear(); this.plugins.clear(); this.pluginRoots.clear(); this.imageRoots.clear(); if (this.mergedPreview) void vscode.commands.executeCommand('setContext', 'hasCustomMarkdownPreview', false); }
+  dispose() { this.sourceScroll.dispose(); this.readerScrollOwners.clear(); this.sourceScrollGenerations.clear(); this.readerScrollTargets.forEach((_, editor) => this.clearReaderScrollTarget(editor)); clearTimeout(this.pluginTimer); this.subscriptions.forEach(item => item.dispose()); this.panels.clear(); this.sentDocuments.clear(); this.loadProgress.clear(); this.timedOut.clear(); this.plugins.clear(); this.pluginRoots.clear(); this.imageRoots.clear(); if (this.mergedPreview) void vscode.commands.executeCommand('setContext', 'hasCustomMarkdownPreview', false); }
   private baseResourceRoots(document: vscode.TextDocument) {
     return [...new Map([vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview'),
       vscode.Uri.joinPath(document.uri, '..'), ...(vscode.workspace.workspaceFolders?.map(folder => folder.uri) ?? [])]
@@ -262,6 +282,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   }
   resolveCustomTextEditor(document: vscode.TextDocument, panel: vscode.WebviewPanel): void {
     this.panels.set(panel, document); this.activeUri = document.uri;
+    if (panel.visible) this.loadWatchdog.start(panel, document.version);
     void maybePromptSkillInstall(this.context, document.uri).catch(error => console.error('LiMR skill prompt', error));
     panel.webview.options = { enableScripts: true, localResourceRoots: this.baseResourceRoots(document) };
     panel.webview.html = this.html(panel.webview);
@@ -273,15 +294,21 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     ];
     panel.onDidDispose(() => {
       events.forEach(event => event.dispose()); this.panels.delete(panel); this.sentDocuments.delete(panel);
+      this.loadWatchdog.stop(panel); this.timedOut.delete(panel);
       if (this.readerScrollOwners.get(document.uri.toString())?.panel === panel) this.releaseReaderInput(document.uri);
       if (![...this.panels.values()].some(item => item.uri.toString() === document.uri.toString())) this.sourceScrollGenerations.delete(document.uri.toString());
-      this.plugins.delete(panel); this.pluginRevisions.delete(panel); this.pluginRoots.delete(panel); this.imageRoots.delete(panel); this.updateStatus();
+      this.plugins.delete(panel); this.pluginRevisions.delete(panel); this.pluginRoots.delete(panel); this.imageRoots.delete(panel); this.loadProgress.delete(panel); this.updateStatus();
     });
     this.updateStatus();
   }
   private state(document: vscode.TextDocument, webview: vscode.Webview): ReaderState {
+    const panel = [...this.panels.keys()].find(candidate => candidate.webview === webview);
+    const buffer = panel && this.timedOut.get(panel) === document.version
+      ? { source: '', loadError: 'timeout' as const }
+      : previewBuffer(document.offsetAt(new vscode.Position(document.lineCount, 0)), () => document.getText());
     return {
-      document: { ...this.documentMetadata(document), source: document.getText() },
+      document: { ...this.documentMetadata(document), source: buffer.source },
+      loadError: buffer.loadError,
       ...this.configuration(document, webview),
     };
   }
@@ -303,19 +330,47 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   private text(uri: vscode.Uri | undefined, zh: string, en: string) { return localized(uri, zh, en); }
   private post(panel: vscode.WebviewPanel, message: HostMessage) { void panel.webview.postMessage(message); }
   private sendState(panel: vscode.WebviewPanel, document: vscode.TextDocument) {
+    // Retained hidden readers receive the latest revision when revealed. Do not
+    // clone and reparse every editor keystroke into each background webview.
+    if (!panel.visible) return;
     const previous = this.sentDocuments.get(panel), uri = document.uri.toString();
     if (previous?.uri === uri && previous.version === document.version) {
       this.post(panel, { type: 'configuration', configuration: this.configuration(document, panel.webview), document: this.documentMetadata(document) });
     } else {
-      this.post(panel, { type: 'state', state: this.state(document, panel.webview) });
+      if (this.timedOut.get(panel) !== document.version) this.timedOut.delete(panel);
+      this.loadWatchdog.start(panel, document.version);
+      const state = this.state(document, panel.webview);
+      if (state.loadError) {
+        this.loadWatchdog.stop(panel);
+        this.loadProgress.set(panel, { uri, version: document.version, requestId: 'host', status: 'error', phase: 'read', percent: 0,
+          error: loadErrorMessage(state.loadError, state.settings.locale) });
+      }
+      this.post(panel, readerStateMessage(state));
       this.sentDocuments.set(panel, { uri, version: document.version });
     }
+  }
+  private loadTimedOut(panel: vscode.WebviewPanel, version: number) {
+    const document = this.panels.get(panel);
+    if (!document) return;
+    this.loadWatchdog.stop(panel); this.timedOut.set(panel, version);
+    this.loadProgress.set(panel, { uri: document.uri.toString(), version, requestId: 'host', status: 'error', phase: 'read', percent: 0,
+      error: loadErrorMessage('timeout', this.settings(document.uri).locale) });
+    // Replacing the guest releases its worker, partial AST, source and pending
+    // plugin work, even when that guest cannot handle a cancellation message.
+    this.sentDocuments.delete(panel); panel.webview.html = this.html(panel.webview);
+    this.updateLoadingStatus();
+  }
+  private retryLoad(panel: vscode.WebviewPanel) {
+    const document = this.panels.get(panel); if (!document) return;
+    this.timedOut.delete(panel); this.sentDocuments.delete(panel); this.loadWatchdog.stop(panel);
+    this.sendState(panel, document); this.updateLoadingStatus();
   }
   private broadcast(document?: vscode.TextDocument) {
     for (const [panel, current] of this.panels) if (!document || current.uri.toString() === document.uri.toString()) this.sendState(panel, current);
     this.updateStatus();
   }
   private updateStatus() {
+    this.updateLoadingStatus();
     const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
     const document = activeTab?.input instanceof vscode.TabInputCustom && activeTab.input.viewType === viewType
       ? [...this.panels].find(([panel]) => panel.active)?.[1] : undefined;
@@ -350,6 +405,31 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       if (name === 'typography' || name === 'translation') item.tooltip += settings.fileOverrides[name === 'typography' ? 'typography' : 'translationMode'] ? t(' · 当前文件', ' · This file') : t(' · 默认配置', ' · Default');
       if (settings.bottomBarButtons.includes(name)) item.show();
     });
+  }
+  private activeLoading() {
+    const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
+    if (!(tab?.input instanceof vscode.TabInputCustom) || tab.input.viewType !== viewType) return;
+    for (const [panel, document] of this.panels) {
+      const progress = this.loadProgress.get(panel);
+      if (panel.active && progress?.version === document.version) return { panel, document, progress };
+    }
+  }
+  private updateLoadingStatus() {
+    const active = this.activeLoading();
+    if (!active) { this.loadingStatus.hide(); return; }
+    const { document, progress } = active, locale = this.settings(document.uri).locale;
+    const label = loadProgressLabel(progress, locale), loading = progress.status === 'loading';
+    this.loadingStatus.text = `${loading ? '$(loading~spin)' : progress.status === 'error' ? '$(error)' : '$(debug-restart)'} LiMR · ${label}`;
+    this.loadingStatus.tooltip = `${basename(document.uri.path)}\n${progress.error ?? label}\n${locale === 'zh-CN'
+      ? loading ? '点击取消加载' : '点击重新加载'
+      : loading ? 'Click to cancel loading' : 'Click to retry loading'}`;
+    this.loadingStatus.accessibilityInformation = { label: `LiMR ${label}` };
+    this.loadingStatus.show();
+  }
+  loadingAction() {
+    const active = this.activeLoading();
+    if (active?.progress.requestId === 'host') { this.retryLoad(active.panel); return; }
+    if (active) this.post(active.panel, { type: 'loadingAction', requestId: active.progress.requestId, action: active.progress.status === 'loading' ? 'cancel' : 'retry' });
   }
   async setFileSettings(uri: vscode.Uri, incoming: ReaderFileSettings, replace = false, translationEpoch?: number, documentVersion?: number) {
     const settings = validateFileSettings(incoming);
@@ -396,29 +476,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     const defaultScope = settingScope(uri, key);
     const defaultValue = vscode.workspace.getConfiguration('limr', uri).get<string>(key, key === 'typography' ? 'standard' : 'paragraph');
     const fileValue = uri ? this.settings(uri)[key] : defaultValue;
-    const scope = await vscode.window.showQuickPick([
-      ...(uri ? [{
-        label: t('当前文件', 'This file'), value: 'file', description: `${t('当前：', 'Current: ')}${labels[fileValue]}`,
-        detail: t('仅对本文件生效；关闭后仍保留，不修改 Markdown。', 'Only affects this file; saved across sessions. Markdown is unchanged.'),
-      }, {
-        label: t('当前文件恢复默认', 'Reset this file to default'), value: 'reset', description: `${t('恢复为：', 'Restore: ')}${labels[defaultValue]}`,
-        detail: key === 'typography'
-          ? t('清除此文件的排版覆盖，重新使用默认配置。', 'Clear this file’s typography override and use the default again.')
-          : t('清除此文件的翻译模式及各段落显示覆盖，重新使用默认配置。', 'Clear this file’s mode and paragraph overrides to use the default.'),
-      }] : []),
-      {
-        label: t('默认配置', 'Default settings'), value: 'default', description: `${defaultScope.label} · ${labels[defaultValue]}`,
-        detail: `${defaultScope.detail} ${t('已有单独设置的文件保留原设置。', 'Keeps existing file overrides.')}`,
-      },
-    ], { title, placeHolder: t('选择设置的生效范围', 'Choose where this setting applies'), matchOnDescription: true, matchOnDetail: true });
-    if (!scope) return;
-    if (scope.value === 'reset' && uri) {
-      if (key === 'translationMode') this.notifyTranslationIntent(uri);
-      const settings = { ...this.settings(uri).fileOverrides }; delete settings[key];
-      if (key === 'translationMode') delete settings.translationParagraphs;
-      await this.setFileSettings(uri, settings, true); return;
-    }
-    const current = scope.value === 'file' ? fileValue : defaultValue;
+    const fileOverride = uri && this.settings(uri).fileOverrides[key] !== undefined;
     const details: Record<string, string> = {
       standard: t('自然换行、左侧对齐，保留普通 Markdown 的阅读排版。', 'Use natural line breaks and left alignment for standard Markdown reading.'),
       justify: t('调整词间距，使段落左右两侧对齐。', 'Adjust spacing to align both edges of each paragraph.'),
@@ -428,15 +486,40 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       translated: t('所有翻译块只展示译文。', 'Show only the translation in every translation block.'),
       paragraph: t('各段分别使用已保存的显示方式；未调整的段落遵循正文中的配置。', 'Use each paragraph’s saved display mode, falling back to its Markdown configuration.'),
     };
-    const placeHolder = key === 'translationMode'
-      ? t('单独切换某段后，当前文件自动改为“按照段落配置”，其它段保持原显示。', 'Changing one paragraph sets this file to “Per paragraph”; others stay as shown.')
-      : scope.value === 'file'
-        ? t('仅为当前文件保存排版方式，不修改正文', 'Save typography for this file only, without changing Markdown')
-        : defaultScope.detail;
-    const pick = await vscode.window.showQuickPick((key === 'typography' ? typographyModes : translationModes).map(value => ({
-      label: labels[value], value, description: current === value ? t('当前', 'Current') : '', detail: details[value],
-    })), { title: `${title} · ${scope.value === 'file' ? t('当前文件', 'This file') : defaultScope.label}`, placeHolder, matchOnDescription: true, matchOnDetail: true });
+    const pick = await vscode.window.showQuickPick([
+      ...(key === 'typography' ? typographyModes : translationModes).map(value => ({
+        label: labels[value], value: value as string,
+        description: [fileValue === value ? t('当前', 'Current') : '', defaultValue === value ? t('默认', 'Default') : ''].filter(Boolean).join(' · '),
+        detail: details[value],
+      })),
+      ...(uri ? [{
+        label: t('当前文件恢复默认', 'Reset this file to default'), value: 'reset', description: `${t('默认：', 'Default: ')}${labels[defaultValue]}`,
+        detail: key === 'typography'
+          ? t('清除此文件的排版覆盖，重新使用默认配置。', 'Clear this file’s typography override and use the default again.')
+          : t('清除此文件的翻译模式及各段落显示覆盖，重新使用默认配置。', 'Clear this file’s mode and paragraph overrides to use the default.'),
+      }] : []),
+    ], {
+      title: `${title} · ${t('当前：', 'Current: ')}${labels[fileValue]} · ${fileOverride ? t('当前文件', 'This file') : defaultScope.label}`,
+      placeHolder: t('先选择配置，再选择应用范围', 'Choose a value, then where it applies'), matchOnDescription: true, matchOnDetail: true,
+    });
     if (!pick) return;
+    if (pick.value === 'reset' && uri) {
+      if (key === 'translationMode') this.notifyTranslationIntent(uri);
+      const settings = { ...this.settings(uri).fileOverrides }; delete settings[key];
+      if (key === 'translationMode') delete settings.translationParagraphs;
+      await this.setFileSettings(uri, settings, true); return;
+    }
+    const scope = uri ? await vscode.window.showQuickPick([
+      {
+        label: t('当前文件', 'This file'), value: 'file', description: labels[pick.value],
+        detail: t('仅对本文件生效；关闭后仍保留，不修改 Markdown。', 'Only affects this file; saved across sessions. Markdown is unchanged.'),
+      },
+      {
+        label: t('默认配置', 'Default settings'), value: 'default', description: `${defaultScope.label} · ${labels[pick.value]}`,
+        detail: `${defaultScope.detail} ${t('已有单独设置的文件保留原设置。', 'Keeps existing file overrides.')}`,
+      },
+    ], { title: `${title} · ${labels[pick.value]}`, placeHolder: t('选择设置的生效范围', 'Choose where this setting applies'), matchOnDescription: true, matchOnDetail: true }) : { value: 'default' };
+    if (!scope) return;
     if (key === 'translationMode') {
       if (scope.value === 'file') this.notifyTranslationIntent(uri);
       else this.notifyDefaultTranslationIntent(uri);
@@ -505,7 +588,45 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     if (!this.panels.has(panel) || !candidate || typeof candidate !== 'object' || !('type' in candidate)) return;
     const message = candidate as WebviewMessage;
     switch (message.type) {
+      case 'retryLoad': this.retryLoad(panel); break;
+      case 'loadProgress': {
+        const progress = message.progress;
+        // Hidden readers may still be finishing the last revision they received
+        // while the native buffer has moved on. Retire that job by its own
+        // version; never let a hidden edit bypass its deadline or mark the new
+        // (not yet sent) revision as timed out.
+        if (!isReaderLoadProgress(progress) || progress.uri !== document.uri.toString()
+          || progress.version !== this.sentDocuments.get(panel)?.version) break;
+        if (this.timedOut.get(panel) === progress.version) break;
+        if (this.loadWatchdog.expired(panel)) { this.loadTimedOut(panel, progress.version); break; }
+        if (progress.status === 'loading') this.loadWatchdog.start(panel, progress.version, progress.requestId);
+        else this.loadWatchdog.stop(panel);
+        if (progress.status === 'ready') {
+          this.loadProgress.delete(panel);
+          const sent = this.sentDocuments.get(panel)!;
+          // A replacement async reader has fresh geometry even if editing did
+          // not move the native viewport. Align once per completed revision,
+          // using the latest visible range, without parsing or polling again.
+          if (!sent.aligned && panel.visible && progress.version === document.version) {
+            sent.aligned = true;
+            if (readerSettings(document.uri).syncScroll && !this.readerScrollOwners.has(progress.uri)) {
+              const editors = vscode.window.visibleTextEditors.filter(editor => editor.document.uri.toString() === progress.uri);
+              const editor = editors.find(editor => editor === vscode.window.activeTextEditor) ?? editors[0];
+              const range = editor?.visibleRanges[0];
+              if (editor && range) {
+                this.sourceScroll.cancel(editor);
+                this.post(panel, { type: 'reveal', offset: document.offsetAt(range.start) });
+              }
+            }
+          }
+        }
+        else this.loadProgress.set(panel, progress);
+        // Progress must not rebroadcast source/configuration or touch toolbar
+        // contexts on every tick.
+        this.updateLoadingStatus(); break;
+      }
       case 'ready': {
+        this.loadProgress.delete(panel);
         if (this.readerScrollOwners.get(document.uri.toString())?.panel === panel) this.releaseReaderInput(document.uri);
         // A recreated guest has no source even if its panel was sent before.
         this.sentDocuments.delete(panel);
@@ -627,6 +748,8 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       if (!readerSettings(document.uri).editingEnabled) throw new Error(this.text(document.uri, '当前处于只读模式，未修改 Markdown。', 'The reader is read-only. Markdown was not changed.'));
       if (document.isClosed || message.baseVersion !== document.version || message.baseSource !== document.getText()) throw new Error(this.text(document.uri, 'Markdown 已被其他编辑更新。已刷新阅读器，请重新提交修改。', 'Markdown changed in another editor. The reader has refreshed; please submit again.'));
       if (typeof message.requestId !== 'string') throw new Error(this.text(document.uri, '无效的修改请求。', 'Invalid edit request.'));
+      if (typeof message.source !== 'string' || Buffer.byteLength(message.source, 'utf8') > MAX_DOCUMENT_BYTES)
+        throw new Error(loadErrorMessage('too-large', this.settings(document.uri).locale));
       const edits = validateTransaction(document.getText(), message.edits, message.source);
       const transaction = new vscode.WorkspaceEdit();
       for (const edit of edits) transaction.replace(document.uri, new vscode.Range(document.positionAt(edit.range.start), document.positionAt(edit.range.end)), edit.text);
