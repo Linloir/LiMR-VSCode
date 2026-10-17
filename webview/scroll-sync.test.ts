@@ -104,4 +104,20 @@ describe('reader scroll input ownership', () => {
     expect(input.mock.calls).toEqual([[true, 1, 0], [false, 1, 0], [true, 2, 0]]);
     sync.dispose();
   });
+  it('waits for loading before revealing unmounted source through the public reader bridge', () => {
+    const root = new Root(), send = vi.fn(), restoreReadingPosition = vi.fn();
+    let ready = false;
+    const bridge = { getReadingPosition: () => ({ source: 4200, offset: -4 }), restoreReadingPosition };
+    const sync = new ReaderScrollSync(root as unknown as HTMLElement, () => true, send, () => {}, () => ready ? bridge : null);
+    sync.reveal(9000); vi.advanceTimersByTime(1000);
+    expect(restoreReadingPosition).not.toHaveBeenCalled();
+    ready = true; sync.refresh(); vi.advanceTimersByTime(16);
+    expect(restoreReadingPosition).toHaveBeenCalledWith({ source: 9000, offset: 18 });
+    expect(send).not.toHaveBeenCalled();
+    root.scrollTop = 200; root.dispatchEvent(new Event('wheel')); root.dispatchEvent(new Event('scroll')); vi.advanceTimersByTime(16);
+    expect(send).toHaveBeenLastCalledWith(4200, 1, 0);
+    sync.sourceInput(1); sync.reveal(8000); vi.advanceTimersByTime(16);
+    expect(restoreReadingPosition).toHaveBeenLastCalledWith({ source: 8000, offset: 18 });
+    sync.dispose();
+  });
 });

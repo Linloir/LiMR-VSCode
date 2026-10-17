@@ -36,6 +36,7 @@ Web links open directly in your browser. File links reuse the target file in ano
 | `limr.codeFontFamily` / `limr.codeFontSize` | `""` / `14` | Code font and size in px; an empty family uses bundled Maple Mono NF CN. |
 | `limr.lineHeight` / `limr.maxWidth` | `1.8` / `860` | Body line-height multiplier and maximum width in px. Reduce them for a more compact layout. |
 | `limr.typography` | `"standard"` | `standard` normal layout; `justify` justified text; `knuth-plass` paragraph-wide line-breaking optimization. |
+| `limr.loadingMode` | `"blocking"` | Wait for a complete long document before reading. `progressive` can show an independently parseable opening while loading continues, preserving your reading position when complete. |
 | `limr.sidebarMode` | `"content"` | `content` shows the sidebar when notes exist; `always` always enables it; `hidden` hides it. Narrow readers display annotations in overlays. |
 | `limr.sidebarAutoCollapse` | `true` | Fold crowded sidebar items automatically; turn off to lay them out individually. |
 | `limr.tocMode` | `"always"` | `always` shows side contents on wide screens and collapsible contents on narrow ones; `wide` shows only side contents; `hidden` hides both. |
@@ -115,6 +116,8 @@ export default ({ React, limr }) => limr.defineBlock({
 ```
 
 Use `:::research-card`, the card's Markdown body, and a closing `:::` in your document. Add CSS for its appearance, or ask your assistant to build syntax, annotation types, and actions using the public interfaces.
+
+The host retains manifest namespaces for extension `name` without mutating the factory's original object; workspace plugins and add-ons may return the same extension name. Authored tag/directive names, component keys and annotation types remain unchanged, so actual syntax names must still avoid conflicts. Wrapped custom syntax uses main-thread compatibility parsing; pure view plugins do not disable the default syntax worker. Windowed rendering has a separate contract, so large-document performance is not guaranteed for every plugin; see the [compatibility contract](skills/limr-annotations/references/reader-plugins.md#large-document-compatibility).
 
 For reuse across projects, package modules as a separate VS Code add-on and register them through `registerPlugin`. See the [plugin guide](skills/limr-annotations/references/reader-plugins.md), [API declarations](api/index.d.ts), and [complete add-on example](examples/vscode-reader-addon). In Remote-WSL / SSH, install add-ons in the same extension host as LiMR.
 

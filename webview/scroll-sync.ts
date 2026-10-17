@@ -3,6 +3,10 @@ import { floorIndex } from '../src/shared/scroll-sync';
 interface SourceBlock { element: HTMLElement; start: number; end: number }
 const selector = '.limr-reader-content > article > [data-source-start]';
 const anchor = 18;
+export interface ReaderScrollBridge {
+  getReadingPosition(): { source: number; offset: number } | null;
+  restoreReadingPosition(position: { source: number; offset: number }): void;
+}
 
 /** The DOM index is rebuilt only when content changes. A scroll reads O(log n)
  * block rectangles once per animation frame, never all inline source spans.
@@ -20,7 +24,8 @@ export class ReaderScrollSync {
   private readonly observer: MutationObserver;
 
   constructor(private readonly root: HTMLElement, private readonly enabled: () => boolean, private readonly send: (offset: number, epoch: number, generation: number) => void,
-    private readonly inputChanged: (active: boolean, epoch: number, generation: number) => void = () => {}) {
+    private readonly inputChanged: (active: boolean, epoch: number, generation: number) => void = () => {},
+    private readonly getReader?: () => ReaderScrollBridge | null) {
     this.observer = new MutationObserver(records => {
       // Popovers, inline highlights and lazy block renderers can mutate while
       // scrolling without changing the article's source-block index.
@@ -74,6 +79,8 @@ export class ReaderScrollSync {
     else if (epoch !== undefined) this.release(epoch);
   }
   reset() { this.onLeave(); this.release(); this.appliedScrollTop = undefined; }
+  /** Loading may finish after a source reveal. Retry it with the public bridge. */
+  refresh() { this.blocks = undefined; if (this.pendingReveal !== undefined) this.schedule(); }
   private index() {
     if (this.blocks) return this.blocks;
     this.article = this.root.querySelector('.limr-reader-content > article');
@@ -100,6 +107,20 @@ export class ReaderScrollSync {
   private flush = () => {
     this.frame = 0;
     if (!this.enabled()) { this.pendingReveal = undefined; return; }
+    if (this.getReader) {
+      const reader = this.getReader();
+      if (!reader) return;
+      if (this.pendingReveal !== undefined) {
+        const offset = this.pendingReveal; this.pendingReveal = undefined;
+        reader.restoreReadingPosition({ source: offset, offset: anchor });
+        this.lastOffset = undefined;
+      } else if (this.readerInput) {
+        const position = reader.getReadingPosition();
+        const offset = this.root.scrollTop < 1 ? 0 : position?.source;
+        if (offset !== undefined && offset !== this.lastOffset) { this.lastOffset = offset; this.send(offset, this.inputEpoch, this.sourceGeneration); }
+      }
+      return;
+    }
     const blocks = this.index();
     if (!blocks.length) return;
     const viewportTop = this.root.getBoundingClientRect().top + anchor;

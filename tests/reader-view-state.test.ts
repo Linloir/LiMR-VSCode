@@ -24,6 +24,29 @@ beforeEach(() => {
 afterEach(() => { dispose?.(); dispose = undefined; vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('reader position across webview resource-grant reloads', () => {
+  it('waits for long loading and lets reading the provisional prefix cancel an old bookmark', () => {
+    const root = new ScrollRoot(); root.scrollHeight = 4000;
+    let ready = false;
+    dispose = preserveReaderViewState(root as unknown as HTMLElement, 'file:///reading.md', undefined, () => ready);
+    vi.advanceTimersByTime(10_000); window.dispatchEvent(new Event('beforeunload'));
+    expect(state.save).not.toHaveBeenCalled(); expect(state.value.limrReaderPosition.top).toBe(900);
+    root.dispatchEvent(new Event('wheel')); root.scrollTo({ top: 200 }); vi.advanceTimersByTime(100);
+    expect(state.save).not.toHaveBeenCalled();
+    ready = true; root.dispatchEvent(new Event('limr-reader-ready')); vi.advanceTimersByTime(100);
+    expect(root.scrollTop).toBe(200); expect(state.value.limrReaderPosition.top).toBe(200);
+  });
+  it('restores a source bookmark after window mounting instead of a stale physical scrollTop', () => {
+    const root = new ScrollRoot(); root.scrollHeight = 8_000_000;
+    const reading = { source: 42_000_000, offset: -5 };
+    state.value.limrReaderPosition.reading = reading;
+    const restoreReadingPosition = vi.fn(() => { root.scrollTop = 7_000_000; });
+    dispose = preserveReaderViewState(root as unknown as HTMLElement, 'file:///reading.md', () => ({ restoreReadingPosition, getReadingPosition: () => reading }));
+    vi.advanceTimersByTime(16);
+    expect(restoreReadingPosition).toHaveBeenCalledWith(reading);
+    expect(state.save).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(64);
+    expect(state.value.limrReaderPosition).toEqual({ uri: 'file:///reading.md', top: 7_000_000, reading });
+  });
   it('preserves the previous position while the new reader has not laid out, then restores it', () => {
     const root = new ScrollRoot(); start(root);
     vi.advanceTimersByTime(160);

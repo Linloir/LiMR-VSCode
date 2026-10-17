@@ -97,7 +97,7 @@ export function activate(context: vscode.ExtensionContext): LiMRExtensionApi {
   command('limr.chooseTranslationMode', () => provider.choosePreference('translationMode', resource()));
   command('limr.configureTopBar', () => provider.chooseButtons('topBarButtons', resource()));
   command('limr.configureBottomBar', () => provider.chooseButtons('bottomBarButtons', resource()));
-  command('limr.resetFileSettings', async () => { const uri = resource(); if (uri) await provider.setFileSettings(uri, {}, true); });
+  command('limr.resetFileSettings', async () => { const uri = resource(); if (uri) { provider.notifyTranslationIntent(uri); await provider.setFileSettings(uri, {}, true); } });
   command('limr.reloadPlugins', () => provider.reloadPlugins());
   command('limr.installGlobalSkill', () => installGlobalSkill(context, resource()));
   command('limr.copySkillInstallPrompt', () => copySkillInstallPrompt(context, resource()));
@@ -109,6 +109,7 @@ export function activate(context: vscode.ExtensionContext): LiMRExtensionApi {
 
 class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposable {
   private readonly panels = new Map<vscode.WebviewPanel, vscode.TextDocument>();
+  private readonly sentDocuments = new Map<vscode.WebviewPanel, { uri: string; version: number }>();
   private readonly subscriptions: vscode.Disposable[] = [];
   private readonly pending = new Map<string, Promise<void>>();
   private readonly plugins = new Map<vscode.WebviewPanel, NonNullable<ReaderState['plugins']>>();
@@ -117,6 +118,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   private readonly imageRoots = new Map<vscode.WebviewPanel, Map<string, vscode.Uri>>();
   private readonly extraStatus = new Map<ReaderButton, vscode.StatusBarItem>();
   private readonly fileWrites = new Map<string, Promise<void>>();
+  private readonly translationEpochs = new Map<string, number>();
   private mergedPreview: boolean | undefined;
   private readonly status = vscode.window.createStatusBarItem('limr.reader', vscode.StatusBarAlignment.Right, 105);
   private pluginTimer: ReturnType<typeof setTimeout> | undefined;
@@ -156,6 +158,9 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       vscode.workspace.onDidChangeTextDocument(event => { if (event.contentChanges.length) this.broadcast(event.document); }),
       vscode.workspace.onDidSaveTextDocument(document => this.broadcast(document)),
       vscode.workspace.onDidChangeConfiguration(event => {
+        for (const uri of new Map([...this.panels.values()].map(document => [document.uri.toString(), document.uri])).values()) {
+          if (event.affectsConfiguration('limr.translationMode', uri) && this.settings(uri).fileOverrides.translationMode === undefined) this.notifyTranslationIntent(uri);
+        }
         if (event.affectsConfiguration('limr.syncScroll')) this.resetScrollSynchronization();
         if (['limr', 'editor.fontFamily', 'editor.fontSize', 'workbench.colorTheme'].some(name => event.affectsConfiguration(name))) { this.broadcast(); void this.reloadPlugins(); }
       }),
@@ -267,7 +272,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       panel.onDidChangeViewState(() => { if (panel.active) this.activeUri = document.uri; if (panel.visible) this.sendState(panel, document); else if (this.readerScrollOwners.get(document.uri.toString())?.panel === panel) this.releaseReaderInput(document.uri); this.updateStatus(); }),
     ];
     panel.onDidDispose(() => {
-      events.forEach(event => event.dispose()); this.panels.delete(panel);
+      events.forEach(event => event.dispose()); this.panels.delete(panel); this.sentDocuments.delete(panel);
       if (this.readerScrollOwners.get(document.uri.toString())?.panel === panel) this.releaseReaderInput(document.uri);
       if (![...this.panels.values()].some(item => item.uri.toString() === document.uri.toString())) this.sourceScrollGenerations.delete(document.uri.toString());
       this.plugins.delete(panel); this.pluginRevisions.delete(panel); this.pluginRoots.delete(panel); this.imageRoots.delete(panel); this.updateStatus();
@@ -276,7 +281,16 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   }
   private state(document: vscode.TextDocument, webview: vscode.Webview): ReaderState {
     return {
-      document: { uri: document.uri.toString(), fsPath: document.uri.fsPath, relativePath: vscode.workspace.asRelativePath(document.uri, false), name: basename(document.uri.path), source: document.getText(), version: document.version, isDirty: document.isDirty },
+      document: { ...this.documentMetadata(document), source: document.getText() },
+      ...this.configuration(document, webview),
+    };
+  }
+  private documentMetadata(document: vscode.TextDocument) {
+    return { uri: document.uri.toString(), fsPath: document.uri.fsPath, relativePath: vscode.workspace.asRelativePath(document.uri, false), name: basename(document.uri.path), version: document.version, isDirty: document.isDirty };
+  }
+  private configuration(document: vscode.TextDocument, webview: vscode.Webview) {
+    return {
+      translationEpoch: this.translationEpochs.get(document.uri.toString()) ?? 0,
       settings: this.settings(document.uri), plugins: this.pluginsFor(webview), themeKind: themeKind(), themeName: vscode.workspace.getConfiguration('workbench').get<string>('colorTheme', ''),
       resourceBase: webview.asWebviewUri(vscode.Uri.joinPath(document.uri, '..')).toString().replace(/\/?$/, '/'), trusted: vscode.workspace.isTrusted,
     };
@@ -288,7 +302,15 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   private settings(uri: vscode.Uri) { return readerSettings(uri, this.context.workspaceState.get<ReaderFileSettings>(`limr.fileSettings:${uri.toString()}`, {})); }
   private text(uri: vscode.Uri | undefined, zh: string, en: string) { return localized(uri, zh, en); }
   private post(panel: vscode.WebviewPanel, message: HostMessage) { void panel.webview.postMessage(message); }
-  private sendState(panel: vscode.WebviewPanel, document: vscode.TextDocument) { this.post(panel, { type: 'state', state: this.state(document, panel.webview) }); }
+  private sendState(panel: vscode.WebviewPanel, document: vscode.TextDocument) {
+    const previous = this.sentDocuments.get(panel), uri = document.uri.toString();
+    if (previous?.uri === uri && previous.version === document.version) {
+      this.post(panel, { type: 'configuration', configuration: this.configuration(document, panel.webview), document: this.documentMetadata(document) });
+    } else {
+      this.post(panel, { type: 'state', state: this.state(document, panel.webview) });
+      this.sentDocuments.set(panel, { uri, version: document.version });
+    }
+  }
   private broadcast(document?: vscode.TextDocument) {
     for (const [panel, current] of this.panels) if (!document || current.uri.toString() === document.uri.toString()) this.sendState(panel, current);
     this.updateStatus();
@@ -329,17 +351,43 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       if (settings.bottomBarButtons.includes(name)) item.show();
     });
   }
-  async setFileSettings(uri: vscode.Uri, incoming: ReaderFileSettings, replace = false) {
+  async setFileSettings(uri: vscode.Uri, incoming: ReaderFileSettings, replace = false, translationEpoch?: number, documentVersion?: number) {
     const settings = validateFileSettings(incoming);
     const key = `limr.fileSettings:${uri.toString()}`;
     const previous = this.fileWrites.get(key) ?? Promise.resolve();
     const next = previous.catch(() => {}).then(async () => {
+      // Recheck inside the serialized write, not only when the message arrives:
+      // a newer native preference can win while an older write is queued.
+      const currentDocument = documentVersion === undefined ? undefined : vscode.workspace.textDocuments.find(document => document.uri.toString() === uri.toString());
+      if (translationEpoch !== undefined && translationEpoch !== (this.translationEpochs.get(uri.toString()) ?? 0) || documentVersion !== undefined && currentDocument?.version !== documentVersion) { this.broadcast(); return; }
       const merged = replace ? settings : { ...this.context.workspaceState.get<ReaderFileSettings>(key, {}), ...settings };
       await this.context.workspaceState.update(key, Object.keys(merged).length ? merged : undefined);
       this.broadcast();
     });
     this.fileWrites.set(key, next);
     try { await next; } finally { if (this.fileWrites.get(key) === next) this.fileWrites.delete(key); }
+  }
+  notifyTranslationIntent(uri?: vscode.Uri) {
+    const documents = new Map([...this.panels.values()].map(document => [document.uri.toString(), document]));
+    for (const [key, document] of documents) {
+      if (uri && key !== uri.toString()) continue;
+      const epoch = (this.translationEpochs.get(key) ?? 0) + 1; this.translationEpochs.set(key, epoch);
+      for (const [panel, target] of this.panels) if (target.uri.toString() === document.uri.toString()) this.post(panel, { type: 'translationIntent', uri: key, epoch });
+    }
+  }
+  private notifyDefaultTranslationIntent(uri?: vscode.Uri) {
+    const selected = vscode.workspace.getConfiguration('limr', uri).inspect('translationMode');
+    const folder = selected?.workspaceFolderValue !== undefined;
+    const workspace = !folder && selected?.workspaceValue !== undefined;
+    const selectedFolder = uri && vscode.workspace.getWorkspaceFolder(uri)?.uri.toString();
+    for (const document of new Map([...this.panels.values()].map(document => [document.uri.toString(), document])).values()) {
+      if (this.settings(document.uri).fileOverrides.translationMode !== undefined) continue;
+      const current = vscode.workspace.getConfiguration('limr', document.uri).inspect('translationMode');
+      if (folder && vscode.workspace.getWorkspaceFolder(document.uri)?.uri.toString() !== selectedFolder) continue;
+      if (workspace && current?.workspaceFolderValue !== undefined) continue;
+      if (!folder && !workspace && (current?.workspaceFolderValue !== undefined || current?.workspaceValue !== undefined)) continue;
+      this.notifyTranslationIntent(document.uri);
+    }
   }
   async choosePreference(key: 'typography' | 'translationMode', uri?: vscode.Uri) {
     const t = (zh: string, en: string) => this.text(uri, zh, en);
@@ -365,6 +413,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     ], { title, placeHolder: t('选择设置的生效范围', 'Choose where this setting applies'), matchOnDescription: true, matchOnDetail: true });
     if (!scope) return;
     if (scope.value === 'reset' && uri) {
+      if (key === 'translationMode') this.notifyTranslationIntent(uri);
       const settings = { ...this.settings(uri).fileOverrides }; delete settings[key];
       if (key === 'translationMode') delete settings.translationParagraphs;
       await this.setFileSettings(uri, settings, true); return;
@@ -388,6 +437,10 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       label: labels[value], value, description: current === value ? t('当前', 'Current') : '', detail: details[value],
     })), { title: `${title} · ${scope.value === 'file' ? t('当前文件', 'This file') : defaultScope.label}`, placeHolder, matchOnDescription: true, matchOnDetail: true });
     if (!pick) return;
+    if (key === 'translationMode') {
+      if (scope.value === 'file') this.notifyTranslationIntent(uri);
+      else this.notifyDefaultTranslationIntent(uri);
+    }
     if (scope.value === 'file' && uri) await this.setFileSettings(uri, { [key]: pick.value });
     else await setReaderSetting(uri, key, pick.value);
   }
@@ -454,6 +507,8 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     switch (message.type) {
       case 'ready': {
         if (this.readerScrollOwners.get(document.uri.toString())?.panel === panel) this.releaseReaderInput(document.uri);
+        // A recreated guest has no source even if its panel was sent before.
+        this.sentDocuments.delete(panel);
         this.sendState(panel, document);
         this.post(panel, { type: 'scrollIntent', active: false, generation: this.sourceScrollGenerations.get(document.uri.toString()) ?? 0 });
         this.updateStatus(); await this.reloadPlugins(); break;
@@ -554,7 +609,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       case 'openSettings': await vscode.commands.executeCommand('limr.openSettings'); break;
       case 'openSkillGuide': await showSkillGuide(this.context, document.uri); break;
       case 'installSkill': await installSkill(this.context, document.uri); break;
-      case 'setFileSettings': await this.setFileSettings(document.uri, message.settings); break;
+      case 'setFileSettings': await this.setFileSettings(document.uri, message.settings, false, message.translationEpoch, message.documentVersion); break;
       case 'setTheme': if (themes.some(theme => theme.value === message.theme)) await setReaderSetting(document.uri, 'theme', message.theme); break;
       case 'setEditing':
         if (typeof message.enabled !== 'boolean') return;
@@ -598,9 +653,10 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     const nonce = randomBytes(24).toString('base64');
     const assets = vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview');
     const script = webview.asWebviewUri(vscode.Uri.joinPath(assets, 'main.js'));
+    const parserWorker = webview.asWebviewUri(vscode.Uri.joinPath(assets, 'reader-worker.js'));
     const style = webview.asWebviewUri(vscode.Uri.joinPath(assets, 'main.css'));
     const csp = `default-src 'none'; base-uri ${webview.cspSource}; img-src ${webview.cspSource} https: http: data: blob:; media-src ${webview.cspSource} https: blob:; font-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource} 'nonce-${nonce}' 'wasm-unsafe-eval'; connect-src ${webview.cspSource}; worker-src ${webview.cspSource} blob:;`;
-    return `<!DOCTYPE html><html lang="${readerLocale(vscode.workspace.getConfiguration('limr').get('language', 'auto'))}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="${csp}"><link rel="stylesheet" href="${style}"><title>LiMR Reader</title></head><body><div id="root"></div><script type="module" nonce="${nonce}" src="${script}"></script></body></html>`;
+    return `<!DOCTYPE html><html lang="${readerLocale(vscode.workspace.getConfiguration('limr').get('language', 'auto'))}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="limr-parser-worker" content="${parserWorker}"><link rel="stylesheet" href="${style}"><title>LiMR Reader</title></head><body><div id="root"></div><script type="module" nonce="${nonce}" src="${script}"></script></body></html>`;
   }
 }
 

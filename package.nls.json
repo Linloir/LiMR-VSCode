@@ -76,5 +76,8 @@
   "limr.syntax.value.description": "Color of LiMR attribute values in Markdown source editors.",
   "limr.syntax.annotation.description": "Color of LiMR active annotation boundaries and inline footnote markers in Markdown source editors.",
   "limr.syntax.highlight.description": "Color of LiMR inline highlight delimiters in Markdown source editors.",
-  "limr.syntax.math.description": "Color of LiMR math delimiters in Markdown source editors."
+  "limr.syntax.math.description": "Color of LiMR math delimiters in Markdown source editors.",
+  "limr.loadingMode.description": "How large Markdown files become available for reading.",
+  "limr.loadingMode.option.blocking": "Finish loading the complete document before reading.",
+  "limr.loadingMode.option.progressive": "Show a safe opening section while the rest loads. Some Markdown or plugins require complete loading."
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { applySourceEdits, createDocument, editSourceAnnotations, Markdown, Reader, standard } from '@linloir/limr';
+import { applySourceEdits, createDocument, editSourceAnnotations, Markdown, Reader, standard, type MarkdownNode } from '@linloir/limr';
 import { readingAnnotations } from './annotations';
 import { DraftStore, EditorContext } from './editor-context';
 import { languageTypography } from './typography';
@@ -43,6 +43,48 @@ describe('language-specific reader typography', () => {
     expect(html).toContain(`data-source-start="${source.indexOf('中文')}"`);
     expect(html).toContain(`data-source-end="${source.indexOf('中文') + 2}"`);
     expect(html).not.toContain('::%%limr%%');
+  });
+
+  it('keeps UTF-16 points and shared positions when identity text crosses scripts and lines', () => {
+    const source = 'A😀中\né\u0301 Z';
+    const nodes = createDocument(source, { extensions }).getSnapshot().blocks[0].node.children!;
+    expect(nodes.map(node => [node.lvScript, node.children![0].value])).toEqual([
+      ['latin', 'A'], ['other', '😀'], ['chinese', '中\n'], ['latin', 'é\u0301 Z'],
+    ]);
+    expect(nodes.map(node => node.position)).toEqual([
+      { start: { offset: 0, line: 1, column: 1 }, end: { offset: 1, line: 1, column: 2 } },
+      { start: { offset: 1, line: 1, column: 2 }, end: { offset: 3, line: 1, column: 4 } },
+      { start: { offset: 3, line: 1, column: 4 }, end: { offset: 5, line: 2, column: 1 } },
+      { start: { offset: 5, line: 2, column: 1 }, end: { offset: 9, line: 2, column: 5 } },
+    ]);
+    for (const node of nodes) expect(node.position).toBe(node.children![0].position);
+  });
+
+  it('keeps repeated classifications independent across paragraphs and typography factories', () => {
+    const source = '中中中 aaa 111 😀中😀\n\n... 中中中 aaa 111 😀中😀';
+    const groups = [['chinese', '中中中 '], ['latin', 'aaa 111 '], ['other', '😀'], ['chinese', '中'], ['other', '😀']];
+    for (const readingExtensions of [extensions, [...standard(), languageTypography()], extensions]) {
+      const document = createDocument(source, { extensions: readingExtensions }).getSnapshot();
+      expect(document.blocks.map(block => block.node.children!.map(node => [node.lvScript, node.children![0].value])))
+        .toEqual([groups, [['latin', '... '], ...groups]]);
+    }
+  });
+
+  it.each([
+    { raw: '&amp; 中文' },
+    { raw: '\\*中文' },
+    { raw: 'A\r\n中文' },
+    { raw: 'Same 中文', sourceOmissions: [{ start: 0, end: 1 }] },
+  ])('keeps raw-equal text on the exact mapper when source syntax is present: $raw', ({ raw, sourceOmissions }) => {
+    // Other syntax plugins may supply literal values. Equality alone must not
+    // bypass the mapper's decoding/omission checks and turn inexact text exact.
+    const lines = raw.split(/\r\n|\r|\n/);
+    const child: MarkdownNode = { type: 'text', value: raw, sourceOmissions,
+      position: { start: { offset: 0, line: 1, column: 1 }, end: { offset: raw.length, line: lines.length, column: lines.at(-1)!.length + 1 } } };
+    const root: MarkdownNode = { type: 'root', children: [child] };
+    languageTypography().transform!(root, { source: raw, documentId: 'literal-plugin', streaming: false });
+    expect(root.children).toEqual([child]);
+    expect(root.children![0]).toBe(child);
   });
 
 });

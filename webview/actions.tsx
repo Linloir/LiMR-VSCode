@@ -36,7 +36,7 @@ export function readerActions(options: ActionOptions): SelectionAction[] {
       if (writable(context) && !options.isBusy()) return highlight.run!(context);
     } },
     addNote('margin-note'), addNote('question'),
-    { id: 'lv-copy', label: zh ? '复制' : 'Copy', icon: <ToolIcon name="copy" />, successLabel: zh ? '已复制' : 'Copied', successIcon: <ToolIcon name="check" />,
+    { id: 'lv-copy', readOnly: true, label: zh ? '复制' : 'Copy', icon: <ToolIcon name="copy" />, successLabel: zh ? '已复制' : 'Copied', successIcon: <ToolIcon name="check" />,
       run: async context => { await copyClipboard(context.selection.text); },
     },
     { id: 'lv-question-context', label: zh ? '提问上下文' : 'Question context', icon: <ToolIcon name="sparkles" />,

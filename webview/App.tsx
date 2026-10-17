@@ -1,19 +1,20 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Reader, chinese, english, codeHighlight, standard, ToolIcon, type SourceChange } from '@linloir/limr';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { chinese, english, standard, ToolIcon, type SourceChange, type DocumentSnapshot } from '@linloir/limr';
 import type { HostMessage, ReaderFileSettings, ReaderState } from '../src/shared/protocol';
 import { readingAnnotations } from './annotations';
 import { readerActions } from './actions';
 import { listen, post } from './bridge';
 import { DraftStore, EditorContext } from './editor-context';
 import { languageTypography } from './typography';
-import { readerTranslations, TranslationPreferences } from './translations';
+import { useTranslationParameters } from './translations';
+import { readerCodeHighlight } from './reader-extensions';
+import { HostedReader, ReaderIntegration, type ReaderCommands } from './reader-integration';
 import { PluginBoundary, useWorkspacePlugins } from './plugins';
 import { ReaderScrollSync } from './scroll-sync';
 import { ReaderImages } from './images';
 import { readerFrontmatter } from './frontmatter';
-import { ImagePreviewProvider, readerImagePreview } from './image-preview';
-import { useReaderSidebar } from './sidebar';
 import { useReaderViewState } from './reader-view-state';
+import { applyReaderConfiguration } from './reader-state';
 
 interface PendingEdit {
   id: string; baseVersion: number; baseSource: string; source: string;
@@ -21,25 +22,38 @@ interface PendingEdit {
 }
 const noExternalAnnotations = Object.freeze([]);
 const noWorkspacePlugins = Object.freeze([]);
+const MemoReader = memo(HostedReader);
 
 export function App() {
   const [state, setState] = useState<ReaderState | null>(null);
-  const [source, setSource] = useState('');
+  const [source, setSourceState] = useState('');
+  const requestedSource = useRef(''), readerReadyRef = useRef(false);
+  const setSource = useCallback((next: string) => {
+    // Native reveal messages can arrive before React commits a replacement.
+    // Invalidate the old bridge immediately, then let the new reader publish it.
+    if (requestedSource.current !== next) { requestedSource.current = next; readerReadyRef.current = false; }
+    setSourceState(next);
+  }, []);
   const [busy, setBusy] = useState(false);
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
   const [readerWidth, setReaderWidth] = useState(0);
+  const readerCommands = useRef<ReaderCommands | null>(null);
+  const [readerContent, setReaderContent] = useState<{ uri: string; source: string; complete: boolean; hasContent: boolean } | null>(null);
   const stateRef = useRef(state), pending = useRef<PendingEdit | null>(null);
   const drafts = useRef(new DraftStore());
   const scrollSync = useRef<ReaderScrollSync | null>(null);
+  const pendingSourceReveal = useRef<number | undefined>(undefined);
   const sourceScrollInput = useRef<{ generation: number; epoch?: number }>({ generation: 0 });
   const notify = useCallback((message: string, error = false) => {
     post({ type: 'notify', message, error });
   }, []);
   const locale = state?.settings.locale ?? 'en';
   const workspacePlugins = useWorkspacePlugins(state?.plugins ?? noWorkspacePlugins, notify);
-  const sidebarEnabled = useReaderSidebar(scrollRoot, state?.settings.sidebarMode ?? 'content', state?.document.uri);
-  useReaderViewState(scrollRoot, state?.document.uri);
-  const updateFileSettings = useCallback((fileOverrides: ReaderFileSettings) => {
+  const readerReady = useMemo(() => readerContent?.uri === state?.document.uri && readerContent?.source === source && !!readerContent?.complete, [readerContent, state?.document.uri, source]);
+  readerReadyRef.current = readerReady;
+  const sidebarEnabled = state?.settings.sidebarMode === 'always' || state?.settings.sidebarMode === 'content' && readerContent?.uri === state?.document.uri && !!readerContent?.hasContent;
+  useReaderViewState(scrollRoot, state?.document.uri, readerReady, readerCommands);
+  const updateFileSettings = useCallback((fileOverrides: ReaderFileSettings, translationEpoch?: number, documentVersion?: number) => {
     const current = stateRef.current;
     if (!current) return;
     const next = { ...current, settings: { ...current.settings, fileOverrides,
@@ -47,8 +61,25 @@ export function App() {
       translationMode: fileOverrides.translationMode ?? current.settings.translationMode,
     } };
     stateRef.current = next; setState(next);
-    post({ type: 'setFileSettings', settings: fileOverrides });
+    post({ type: 'setFileSettings', settings: fileOverrides, translationEpoch, documentVersion });
   }, []);
+  const translationRequest = useMemo(() => state ? { uri: state.document.uri, version: state.document.version, source } : undefined,
+    [state?.document.uri, state?.document.version, source]);
+  const { parameters, onDocument: translationDocument, cancel: cancelPendingTranslation } = useTranslationParameters(state?.settings, updateFileSettings, translationRequest, state?.translationEpoch ?? 0);
+  const readerAvailable = useCallback((commands: ReaderCommands, document: DocumentSnapshot, hasContent: boolean) => {
+    readerCommands.current = commands;
+    const complete = commands.isDocumentComplete();
+    translationDocument(document, complete);
+    setReaderContent(previous => {
+      // Derived table notes leave the DOM with their table. Keep the rail stable
+      // for this revision once it was needed; ordinary source edits reset it.
+      const content = hasContent || previous?.uri === document.id && previous.source === document.source && previous.hasContent;
+      return previous?.uri === document.id && previous.source === document.source && previous.complete === complete && previous.hasContent === content
+        ? previous : { uri: document.id, source: document.source, complete, hasContent: content };
+    });
+    scrollSync.current?.refresh();
+  }, [translationDocument]);
+  const readerDisposed = useCallback((commands: ReaderCommands) => { if (readerCommands.current === commands) readerCommands.current = null; }, []);
   const applyState = useCallback((incoming: ReaderState, force = false) => {
     const current = stateRef.current;
     // A delayed acknowledgement must never replace a newer editor revision.
@@ -61,6 +92,11 @@ export function App() {
   useEffect(() => {
     const receive = (message: HostMessage) => {
       if (message.type === 'state') applyState(message.state);
+      else if (message.type === 'translationIntent') { if (message.uri === stateRef.current?.document.uri) cancelPendingTranslation(message.epoch); }
+      else if (message.type === 'configuration') {
+        const next = applyReaderConfiguration(stateRef.current, message);
+        if (next) { stateRef.current = next; setState(next); }
+      }
       else if (message.type === 'editResult') {
         const edit = pending.current;
         if (!edit || edit.id !== message.requestId) { applyState(message.state); return; }
@@ -71,7 +107,10 @@ export function App() {
           edit.reject(error); notify(error.message, true);
         }
       } else if (message.type === 'notice') notify(message.message, message.error);
-      else if (message.type === 'reveal') scrollSync.current?.reveal(message.offset);
+      else if (message.type === 'reveal') {
+        if (scrollSync.current) scrollSync.current.reveal(message.offset);
+        else pendingSourceReveal.current = message.offset;
+      }
       else if (message.type === 'scrollIntent') {
         if (message.generation >= sourceScrollInput.current.generation) sourceScrollInput.current = message;
         scrollSync.current?.sourceInput(message.generation, message.epoch);
@@ -79,7 +118,7 @@ export function App() {
     };
     const dispose = listen(receive); post({ type: 'ready' });
     return dispose;
-  }, [applyState, notify]);
+  }, [applyState, notify, cancelPendingTranslation]);
 
   const editSource = useCallback((nextSource: string, change: SourceChange): boolean => {
     const current = stateRef.current;
@@ -116,8 +155,8 @@ export function App() {
   const oneDark = selectedTheme.startsWith('one-dark') || selectedTheme === 'auto' && /one dark pro/i.test(state?.themeName ?? '');
   const extensions = useMemo(() => [
     ...standard().filter(extension => extension.name !== 'code-highlight'),
-    codeHighlight({ lightTheme: playground ? 'github-light' : 'light-plus', darkTheme: playground ? 'github-dark' : oneDark ? 'one-dark-pro' : 'dark-plus' }),
-    readerFrontmatter(), readingAnnotations(locale), languageTypography(), readerTranslations(), readerImagePreview(),
+    readerCodeHighlight({ lightTheme: playground ? 'github-light' : 'light-plus', darkTheme: playground ? 'github-dark' : oneDark ? 'one-dark-pro' : 'dark-plus' }),
+    readerFrontmatter(), readingAnnotations(locale), languageTypography(),
   ], [oneDark, playground, locale]);
 
   useLayoutEffect(() => {
@@ -167,9 +206,11 @@ export function App() {
   useEffect(() => {
     if (!scrollRoot) return;
     const sync = new ReaderScrollSync(scrollRoot, () => !!stateRef.current?.settings.syncScroll,
-      (offset, epoch, generation) => post({ type: 'revealSource', offset, epoch, generation }), (active, epoch, generation) => post({ type: 'scrollIntent', active, epoch, generation }));
+      (offset, epoch, generation) => post({ type: 'revealSource', offset, epoch, generation }), (active, epoch, generation) => post({ type: 'scrollIntent', active, epoch, generation }),
+      () => readerReadyRef.current && readerCommands.current?.document.id === stateRef.current?.document.uri && readerCommands.current?.isDocumentComplete() ? readerCommands.current : null);
     scrollSync.current = sync;
     sync.sourceInput(sourceScrollInput.current.generation, sourceScrollInput.current.epoch);
+    if (pendingSourceReveal.current !== undefined) { sync.reveal(pendingSourceReveal.current); pendingSourceReveal.current = undefined; }
     return () => { sync.dispose(); scrollSync.current = null; };
   }, [scrollRoot]);
   useEffect(() => { scrollSync.current?.reset(); }, [state?.settings.syncScroll]);
@@ -195,19 +236,15 @@ export function App() {
   const centeredToc = readerWidth >= state.settings.maxWidth + 2 * (200 + 24);
   const sideTocAvailable = sidebarEnabled && readerWidth >= 1120 || centeredToc;
   const tocVisible = state.settings.tocMode === 'always' || state.settings.tocMode === 'wide' && sideTocAvailable;
-  return <div className={`lv-app${busy ? ' is-saving' : ''}`} data-testid="reader-app" data-editing={editingEnabled} aria-busy={busy}>
+  return <div className={`lv-app${busy ? ' is-saving' : ''}`} data-testid="reader-app" data-editing={editingEnabled} data-reader-ready={readerReady} aria-busy={busy || !readerReady}>
     <div className="lv-scroll" ref={setScrollRoot} data-testid="reader-scroll">
       <EditorContext.Provider value={editorSession}>
-        <TranslationPreferences.Provider value={{ settings: state.settings, update: updateFileSettings }}>
-        <ImagePreviewProvider key={state.document.uri} locale={locale}>
-        <PluginBoundary plugins={workspacePlugins} notify={notify}>{plugins => <Reader key={state.document.uri} className={`lv-reader${centeredToc ? ' lv-centered-toc' : ''}`} source={source} documentId={state.document.uri}
+        <PluginBoundary plugins={workspacePlugins} notify={notify}>{plugins => <MemoReader key={state.document.uri} className={`lv-reader${centeredToc ? ' lv-centered-toc' : ''}`} source={source} documentId={state.document.uri}
           theme={isDark ? 'dark' : 'light'} appearance={playground ? 'classic' : 'vscode'} locale={locale === 'zh-CN' ? chinese : english} extensions={extensions} plugins={plugins}
           actions={actions} annotations={noExternalAnnotations} onSourceChange={editingEnabled ? editSource : undefined}
-          typography={state.settings.typography}
+          typography={state.settings.typography} parameters={parameters} loadingMode={state.settings.loadingMode}
           sidebar={sidebarEnabled} sidebarBreakpoint={tocVisible ? 1120 : 900} sidebarCollapse={state.settings.sidebarAutoCollapse} toc={tocVisible}
-          scrollRoot={scrollRoot} scrollOffset={18} />}</PluginBoundary>
-        </ImagePreviewProvider>
-        </TranslationPreferences.Provider>
+          scrollRoot={scrollRoot} scrollOffset={18}><ReaderIntegration onReader={readerAvailable} onDispose={readerDisposed} /></MemoReader>}</PluginBoundary>
       </EditorContext.Provider>
       {!source.trim() && <div className="lv-empty"><ToolIcon name="note" /><p>{locale === 'zh-CN' ? '这份 Markdown 还是空白。' : 'This Markdown document is empty.'}</p><button type="button" onClick={() => post({ type: 'openSource' })}><span className="limr-underline">{locale === 'zh-CN' ? '在编辑器中开始书写' : 'Start writing in the editor'}</span></button></div>}
     </div>

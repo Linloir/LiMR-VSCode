@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
 import {
   AnnotationCard, AnnotationEditor, AnnotationMarkdown, ToolIcon, useAnnotationState,
-  useAnnotations, useLiMR, useLocale, type Annotation, type AnnotationContentProps,
+  useAnnotations, useLiMR, useLocale, registerWorkerExtension, type Annotation, type AnnotationContentProps,
   type AnnotationOverlayCardProps, type AnnotationSidebarPreviewProps, type RendererExtension,
 } from '@linloir/limr';
 import { useDraft, useEditorSession } from './editor-context';
+import { readingAnnotationsSyntax, readerSyntaxIds } from '../src/shared/reader-syntax';
 
 type NoteData = { body?: string; agent?: string; threadId?: string; turnId?: string; [key: string]: unknown };
 const noteKinds = [
@@ -136,23 +137,11 @@ function NoteCard(props: AnnotationOverlayCardProps<NoteData>) {
 
 /** Applications own note presentation; LiMR owns parsing, geometry and source serialization. */
 export function readingAnnotations(language: 'zh-CN' | 'en' = 'zh-CN'): RendererExtension {
-  return { name: 'vscode-reading-annotations', scope: 'local',
-    transform(root) {
-      const visit = (node: import('@linloir/limr').MarkdownNode) => {
-        const annotation = node.annotation as Annotation<Record<string, unknown>> | undefined;
-        // LiMR's default read-only hint replaces every custom action with Copy.
-        // This host supplies a fully controlled toolbar (Copy + AI Context in
-        // read-only mode). Source ownership and onSourceChange remain the write gate.
-        if (annotation?.type === 'highlight' && annotation.source && annotation.data?.readOnly) {
-          node.annotation = { ...annotation, data: { ...annotation.data, readOnly: false } };
-        }
-        node.children?.forEach(visit);
-      };
-      visit(root);
-    }, annotationTypes: noteKinds.map(kind => ({
+  const extension: RendererExtension = { ...readingAnnotationsSyntax(), annotationTypes: noteKinds.map(kind => ({
     type: kind.type, label: language === 'zh-CN' ? kind.label : kind.english, icon: <ToolIcon name={kind.icon} />, color: kind.color,
     Content: NoteContent,
     sidebar: { Preview: NotePreview, previewLines: 3, collapseOnContentClick: false },
     overlay: { Card: NoteCard, previewWidth: 320, expand: { placement: 'anchor', width: 440, maxHeight: '75dvh' } },
   })) };
+  return registerWorkerExtension(extension, { id: readerSyntaxIds.annotations });
 }

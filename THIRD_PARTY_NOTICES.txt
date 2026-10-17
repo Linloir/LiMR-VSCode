@@ -3579,7 +3579,7 @@ SOFTWARE.
 
 
 ========================================================================
-cytoscape 3.34.3
+cytoscape 3.34.4
 License: MIT
 
 LICENSE
@@ -6580,7 +6580,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ========================================================================
-katex 0.18.10
+katex 0.18.11
 License: MIT
 
 LICENSE

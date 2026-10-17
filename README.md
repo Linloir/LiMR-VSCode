@@ -36,6 +36,7 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 | `limr.codeFontFamily` / `limr.codeFontSize` | `""` / `14` | 代码字体和字号（px）；空字体使用内置 Maple Mono NF CN。 |
 | `limr.lineHeight` / `limr.maxWidth` | `1.8` / `860` | 正文行高倍数与最大宽度（px）；偏好紧凑阅读可适当调小。 |
 | `limr.typography` | `"standard"` | `standard` 标准排版；`justify` 两端对齐；`knuth-plass` 使用段落级断行优化。 |
+| `limr.loadingMode` | `"blocking"` | 长文默认等完整加载后开始阅读；`progressive` 在语法允许时先显示可独立解析的开头，后台继续加载，完成后保留阅读位置。 |
 | `limr.sidebarMode` | `"content"` | `content` 有旁注时显示；`always` 始终启用；`hidden` 隐藏。窄窗口通过浮层查看标注。 |
 | `limr.sidebarAutoCollapse` | `true` | 自动折叠密集的旁注条目；关闭后逐项排布。 |
 | `limr.tocMode` | `"always"` | `always` 宽屏显示侧目录、窄屏显示折叠目录；`wide` 仅宽屏显示；`hidden` 隐藏。 |
@@ -116,6 +117,8 @@ export default ({ React, limr }) => limr.defineBlock({
 
 在 Markdown 中使用 `:::research-card`、卡片正文和结束的 `:::`，即可显示这个组件。可继续用 CSS 美化卡片，或让 AI 按公开接口增加语法、标注类型和操作。
 
+宿主沿用清单命名空间隔离扩展 `name`，不会修改工厂返回的原对象；不同工作区插件或附加扩展可返回相同扩展名。Markdown 的 tag/directive 名称、组件键和批注类型保持原样，实际语法名称仍需避免冲突。包装后的自定义语法采用主线程兼容解析；纯视图插件不会禁用默认语法的 Worker。窗口阅读另需渲染器契约，不能据此承诺所有插件的超大文档性能；边界见[插件指引](skills/limr-annotations/references/reader-plugins.md#large-document-compatibility)。
+
 需要在多个项目复用时，可将模块打包为独立的 VS Code 附加扩展，通过 `registerPlugin` 注册，安装后即可使用。参见 [插件指引](skills/limr-annotations/references/reader-plugins.md)、[API 类型定义](api/index.d.ts) 和 [完整附加扩展示例](examples/vscode-reader-addon)。Remote-WSL / SSH 下，附加扩展应与 LiMR 位于同一扩展宿主。
 
 ### 围绕文档提问与标注
@@ -162,6 +165,7 @@ Web links open directly in your browser. File links reuse the target file in ano
 | `limr.codeFontFamily` / `limr.codeFontSize` | `""` / `14` | Code font and size in px; an empty family uses bundled Maple Mono NF CN. |
 | `limr.lineHeight` / `limr.maxWidth` | `1.8` / `860` | Body line-height multiplier and maximum width in px. Reduce them for a more compact layout. |
 | `limr.typography` | `"standard"` | `standard` normal layout; `justify` justified text; `knuth-plass` paragraph-wide line-breaking optimization. |
+| `limr.loadingMode` | `"blocking"` | Wait for a complete long document before reading. `progressive` can show an independently parseable opening while loading continues, preserving your reading position when complete. |
 | `limr.sidebarMode` | `"content"` | `content` shows the sidebar when notes exist; `always` always enables it; `hidden` hides it. Narrow readers display annotations in overlays. |
 | `limr.sidebarAutoCollapse` | `true` | Fold crowded sidebar items automatically; turn off to lay them out individually. |
 | `limr.tocMode` | `"always"` | `always` shows side contents on wide screens and collapsible contents on narrow ones; `wide` shows only side contents; `hidden` hides both. |
@@ -241,6 +245,8 @@ export default ({ React, limr }) => limr.defineBlock({
 ```
 
 Use `:::research-card`, the card's Markdown body, and a closing `:::` in your document. Add CSS for its appearance, or ask your assistant to build syntax, annotation types, and actions using the public interfaces.
+
+The host retains manifest namespaces for extension `name` without mutating the factory's original object; workspace plugins and add-ons may return the same extension name. Authored tag/directive names, component keys and annotation types remain unchanged, so actual syntax names must still avoid conflicts. Wrapped custom syntax uses main-thread compatibility parsing; pure view plugins do not disable the default syntax worker. Windowed rendering has a separate contract, so large-document performance is not guaranteed for every plugin; see the [compatibility contract](skills/limr-annotations/references/reader-plugins.md#large-document-compatibility).
 
 For reuse across projects, package modules as a separate VS Code add-on and register them through `registerPlugin`. See the [plugin guide](skills/limr-annotations/references/reader-plugins.md), [API declarations](api/index.d.ts), and [complete add-on example](examples/vscode-reader-addon). In Remote-WSL / SSH, install add-ons in the same extension host as LiMR.
 

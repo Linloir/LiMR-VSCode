@@ -40,6 +40,8 @@ export interface ReaderSettings {
   bottomBarButtons: ReaderButton[];
   fileOverrides: ReaderFileSettings;
   syncScroll: boolean;
+  /** Complete loading is the default; progressive mode may show a safe prefix. */
+  loadingMode?: 'blocking' | 'progressive';
 }
 export interface ReaderDocument {
   uri: string;
@@ -51,6 +53,8 @@ export interface ReaderDocument {
   isDirty: boolean;
 }
 export interface ReaderState {
+  /** Host-local ordering for provisional translation preferences. */
+  translationEpoch?: number;
   document: ReaderDocument;
   settings: ReaderSettings;
   themeKind: 'light' | 'dark' | 'high-contrast' | 'high-contrast-light';
@@ -60,8 +64,12 @@ export interface ReaderState {
   plugins?: { id: string; stylesheet?: string; module?: string }[];
 }
 export interface SourceEdit { range: { start: number; end: number }; text: string }
+/** View preferences never carry another copy of the Markdown buffer. */
+export type ReaderConfiguration = Omit<ReaderState, 'document'>;
 export type HostMessage =
+  | { type: 'translationIntent'; uri: string; epoch: number }
   | { type: 'state'; state: ReaderState }
+  | { type: 'configuration'; configuration: ReaderConfiguration; document: Omit<ReaderDocument, 'source'> }
   | { type: 'imageResolved'; requestId: string; src: string; uri?: string; reason?: 'missing' | 'ambiguous' | 'unsupported' }
   | { type: 'editResult'; requestId: string; success: boolean; state: ReaderState; error?: string }
   | { type: 'reveal'; offset: number }
@@ -78,7 +86,7 @@ export type WebviewMessage =
   | { type: 'installSkill' }
   | { type: 'setTheme'; theme: ReaderTheme }
   | { type: 'setEditing'; enabled: boolean }
-  | { type: 'setFileSettings'; settings: ReaderFileSettings }
+  | { type: 'setFileSettings'; settings: ReaderFileSettings; translationEpoch?: number; documentVersion?: number }
   | { type: 'copyFallback'; text: string }
   | { type: 'openLink'; href: string }
   | { type: 'revealSource'; offset: number; epoch: number; generation: number }

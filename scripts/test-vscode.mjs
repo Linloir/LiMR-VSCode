@@ -16,12 +16,18 @@ import { runBlockMotion } from '../tests/browser/block-motion.mjs';
 import { runRegressionAcceptance } from '../tests/browser/regressions.mjs';
 import { runFeatureAcceptance } from '../tests/browser/features.mjs';
 import { runSkillAcceptance } from '../tests/browser/skills.mjs';
+import { fileHashes } from '../benchmarks/reading/build.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillSuite = process.env.LIMR_TEST_SUITE === 'skills' || process.argv.includes('--skills');
 const syntaxSuite = process.env.LIMR_TEST_SUITE === 'syntax-highlighting' || process.argv.includes('--syntax-highlighting');
 const navigationSuite = process.env.LIMR_TEST_SUITE === 'navigation' || process.argv.includes('--navigation');
 const extensionPluginSuite = process.env.LIMR_TEST_SUITE === 'extension-plugins' || process.argv.includes('--extension-plugins');
+const largePluginSuite = process.env.LIMR_TEST_SUITE === 'large-plugins' || process.argv.includes('--large-plugins');
+// Fixtures and the integration host stay in this repository. Only the actual
+// product bundle can be selected from an immutable, previously built candidate.
+const extensionPath = process.env.LIMR_TEST_EXTENSION_PATH ? path.resolve(process.env.LIMR_TEST_EXTENSION_PATH) : root;
+assert.ok(!skillSuite || extensionPath === root, 'The skill-isolation suite builds its own disposable product and cannot use LIMR_TEST_EXTENSION_PATH.');
 const artifacts = process.env.LIMR_TEST_ARTIFACTS ? path.resolve(root, process.env.LIMR_TEST_ARTIFACTS) : path.join(root, 'artifacts', 'test-vscode');
 const temporary = await mkdtemp(path.join(process.env.LIMR_TEST_TEMP_ROOT ?? os.tmpdir(), 'limr-vscode-test-'));
 const ipc = path.join(temporary, 'ipc');
@@ -42,7 +48,7 @@ if (themeDirectory) {
   await cp(themeDirectory, path.join(extensionDirectory, 'zhuangtongfa.material-theme'), { recursive: true });
   theme = 'One Dark Pro';
 }
-if (extensionPluginSuite) {
+if (extensionPluginSuite || largePluginSuite) {
   // Install a real companion extension into this disposable VS Code profile.
   // The example itself activates through extensionDependencies and exports API v1.
   const addon = path.join(extensionDirectory, 'limr-examples.limr-reader-addon');
@@ -74,6 +80,11 @@ module.exports.activate = async function (context) {
   );
 };
 `);
+  if (largePluginSuite) {
+    const { largeAddonFixtures, largeAddonActivation } = await import('../tests/browser/large-plugins.mjs');
+    for (const [name, contents] of Object.entries(largeAddonFixtures)) await writeFile(path.join(addon, name), contents);
+    await writeFile(entry, await readFile(entry, 'utf8') + largeAddonActivation);
+  }
 }
 await writeFile(path.join(userData, 'User', 'settings.json'), JSON.stringify({
   'workbench.colorTheme': theme,
@@ -95,13 +106,22 @@ await writeFile(path.join(userData, 'User', 'settings.json'), JSON.stringify({
   'limr.syncScroll': false,
 }, null, 2));
 const executable = process.env.VSCODE_EXECUTABLE_PATH ?? await downloadAndUnzipVSCode(process.env.VSCODE_TEST_VERSION ?? 'stable');
-await access(path.join(root, 'dist', 'extension.cjs'));
+await access(path.join(extensionPath, 'dist', 'extension.cjs'));
+const assets = await fileHashes(path.join(extensionPath, 'dist'));
+const candidate = await readFile(path.join(extensionPath, 'reading-build.json'), 'utf8').then(JSON.parse).catch(error => {
+  if (error.code !== 'ENOENT') throw error;
+});
+if (candidate) assert.deepEqual(assets, candidate.assets, 'Frozen candidate assets must match their build manifest.');
 const build = {
-  extensionVersion: JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version,
-  limrVersion: JSON.parse(await readFile(path.join(root, 'node_modules/@linloir/limr/package.json'), 'utf8')).version,
-  sha256: Object.fromEntries(await Promise.all(['dist/extension.cjs', 'dist/syntax-worker.cjs', 'dist/webview/main.js', 'dist/webview/main.css'].map(async file => [file, createHash('sha256').update(await readFile(path.join(root, file))).digest('hex')]))),
+  extensionPath,
+  extensionVersion: JSON.parse(await readFile(path.join(extensionPath, 'package.json'), 'utf8')).version,
+  limrVersion: candidate?.coreVersion ?? JSON.parse(await readFile(path.join(extensionPath, 'node_modules/@linloir/limr/package.json'), 'utf8')).version,
+  sha256: Object.fromEntries(['extension.cjs', 'syntax-worker.cjs', 'webview/main.js', 'webview/main.css', 'webview/reader-worker.js'].map(file => [`dist/${file}`, assets[file]])),
+  assets,
+  ...(candidate ? { candidate: { sourceSHA256: candidate.sourceSHA256, coreSHA256: candidate.coreSHA256, builtAt: candidate.builtAt } } : {}),
 };
-let developmentPath = root;
+await writeFile(path.join(artifacts, 'build.json'), JSON.stringify(build, null, 2));
+let developmentPath = extensionPath;
 if (skillSuite) {
   // Exercise first-use onboarding even when the developer has a global skill.
   // Only this disposable bundle sees the empty skill home; no real home/config
@@ -198,8 +218,10 @@ try {
     : process.env.LIMR_TEST_SUITE === 'annotations' || process.argv.includes('--annotations') ? (await import('../tests/browser/annotations.mjs')).runAnnotationAcceptance
     : navigationSuite ? (await import('../tests/browser/navigation.mjs')).runNavigationAcceptance
     : process.env.LIMR_TEST_SUITE === 'image-preview' || process.argv.includes('--image-preview') ? (await import('../tests/browser/image-preview.mjs')).runImagePreviewAcceptance
+    : process.env.LIMR_TEST_SUITE === 'table-layout' || process.argv.includes('--table-layout') ? (await import('../tests/browser/table-layout.mjs')).runTableLayoutAcceptance
     : syntaxSuite ? (await import('../tests/browser/syntax-highlighting.mjs')).runSyntaxHighlightingAcceptance
     : extensionPluginSuite ? (await import('../tests/browser/extension-plugins.mjs')).runExtensionPluginsAcceptance
+    : largePluginSuite ? (await import('../tests/browser/large-plugins.mjs')).runLargePluginsAcceptance
     : process.env.LIMR_TEST_SUITE === 'images' || process.argv.includes('--images') ? (await import('../tests/browser/images.mjs')).runImageAcceptance
     : process.env.LIMR_TEST_SUITE === 'sidebar-mode' || process.argv.includes('--sidebar-mode') ? (await import('../tests/browser/sidebar-mode.mjs')).runSidebarModeAcceptance
     : process.env.LIMR_TEST_SUITE === 'scroll-sync' || process.argv.includes('--scroll-sync') ? (await import('../tests/browser/scroll-sync.mjs')).runScrollSyncAcceptance

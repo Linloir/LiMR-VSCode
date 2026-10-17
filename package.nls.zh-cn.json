@@ -76,5 +76,8 @@
   "limr.syntax.value.description": "Markdown 原文中的 LiMR 属性值颜色。",
   "limr.syntax.annotation.description": "Markdown 原文中的 LiMR 已生效的标注范围边界及内联脚注标记颜色。",
   "limr.syntax.highlight.description": "Markdown 原文中的 LiMR 内联高亮分隔符颜色。",
-  "limr.syntax.math.description": "Markdown 原文中的 LiMR 公式分隔符颜色。"
+  "limr.syntax.math.description": "Markdown 原文中的 LiMR 公式分隔符颜色。",
+  "limr.loadingMode.description": "大 Markdown 文件的加载方式。",
+  "limr.loadingMode.option.blocking": "完整加载后开始阅读。",
+  "limr.loadingMode.option.progressive": "在后续内容加载时先展示可安全阅读的开头。部分 Markdown 或插件仍需完整加载。"
 }

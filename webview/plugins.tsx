@@ -1,6 +1,7 @@
 import * as React from 'react';
 import * as limr from '@linloir/limr';
 import type { PluginEntry } from '../src/plugin-manifest';
+import { instantiateWorkspacePlugin } from './plugin-factory';
 
 /** Factories share the reader's React and LiMR instances; plugins need no bundler. */
 export function useWorkspacePlugins(entries: readonly PluginEntry[], notify: (message: string, error?: boolean) => void) {
@@ -17,13 +18,12 @@ export function useWorkspacePlugins(entries: readonly PluginEntry[], notify: (me
           if (entry.module) {
             const module = await import(/* webpackIgnore: true */ entry.module);
             if (cancelled) return;
-            if (typeof module.default !== 'function') throw new Error('Export a default factory: ({ React, limr }) => RendererExtension.');
-            const extension = await module.default({ React, limr });
+            const extension = await instantiateWorkspacePlugin(module.default, entry.id);
             if (cancelled) return;
-            if (!extension || typeof extension.name !== 'string') throw new Error('The factory must return a named RendererExtension.');
-            // Registry IDs isolate module configuration and cache identity. Syntax
-            // names stay unchanged so authored tags and annotations still resolve.
-            extensions[index] = { ...extension, name: entry.id };
+            // Manifest IDs isolate extension names across workspace/add-on
+            // sources. Authored tags, renderer keys and annotation types retain
+            // their original names; syntax uses the explicit compatibility path.
+            extensions[index] = extension;
             setLoaded({ key, extensions: extensions.filter((value): value is limr.RendererExtension => !!value) });
           }
           if (entry.stylesheet && !cancelled) {

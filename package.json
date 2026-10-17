@@ -571,6 +571,20 @@
           "default": true,
           "scope": "resource",
           "description": "%limr.syntaxHighlighting.enabled.description%"
+        },
+        "limr.loadingMode": {
+          "type": "string",
+          "enum": [
+            "blocking",
+            "progressive"
+          ],
+          "default": "blocking",
+          "description": "%limr.loadingMode.description%",
+          "enumDescriptions": [
+            "%limr.loadingMode.option.blocking%",
+            "%limr.loadingMode.option.progressive%"
+          ],
+          "scope": "resource"
         }
       }
     },

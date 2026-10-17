@@ -24,7 +24,7 @@ export async function runImagePreviewAcceptance({ page, frame, host, artifacts }
   const evidence = [], errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const save = async value => { evidence.push(value); await writeFile(path.join(artifacts, 'checks.json'), JSON.stringify(evidence, null, 2)); console.log(value.check); };
-  const dialog = () => frame.getByRole('dialog');
+  const dialog = () => frame.getByRole('dialog').filter({ has: frame.locator('.limr-image-preview-stage') });
   const close = () => dialog().getByRole('button', { name: /关闭图片预览|Close image preview/ });
   const target = alt => frame.locator('.lv-reader').getByAltText(alt, { exact: true });
   const scrollTop = () => frame.getByTestId('reader-scroll').evaluate(element => element.scrollTop);
@@ -39,10 +39,12 @@ export async function runImagePreviewAcceptance({ page, frame, host, artifacts }
     await image.scrollIntoViewIfNeeded();
     await expect(image).toHaveJSProperty('naturalWidth', 2400);
     await expect(image).toHaveAttribute('role', 'button');
+    await expect(image).toHaveClass(/limr-previewable-image/);
     const originalScroll = await scrollTop();
     const resolved = await image.evaluate(element => element.currentSrc);
     await image.click();
     await expect(dialog()).toBeVisible();
+    await expect(dialog()).toHaveClass(/limr-image-preview/);
     await expect(dialog()).toHaveAttribute('aria-label', '图片预览');
     await expect(dialog().getByAltText(alt, { exact: true })).toHaveAttribute('src', resolved);
     await expect(dialog().getByAltText(alt, { exact: true })).toHaveJSProperty('naturalWidth', 2400);
@@ -50,6 +52,13 @@ export async function runImagePreviewAcceptance({ page, frame, host, artifacts }
     // Native modal focus stays within the preview in both tab directions.
     await close().press('Tab');
     expect(await dialog().evaluate(element => element.contains(document.activeElement))).toBe(true);
+    const keyboardFocus = await dialog().evaluate(element => {
+      const active = element.ownerDocument.activeElement, style = getComputedStyle(active);
+      return { visible: active.matches(':focus-visible'), outline: style.outlineStyle, width: parseFloat(style.outlineWidth) };
+    });
+    expect(keyboardFocus.visible).toBe(true);
+    expect(keyboardFocus.outline).not.toBe('none');
+    expect(keyboardFocus.width).toBeGreaterThan(0);
     await frame.locator(':focus').press('Shift+Tab');
     expect(await dialog().evaluate(element => element.contains(document.activeElement))).toBe(true);
     if (alt === 'Landscape') {
@@ -61,9 +70,9 @@ export async function runImagePreviewAcceptance({ page, frame, host, artifacts }
       expect(dimensions.imageHeight).toBeLessThanOrEqual(dimensions.stageHeight);
       await page.screenshot({ path: path.join(artifacts, 'preview-dark-fit.png') });
       await dialog().getByRole('button', { name: '原始大小', exact: true }).click();
-      await expect(dialog().locator('.lv-image-preview-stage')).toHaveAttribute('data-original', 'true');
+      await expect(dialog().locator('.limr-image-preview-stage')).toHaveAttribute('data-original', 'true');
       expect(await dialog().getByAltText(alt).evaluate(image => image.getBoundingClientRect().width)).toBe(2400);
-      expect(await dialog().locator('.lv-image-preview-stage').evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+      expect(await dialog().locator('.limr-image-preview-stage').evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
       await dialog().getByRole('button', { name: '适应窗口', exact: true }).click();
       await page.screenshot({ path: path.join(artifacts, 'preview-dark-controls.png') });
     }
@@ -77,13 +86,17 @@ export async function runImagePreviewAcceptance({ page, frame, host, artifacts }
   await save({ check: 'Ordinary, reference, figure and linked images open in the reader with resolved local resources; modal focus, fit/actual size, Escape, restored focus, scroll and source preservation pass' });
 
   await target('Landscape').focus();
+  await target('Landscape').press('Tab');
+  await frame.locator(':focus').press('Shift+Tab');
+  await expect(target('Landscape')).toBeFocused();
+  expect(await target('Landscape').evaluate(element => element.matches(':focus-visible') && getComputedStyle(element).outlineStyle !== 'none')).toBe(true);
   await target('Landscape').press('Enter');
   await expect(dialog()).toBeVisible();
   await close().click();
   await expect(target('Landscape')).toBeFocused();
   await target('Landscape').press('Space');
   await expect(dialog()).toBeVisible();
-  await dialog().locator('.lv-image-preview-stage').click({ position: { x: 3, y: 3 } });
+  await dialog().locator('.limr-image-preview-stage').click({ position: { x: 3, y: 3 } });
   await expect(dialog()).toHaveCount(0);
   const missing = target('Missing image');
   await expect(missing).toHaveAttribute('data-lv-image-error', 'missing');

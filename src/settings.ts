@@ -50,6 +50,7 @@ export function readerSettings(uri: vscode.Uri, fileOverrides: ReaderFileSetting
     topBarButtons: buttons(config.get('topBarButtons'), topBarButtons, topBarButtons),
     bottomBarButtons: buttons(config.get('bottomBarButtons'), bottomBarButtons, defaultBottomBarButtons),
     syncScroll: config.get<boolean>('syncScroll', true),
+    loadingMode: choice(config.get('loadingMode'), ['blocking', 'progressive'] as const, 'blocking'),
   };
 }
 export async function setReaderSetting(uri: vscode.Uri | undefined, key: string, value: unknown): Promise<void> {

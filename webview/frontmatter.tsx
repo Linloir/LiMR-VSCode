@@ -1,8 +1,8 @@
-import { useLocale, type MarkdownNode, type NodeRendererProps, type ParseContext, type RendererExtension } from '@linloir/limr';
+import { registerWorkerExtension, useLiMR, useLocale, type MarkdownNode, type NodeRendererProps, type RendererExtension } from '@linloir/limr';
 
-import { parseFrontmatter, type MetadataValue, type Frontmatter } from '../src/shared/frontmatter';
+import type { MetadataValue } from '../src/shared/frontmatter';
+import { frontmatterNodeType, readerFrontmatterSyntax, readerSyntaxIds } from '../src/shared/reader-syntax';
 export { parseFrontmatter } from '../src/shared/frontmatter';
-const type = 'vscode-frontmatter';
 
 function Value({ value }: { value: MetadataValue }) {
   if (Array.isArray(value)) {
@@ -18,8 +18,9 @@ function Fields({ values }: { values: Record<string, MetadataValue> }) {
     <dt>{key}</dt><dd><Value value={value} /></dd>
   </div>)}</dl>;
 }
-function FrontmatterCard({ node, source }: NodeRendererProps) {
+function FrontmatterCard({ node, source, rawChanged }: NodeRendererProps & { rawChanged(open: boolean): boolean }) {
   const zh = useLocale().language?.startsWith('zh');
+  const { invalidatePresentation } = useLiMR();
   const values = node.metadata as Record<string, MetadataValue> | undefined;
   const name = typeof values?.name === 'string' && values.name.trim() ? values.name : undefined;
   const description = typeof values?.description === 'string' && values.description.trim() ? values.description : undefined;
@@ -30,33 +31,45 @@ function FrontmatterCard({ node, source }: NodeRendererProps) {
     {name && <div className="limr-definition-title lv-frontmatter-name">{name}</div>}
     {description && <p className="lv-frontmatter-description">{description}</p>}
     {Object.keys(remaining).length > 0 && <Fields values={remaining} />}
-    {values ? <details className="limr-disclosure lv-frontmatter-raw" data-limr-card-interactive="true">
+    {values ? <details className="limr-disclosure lv-frontmatter-raw" data-limr-card-interactive="true" onToggle={event => {
+      if (rawChanged(event.currentTarget.open)) invalidatePresentation();
+    }}>
       <summary data-limr-ignore="true"><span className="limr-underline">{zh ? '查看原始元信息' : 'View original metadata'}</span><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></summary>
       {raw}
     </details> : <><p className="lv-frontmatter-fallback">{zh ? '此段元信息按原文显示。' : 'This metadata is shown as written.'}</p>{raw}</>}
   </section>;
 }
 
-/** Remove only a recognized header from Markdown parsing, then restore it as a
- * source-mapped block. The document and all following UTF-16 ranges stay intact.
- */
+function metadataText(value: MetadataValue): string {
+  if (Array.isArray(value)) return value.length ? value.map(metadataText).join('\n') : '[]';
+  if (value && typeof value === 'object') return Object.keys(value).length
+    ? Object.entries(value).map(([key, child]) => `${key}\n${metadataText(child)}`).join('\n') : '{}';
+  return value === null ? 'null' : value === '' ? '“”' : String(value);
+}
+
+/** Atomic copy preserves the authored YAML. Search projects visible metadata;
+ * its disclosure stays alive so opening the source remains stable offscreen. */
 export function readerFrontmatter(): RendererExtension {
-  const prepared = new WeakMap<ParseContext, Frontmatter>();
-  return { name: type, scope: 'local', components: { [type]: FrontmatterCard },
-    preprocess(context) {
-      const metadata = parseFrontmatter(context.source);
-      if (!metadata) return [];
-      prepared.set(context, metadata);
-      return [{ start: 0, end: metadata.end }];
-    },
-    transform(root, context) {
-      const metadata = prepared.get(context);
-      if (!metadata || (root.position?.start.offset ?? 0) !== 0) return;
-      const lines = metadata.raw.split(/\r\n|\r|\n/);
-      const node: MarkdownNode = { type, value: metadata.raw, metadata: metadata.values, selection: 'atomic',
-        position: { start: { offset: 0, line: 1, column: 1 }, end: { offset: metadata.end, line: lines.length, column: lines.at(-1)!.length + 1 } },
-      };
-      root.children = [node, ...root.children ?? []];
-    },
+  const expanded = new WeakSet<MarkdownNode>();
+  const extension: RendererExtension = {
+    ...readerFrontmatterSyntax(),
+    components: { [frontmatterNodeType]: props => <FrontmatterCard {...props} rawChanged={open => {
+      if (expanded.has(props.node) === open) return false;
+      if (open) expanded.add(props.node); else expanded.delete(props.node);
+      return true;
+    }} /> },
+    virtualization: { [frontmatterNodeType]: {
+      keepAlive: true,
+      copyText: (_node, { source }) => source,
+      searchText: (node, { source }) => {
+        const values = node.metadata as Record<string, MetadataValue> | undefined;
+        if (!values) return source;
+        const promoted = ['name', 'description'].filter(key => typeof values[key] === 'string' && (values[key] as string).trim());
+        const summary = [...promoted.map(key => metadataText(values[key])), ...Object.entries(values)
+          .filter(([key]) => !promoted.includes(key)).map(([key, value]) => `${key}\n${metadataText(value)}`)].join('\n');
+        return expanded.has(node) ? `${summary}\n${source}` : summary;
+      },
+    } },
   };
+  return registerWorkerExtension(extension, { id: readerSyntaxIds.frontmatter });
 }

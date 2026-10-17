@@ -59,9 +59,13 @@ button:disabled { opacity: .45; cursor: default; }
 button, select { -webkit-tap-highlight-color: transparent; }
 /* VS Code injects unlayered a/input/textarea:focus rules, which override LiMR's
    layered skin even for mouse clicks. Keep its underline/active/caret cues on
-   both the reader and portalled cards without introducing a host focus frame. */
-[data-limr-appearance]:is(:focus,:focus-visible),
-[data-limr-appearance] :is(a,button,input,textarea,select,summary,[tabindex],[contenteditable]):is(:focus,:focus-visible),
+   both the reader and portalled cards without introducing a host focus frame.
+   Core media/table controls retain their own keyboard focus treatment. */
+[data-limr-appearance]:not(:where(.limr-image-preview,[data-type='table-cell-overflow'])):is(:focus,:focus-visible),
+[data-limr-appearance] :is(a,button,input,textarea,select,summary,[tabindex],[contenteditable]):not(:where(
+  .limr-previewable-image,.limr-table-layout,.limr-table-layout *,
+  .limr-image-preview *,[data-type='table-cell-overflow'],[data-type='table-cell-overflow'] *
+)):is(:focus,:focus-visible),
 .limr-overlay-positioner:is(:focus,:focus-visible) { outline: none; box-shadow: none; }
 [data-limr-appearance] input:focus-visible + .limr-choice-diamond { outline: none; }
 /* The palette ring denotes the selected color, independently of focus. */
@@ -144,7 +148,9 @@ body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button:focus
 [data-limr-appearance='vscode'].limr-selection-toolbar, [data-limr-appearance='vscode'].limr-annotation-overlay { font-family: var(--lv-font-body); }
 [data-limr-appearance='vscode'] .limr-overlay-surface { background: var(--lv-surface); box-shadow: 0 8px 32px var(--lv-shadow), inset 0 0 0 1px var(--lv-border); }
 [data-limr-appearance='vscode'] .limr-toolbar-surface { background: var(--lv-surface); }
-[data-limr-appearance] .limr-sidebar-preview { display: block; overflow: visible; -webkit-line-clamp: unset; line-clamp: unset; }
+/* Host notes clamp their own rich summary. Other annotation types, including
+   table overflow previews, keep LiMR's native preview-height contract. */
+[data-limr-appearance] .limr-sidebar-preview:has(.lv-note-preview) { display: block; overflow: visible; -webkit-line-clamp: unset; line-clamp: unset; }
 .limr-sidebar-card:is([data-type='margin-note'],[data-type='question'],[data-type='inline-note'],[data-type='footnote']) { --limr-sidebar-padding-block: 6px; --limr-sidebar-padding-inline: 12px; }
 .limr-sidebar-card:has(.lv-note-content,.lv-note-preview) .limr-sidebar-card-heading { font-size: 13px; line-height: 1.4; }
 .limr-sidebar-card:has(.lv-note-content) .limr-sidebar-card-content { padding-top: 3px; }

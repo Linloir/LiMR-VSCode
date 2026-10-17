@@ -66,6 +66,22 @@ describe('local image bridge lifecycle', () => {
     resolver.dispose(); reply(1, 'https://resource/disposed.svg');
     expect(root.images[0].src).toBe('');
   });
+  it('reuses resolved local URLs when a document window remounts its image', () => {
+    const { root, send, reply } = setup('./windowed.svg');
+    const removed = root.images.shift()!;
+    reply(0, 'https://resource/windowed.svg');
+    expect(removed.src).toBe('');
+    const remounted = new ImageFixture('./windowed.svg'); root.images.push(remounted); added(remounted);
+    expect(remounted.src).toBe('https://resource/windowed.svg');
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+  it('does not send a second local-file request for the core preview portal', () => {
+    const { root, send, reply } = setup('./preview.svg');
+    reply(0, 'https://resource/preview.svg');
+    const preview = new ImageFixture(root.images[0].src); root.images.push(preview); added(preview);
+    expect(preview.src).toBe('https://resource/preview.svg');
+    expect(send).toHaveBeenCalledTimes(1);
+  });
   it('leaves browser-readable URLs alone while resolving explicit local URL forms', () => {
     const { send } = setup('https://example.test/a.png', 'http://localhost/a.png', 'data:image/png;base64,AAAA', 'blob:some-id', '//example.test/a.png', './a.png', '/a.png', 'file:///a.png');
     expect(send.mock.calls.map(call => call[1])).toEqual(['./a.png', '/a.png', 'file:///a.png']);
