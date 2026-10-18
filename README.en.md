@@ -15,7 +15,7 @@ LiMR is a Markdown reader designed for comfortable reading. This extension bring
 - **Reading preferences**: configure fonts, spacing, article width, contents, translation display, and paragraph layout. Source and reader can scroll together.
 - **Simple extensibility**: use workspace CSS to change appearance and JavaScript modules to add components, syntax, annotations, or actions. Reusable modules can also ship as VS Code add-ons.
 
-LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.1`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
+LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.4`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
 
 ## Get started and configure
 
@@ -23,7 +23,9 @@ LiMR is also a Markdown rendering library for React projects. This extension use
 2. Use the reader toolbar to choose a theme, typography, or translation display. Enable editing with the edit button to add annotations or change task checkboxes; use VS Code's usual save and undo actions.
 3. Click settings or run **LiMR: Reader Settings**. Search VS Code Settings for `@ext:linloir.limr-vscode`. Choose **User** for personal defaults or **Workspace** for project settings.
 
-Web links open directly in your browser. File links reuse the target file in another editor group when available, otherwise use another existing group. A side group is created only when there is no other group. Heading links within the current document scroll inside the reader.
+Web links open in your browser. Markdown links default to smart navigation: a source/reader pair for the same document updates together; other layouts update only the current reader. Choose among five link modes; side targets reuse existing groups. Mouse back/forward or Alt+arrow keys restore reader history and the previous companion file. Same-document heading links scroll within the reader.
+
+Documents of at least 256 KiB of UTF-16 text coalesce edits for 250 ms, with a 1.2 s maximum wait during continuous typing. Smaller documents update immediately. Asynchronous refresh keeps the accepted content visible until a complete replacement is ready at the same reading position.
 
 ### Common settings
 
@@ -38,6 +40,9 @@ Web links open directly in your browser. File links reuse the target file in ano
 | `limr.typography` | `"standard"` | `standard` normal layout; `justify` justified text; `knuth-plass` paragraph-wide line-breaking optimization. |
 | `limr.tableLayout.enabled` | `true` | Optimize table layout; disable for native tables with less measurement work on long tables. |
 | `limr.loadingMode` | `"progressive"` | Show a read-only preview while the complete document parses in the background, preserving your reading position when ready. Choose `blocking` to wait before showing content. Some plugins require complete loading. |
+| `limr.markdownOpenMode` | `"none"` | `none` preserves current opening behavior; `reader` opens LiMR; `sideBySide` opens source and reader together. |
+| `limr.markdownLinkMode` | `"smart"` | `currentReader`, `besideReader`, `besideEditor`, `editorAndReader`, or `smart`. Smart updates both columns only when they show source and reader for the same document. Mouse back/forward and Alt+arrow keys restore navigation. |
+| `limr.singleReader` | `false` | Reuse one reader; `besideReader` falls back to the current group. Unsaved old reader tabs remain available to protect edits. |
 | `limr.sidebarMode` | `"content"` | `content` shows the sidebar when notes exist; `always` always enables it; `hidden` hides it. Narrow readers display annotations in overlays. |
 | `limr.sidebarAutoCollapse` | `true` | Fold crowded sidebar items automatically; turn off to lay them out individually. |
 | `limr.tocMode` | `"always"` | `always` shows side contents on wide screens and collapsible contents on narrow ones; `wide` shows only side contents; `hidden` hides both. |
@@ -128,6 +133,6 @@ For reuse across projects, package modules as a separate VS Code add-on and regi
 
 ### Ask questions and annotate documents
 
-Select text, choose **Question context**, then paste into your assistant and add your question. With editing enabled, the skill requires writing the question, answer, and highlighting back to Markdown. Corresponding original/translated passages share one question annotation. For papers, it recommends `figure` / `figures` for captioned images. The extension does not call an AI model; changes your assistant makes to Markdown appear in the reader. See the [AI guide](docs/ai-guide.en.md).
+Select text, choose **Question context**, then paste into your assistant and add your question. Compact context asks the assistant to answer first, then use the bundled script against the live VS Code buffer, including unsaved edits and undo. It rereads and relocates only if quick writeback fails. With editing enabled, the skill requires writing the question, answer, and highlighting back to Markdown. Corresponding original/translated passages share one question annotation. For papers, it recommends `figure` / `figures` for captioned images. The extension does not call an AI model; changes your assistant makes to Markdown appear in the reader. See the [AI guide](docs/ai-guide.en.md).
 
 For extension development and builds, see the [development guide](docs/development.md).

@@ -70,6 +70,15 @@ export async function runImagePreviewAcceptance({ page, frame, host, artifacts }
       });
       expect(dimensions.imageWidth).toBeLessThanOrEqual(dimensions.stageWidth);
       expect(dimensions.imageHeight).toBeLessThanOrEqual(dimensions.stageHeight);
+      const stable = await dialog().locator('.limr-image-preview-stage').evaluate(stage => new Promise(resolve => {
+        const samples = []; const sample = () => {
+          const image = stage.querySelector('img'), rect = image.getBoundingClientRect();
+          samples.push([stage.clientWidth, stage.clientHeight, rect.width, rect.height, stage.dataset.scale].join(':'));
+          if (samples.length < 100) requestAnimationFrame(sample); else resolve([...new Set(samples)]);
+        }; requestAnimationFrame(sample);
+      }));
+      expect(stable).toHaveLength(1);
+      await save({ check: 'Image fit dimensions and scale remain stable for 100 frames after the expansion animation', stable });
       await page.screenshot({ path: path.join(artifacts, 'preview-dark-fit.png') });
       await dialog().getByRole('button', { name: '原始大小', exact: true }).click();
       await expect(dialog().locator('.limr-image-preview-stage')).toHaveAttribute('data-original', 'true');
@@ -117,6 +126,7 @@ export async function runImagePreviewAcceptance({ page, frame, host, artifacts }
   const missing = target('Missing image');
   await expect(missing).toHaveAttribute('data-lv-image-error', 'missing');
   await expect(missing).not.toHaveAttribute('role', 'button');
+  await expect(missing.locator('..').locator('[data-limr-image-fallback]')).toBeVisible();
   await save({ check: 'Keyboard Enter/Space, close button and background click work; missing images have no misleading preview affordance' });
 
   await host('configure', { values: { language: 'en', theme: 'playground-light' } });

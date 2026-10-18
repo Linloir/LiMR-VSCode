@@ -27,7 +27,7 @@ vi.mock('vscode',()=>({
     showErrorMessage:async(message:string)=>{throw new Error(message);},showInformationMessage:async()=>undefined,
     get visibleTextEditors(){return state.editors;},activeTextEditor:undefined,activeColorTheme:{kind:1},
     onDidChangeActiveColorTheme:state.event,onDidChangeActiveTextEditor:state.event,onDidChangeTextEditorSelection:state.event,onDidChangeWindowState:state.event,onDidChangeTextEditorVisibleRanges:state.event,
-    tabGroups:{activeTabGroup:{activeTab:undefined},onDidChangeTabs:state.event},
+    tabGroups:{all:[],onDidChangeTabGroups:state.event,activeTabGroup:{activeTab:undefined},onDidChangeTabs:state.event},
   },
   workspace:{
     get textDocuments(){return state.documents;},isTrusted:true,fs:{isWritableFileSystem:()=>true},
@@ -141,14 +141,14 @@ describe('alignment after a completed source revision',()=>{
     const complete=(version=document.version)=>state.receivers.get(uri)!({type:'loadProgress',progress:{uri,version,requestId:'completed',status:'ready',phase:'ready',percent:100}});
     return{document,uri,complete};
   }
-  it('reads the latest viewport on completion, aligns once and ignores obsolete completions',()=>{
+  it('aligns a new guest once and leaves subsequent retained revisions at their reading position',()=>{
     const {document,uri,complete}=prepare();
     state.editors[0].visibleRanges[0].start.line=3700;complete();complete();
     expect(state.posts.filter(item=>item.message.type==='reveal').map(item=>item.message.offset)).toEqual([370000]);
     (document as any).version=4;state.viewChanges.get(uri)!();state.posts=[];
     complete(3);expect(state.posts.filter(item=>item.message.type==='reveal')).toEqual([]);
     state.editors[0].visibleRanges[0].start.line=3900;complete(4);
-    expect(state.posts.filter(item=>item.message.type==='reveal').map(item=>item.message.offset)).toEqual([390000]);
+    expect(state.posts.filter(item=>item.message.type==='reveal').map(item=>item.message.offset)).toEqual([]);
   });
   it('does not take control from a reader gesture',()=>{
     const {uri,complete}=prepare();

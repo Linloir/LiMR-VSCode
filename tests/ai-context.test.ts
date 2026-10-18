@@ -22,13 +22,11 @@ describe('AI question context', () => {
     const result = buildAIContext(base);
     const data = payload(result.text);
     expect(data.selections[0]).toMatchObject({
-      offsets: { start: 6, end: 9 },
-      start: { line: 2, column: 2 },
-      end: { line: 2, column: 5 },
+      start: 6, end: 9,
       raw: '😀B', before: '第一行\r\nA', after: 'C\r\n最后一行',
     });
-    expect(data.selectedText).toBe('😀B');
-    expect(data.file.editorVersion).toBe(7);
+    expect(data.selectedText).toBeUndefined(); // Identical rendered/raw text is sent once.
+    expect(data.version).toBe(7);
     expect(result.text.startsWith('@docs/notes.md')).toBe(true);
     expect(result.html).toContain('at-mention-path="docs/notes.md"');
     expect(result.html).toContain('at-mention-fs-path="/workspace/docs/notes.md"');
@@ -79,20 +77,20 @@ describe('AI question context', () => {
     expect(data.selections[0].raw).toBe('');
     expect(data.allowSourceEdits).toBe(false);
     expect(result.text).toContain('answer without automatically writing annotations');
-    expect(result.text).toContain('$limr-annotations');
+    expect(data.writeback).toBeUndefined();
   });
 });
 
 
 describe('paired-boundary AI context', () => {
-  it('includes current syntax and reusable IDs in both languages', () => {
+  it('keeps compact locators and optional script paths without repeated syntax', () => {
     for (const language of ['zh-CN', 'en'] as const) {
-      const result = buildAIContext({ ...base, language, allowSourceEdits: true, rangeIds: ['selected'] });
-      expect(result.text).toContain('::%%limr%%{<#');
-      expect(result.text).toContain('::%%limr%%{>#');
-      expect(payload(result.text)).toMatchObject({ format: 'limr-context-v2', annotationSyntax: {
-        liMRVersion: '1.2.3', rangeStart: '::%%limr%%{<#ID}', rangeEnd: '::%%limr%%{>#ID}', definition: ':::limr-annotation',
-      } });
+      const writeback = { context: '/tmp/context.json', script: '/extension/skills/write-question.cjs' };
+      const result = buildAIContext({ ...base, language, allowSourceEdits: true, rangeIds: ['selected'], writeback });
+      expect(payload(result.text)).toMatchObject({ format: 'limr-context-v3', rangeIds: ['selected'], writeback });
+      expect(result.text.length).toBeLessThan(1000);
+      expect(payload(result.text)).not.toHaveProperty('annotationSyntax');
+      expect(payload(result.text)).not.toHaveProperty('coordinates');
     }
   });
 

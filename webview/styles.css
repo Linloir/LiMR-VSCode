@@ -157,6 +157,11 @@ body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button:focus
   --limr-success: var(--lv-success) !important; --limr-error: var(--lv-error) !important;
   --limr-font-text: var(--lv-font-body) !important;
 }
+/* The embedded Chromium scroller can use non-overlay scrollbars. Their width
+   otherwise feeds back into core's fit/zoom measurements after the opening
+   animation. Keep the viewport invariant; wheel, touch and drag still pan. */
+.limr-image-preview-stage { scrollbar-width: none; }
+.limr-image-preview-stage::-webkit-scrollbar { width: 0; height: 0; }
 /* Unlayered host resets otherwise win over the new native toolbar skin. */
 .limr-image-preview-toolbar > button { color: var(--limr-secondary); background: transparent; }
 .limr-image-preview-toolbar > button:enabled:hover { color: var(--limr-text); background: color-mix(in srgb, var(--limr-text) 9%, transparent); }

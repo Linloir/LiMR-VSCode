@@ -16,7 +16,7 @@ export async function runScrollRefreshAcceptance({ page, frame, host, artifacts 
     const edge = root.getBoundingClientRect().top + 18;
     const blocks = [...root.querySelectorAll('[data-source-start]')].filter(block => !block.closest('[inert],[data-window-parked]'));
     const block = blocks.find(block => { const rect = block.getBoundingClientRect(); return rect.height > 0 && rect.bottom > edge; });
-    return { top: root.scrollTop, start: Number(block?.dataset.sourceStart), text: block?.textContent.slice(0, 80) };
+    return { top: root.scrollTop, start: Number(block?.dataset.sourceStart), text: block?.textContent.slice(0, 80), textTop: block?.getBoundingClientRect().top - root.getBoundingClientRect().top };
   });
   await frame.evaluate(() => {
     const NativeWorker = Worker;
@@ -35,7 +35,11 @@ export async function runScrollRefreshAcceptance({ page, frame, host, artifacts 
   await host('configure', { values: { syncScroll: false, tocMode: 'hidden', sidebarMode: 'hidden', 'plugins.enabled': false } });
   await host('configureEditor', { values: { smoothScrolling: false, wordWrap: 'off' } });
   for (const large of [false, true]) {
-    await host('replaceSource', { source: large ? source : source.slice(0, 8000) }); await ready();
+    const loadsBefore = await frame.evaluate(() => window.__refreshWorker.loads);
+    await host('replaceSource', { source: large ? source : source.slice(0, 8000) });
+    if (large) await expect.poll(() => frame.evaluate(() => window.__refreshWorker.loads)).toBe(loadsBefore + 1);
+    await expect(frame.getByRole('heading', { name: 'Title after ordinary text', exact: true })).toBeVisible();
+    await ready();
     await frame.evaluate(() => document.fonts.ready);
     for (const syncScroll of [false, true]) {
       await host('configure', { values: { syncScroll } });
@@ -54,14 +58,33 @@ export async function runScrollRefreshAcceptance({ page, frame, host, artifacts 
     await expect.poll(async () => (await position()).start, { timeout: 15_000 }).toBeGreaterThan(source.length * .35);
     await pause(350); const before = await position();
     const loadsBefore = await frame.evaluate(() => window.__refreshWorker.loads);
+    await root.evaluate((root, start) => {
+      window.__refreshFrames = []; window.__watchRefresh = true;
+      const sample = () => { if (!window.__watchRefresh) return; window.__refreshFrames.push({ top: root.scrollTop, height: root.scrollHeight, textTop: root.querySelector(`[data-source-start="${start}"]`)?.getBoundingClientRect().top - root.getBoundingClientRect().top }); requestAnimationFrame(sample); }; sample();
+    }, before.start);
     const start = source.indexOf('Paragraph 3510.');
     const change = await host('editSource', { start, text: `Edited ${loadingMode}. ` });
+    await expect.poll(() => frame.evaluate(() => window.__refreshWorker.loads)).toBe(loadsBefore + 1);
     await ready(); await pause(500);
     const after = await position();
+    const frames = await frame.evaluate(() => { window.__watchRefresh = false; return window.__refreshFrames; });
+    expect(frames.length).toBeGreaterThan(5);
+    await writeFile(path.join(artifacts, `frames-${loadingMode}.json`), JSON.stringify({ before, after, frames }, null, 2));
+    expect(Math.max(...frames.map(sample => Math.abs(sample.textTop - before.textTop)))).toBeLessThanOrEqual(2);
+    expect(Math.min(...frames.map(sample => sample.height))).toBeGreaterThan(before.top);
     expect(await frame.evaluate(() => window.__refreshWorker.loads)).toBe(loadsBefore + 1);
-    await save({ check: 'Source edit restores the aligned middle without another scroll', loadingMode, before, after,
+    await save({ check: 'Source edit restores the aligned middle without another scroll', loadingMode, before, after, minTopDuringRefresh: Math.min(...frames.map(sample => sample.top)), frames: frames.length,
       sourceLine: change.visibleRanges[0]?.start });
   }
+  const burstBefore = await position(), beforeLoads = await frame.evaluate(() => window.__refreshWorker.loads);
+  await host('editBurst', { start: source.indexOf('Paragraph 3510.'), text: 'x', count: 12, interval: 20 });
+  await expect.poll(() => frame.evaluate(() => window.__refreshWorker.loads)).toBe(beforeLoads + 1);
+  await ready();
+  expect(await frame.evaluate(() => window.__refreshWorker.loads)).toBe(beforeLoads + 1);
+  const burstAfter = await position();
+  expect(burstAfter.start).toBe(burstBefore.start);
+  expect(Math.abs(burstAfter.textTop - burstBefore.textTop)).toBeLessThanOrEqual(2);
+  await save({ check: 'Twelve rapid large-document edits cause one worker load and keep the reading viewport', before: burstBefore, after: burstAfter, workerLoads: 1 });
   // Keep one real worker request pending so the user can change the source
   // viewport during parsing, regardless of how fast this machine parses.
   await host('configure', { values: { loadingMode: 'progressive' } }); await ready();

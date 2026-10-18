@@ -44,6 +44,7 @@ export function App() {
   const drafts = useRef(new DraftStore());
   const scrollSync = useRef<ReaderScrollSync | null>(null);
   const pendingSourceReveal = useRef<number | undefined>(undefined);
+  const [navigationTarget, setNavigationTarget] = useState<import('../src/navigation').ReaderLocation | null>(null);
   const sourceScrollInput = useRef<{ generation: number; epoch?: number }>({ generation: 0 });
   const notify = useCallback((message: string, error = false) => {
     post({ type: 'notify', message, error });
@@ -124,6 +125,8 @@ export function App() {
           edit.reject(error); notify(error.message, true);
         }
       } else if (message.type === 'notice') notify(message.message, message.error);
+      else if (message.type === 'navigateTo') setNavigationTarget(message.location);
+      else if (message.type === 'requestHistory') post({ type: 'navigateHistory', direction: message.direction, position: readerCommands.current?.getReadingPosition() ?? undefined });
       else if (message.type === 'reveal') {
         if (scrollSync.current) scrollSync.current.reveal(message.offset);
         else pendingSourceReveal.current = message.offset;
@@ -136,6 +139,23 @@ export function App() {
     const dispose = listen(receive); post({ type: 'ready' });
     return dispose;
   }, [applyState, notify, cancelPendingTranslation]);
+
+  useEffect(() => {
+    if (!navigationTarget || !readerReady || !scrollRoot || navigationTarget.uri !== state?.document.uri) return;
+    if (navigationTarget.position) readerCommands.current?.restoreReadingPosition(navigationTarget.position);
+    else if (navigationTarget.line) {
+      const lines = source.split('\n');
+      const offset = lines.slice(0, Math.max(0, navigationTarget.line - 1)).reduce((total, line) => total + line.length + 1, 0);
+      readerCommands.current?.restoreReadingPosition({ source: Math.min(source.length, offset), offset: 0 });
+    } else if (navigationTarget.fragment) {
+      const id = navigationTarget.fragment;
+      const target = document.getElementById(id) ?? document.getElementById(`${state.document.uri}-${id}`);
+      const heading = readerCommands.current?.document.getSnapshot().headings.find(heading => heading.id === id || heading.id === `${state.document.uri}-${id}`);
+      if (heading) readerCommands.current?.restoreReadingPosition({ source: heading.range.start, offset: 0 });
+      else target?.scrollIntoView({ behavior: 'instant', block: 'start' });
+    } else scrollRoot.scrollTo({ top: 0, behavior: 'instant' });
+    setNavigationTarget(null);
+  }, [navigationTarget, readerReady, scrollRoot, state?.document.uri, source]);
 
   const editSource = useCallback((nextSource: string, change: SourceChange): boolean => {
     const current = stateRef.current;
@@ -222,12 +242,30 @@ export function App() {
       if (href.startsWith('#')) {
         let id = href.slice(1); try { id = decodeURIComponent(id); } catch { /* literal anchor */ }
         const target = document.getElementById(id) ?? document.getElementById(`${stateRef.current?.document.uri}-${id}`);
-        target?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
-      } else post({ type: 'openLink', href });
+        const heading = readerCommands.current?.document.getSnapshot().headings.find(heading => heading.id === id || heading.id === `${stateRef.current?.document.uri}-${id}`);
+        if (!target && heading) readerCommands.current?.restoreReadingPosition({ source: heading.range.start, offset: 0 });
+        else target?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+      } else post({ type: 'openLink', href, position: readerCommands.current?.getReadingPosition() ?? undefined });
     };
+    const historyMouse = (event: MouseEvent) => {
+      if (event.button !== 3 && event.button !== 4) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      if (event.type === 'mouseup') post({ type: 'navigateHistory', direction: event.button === 3 ? 'back' : 'forward', position: readerCommands.current?.getReadingPosition() ?? undefined });
+    };
+    const historyKey = (event: KeyboardEvent) => {
+      if (!event.altKey || !['ArrowLeft', 'ArrowRight'].includes(event.key) || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      post({ type: 'navigateHistory', direction: event.key === 'ArrowLeft' ? 'back' : 'forward', position: readerCommands.current?.getReadingPosition() ?? undefined });
+    };
+    for (const name of ['mousedown', 'mouseup', 'auxclick'] as const) document.addEventListener(name, historyMouse, true);
+    document.addEventListener('keydown', historyKey, true);
     document.addEventListener('click', click);
     document.addEventListener('auxclick', click);
-    return () => { document.removeEventListener('click', click); document.removeEventListener('auxclick', click); };
+    return () => {
+      document.removeEventListener('click', click); document.removeEventListener('auxclick', click);
+      for (const name of ['mousedown', 'mouseup', 'auxclick'] as const) document.removeEventListener(name, historyMouse, true);
+      document.removeEventListener('keydown', historyKey, true);
+    };
   }, []);
   useEffect(() => {
     if (!scrollRoot) return;

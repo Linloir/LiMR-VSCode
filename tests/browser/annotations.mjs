@@ -2,6 +2,9 @@ import { expect } from '@playwright/test';
 import { createDocument, standard } from '@linloir/limr';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const run = promisify(execFile);
 
 const plain = '# Annotation actions\n\nBefore **selected words** after.\n\nAn independent paragraph.\n';
 const kinds = [['margin-note', '旁注'], ['question', '提问'], ['inline-note', '内联笔记'], ['footnote', '脚注']];
@@ -68,9 +71,50 @@ export async function runAnnotationAcceptance({ page, frame, host, artifacts }) 
   await toolbar.getByRole('button', { name: '添加高亮', exact: true }).click();
   await expect.poll(async () => sourceAnnotations((await host('snapshot')).source).map(item => item.type)).toEqual(['highlight']);
   await paragraph().locator('strong').click();
-  await expect(toolbar.getByRole('button', { name: '隐藏高亮', exact: true })).toBeVisible();
+  await expect(toolbar.getByRole('button', { name: '隐藏高亮', exact: true })).toHaveCount(0);
+  await expect(toolbar.locator('[data-action-id="delete-annotations"]')).toBeVisible();
   await host('undo'); expect((await host('snapshot')).source).toBe(plain);
   await save({ check: 'Selecting text creates a source-backed highlight and native Undo restores the original text' });
+
+  for (const legacy of ['==**selected words**==[^legacy]', '==**selected words**=[^legacy]']) {
+    await reset(`# Annotation actions\n\nBefore ${legacy} after.\n\n[^legacy]: Keep this native footnote.\n`);
+    await paragraph().getByRole('button', { name: /脚注/ }).click();
+    await expect(toolbar).toBeVisible();
+    await expect(toolbar.locator('[data-action-id="delete-annotations"]')).toHaveCount(0);
+    await expect(toolbar.locator('.limr-toolbar-readonly-hint')).toHaveCount(0);
+    await expect(frame.locator('.lv-note-actions button.lv-delete')).toHaveCount(0);
+    await host('configure', { values: { editingEnabled: false } });
+    await expect(toolbar.locator('[data-action-id="delete-annotations"]')).toHaveCount(0);
+    await host('configure', { values: { editingEnabled: true } });
+  }
+  await save({ check: 'Legacy highlight-footnote markers and native footnotes never expose deletion; a lone source highlight has Delete without Hide' });
+
+  await reset(plain); await selectWords();
+  await toolbar.getByRole('button', { name: '提问上下文', exact: true }).click();
+  const copied = await host('clipboard');
+  const context = JSON.parse(/```json\n([\s\S]*?)\n```/.exec(copied)[1]);
+  expect(context.format).toBe('limr-context-v3'); expect(context.allowSourceEdits).toBe(true);
+  const inputFile = path.join(artifacts, 'question-answer.json');
+  await writeFile(inputFile, JSON.stringify({ question: 'Why select these words?', answer: 'This answer is shown first, then recorded with **both** question and answer.' }));
+  const invoke = () => run(process.execPath, [context.writeback.script, '--context', context.writeback.context, '--input', inputFile]);
+  const result = JSON.parse((await invoke()).stdout);
+  expect(result.ok).toBe(true); expect(result.saved).toBe(false);
+  const written = await host('snapshot');
+  expect(written.source).toContain('Why select these words?'); expect(written.source).toContain('This answer is shown first');
+  expect(model(written.source).annotations.filter(item => item.type === 'question')).toHaveLength(1);
+  expect(JSON.parse((await invoke()).stdout).annotationId).toBe(result.annotationId);
+  expect((await host('snapshot')).version).toBe(written.version);
+  await host('undo'); expect((await host('snapshot')).source).toBe(plain);
+  await dismiss(); await selectWords();
+  await toolbar.getByRole('button', { name: '提问上下文', exact: true }).click();
+  const stale = JSON.parse(/```json\n([\s\S]*?)\n```/.exec(await host('clipboard'))[1]);
+  const changed = await host('editSource', { start: 0, text: 'New editor input.\n\n' });
+  let failure;
+  try { await run(process.execPath, [stale.writeback.script, '--context', stale.writeback.context, '--input', inputFile]); }
+  catch (error) { failure = error; }
+  expect(failure?.stderr).toContain('Markdown changed');
+  expect((await host('snapshot')).source).toBe(changed.source);
+  await save({ check: 'Compact context invokes the real bundled script against an unsaved buffer; complete Q/A, highlighting, idempotent retry, native undo and stale-version refusal pass', contextCharacters: copied.length });
 
   for (const [type, label] of kinds.slice(0, 2)) {
     await reset(plain);

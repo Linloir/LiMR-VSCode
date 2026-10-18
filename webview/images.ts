@@ -51,6 +51,10 @@ export class ReaderImages {
         state.resolved = '';
         image.removeAttribute('src');
         image.dataset.lvImageError = reply.reason ?? 'missing';
+        // Removing src while resolving intentionally suppresses browser loads.
+        // Forward a definitive host failure through the native image contract
+        // so LiMR can render its localized fallback and clear preview state.
+        image.dispatchEvent(new Event('error'));
       }
     }
     request.images.clear();
@@ -108,7 +112,20 @@ export class ReaderImages {
     const current = image.getAttribute('src')?.trim() ?? '';
     if (!state || state.generation !== this.generation || state.source !== source || (current !== source && current !== state.resolved) || !this.root.contains(image)) return;
     state.resolved = uri;
-    if (uri) { delete image.dataset.lvImageError; image.setAttribute('src', uri); }
+    if (uri) {
+      // Core retains a hidden native img behind its failure placeholder. A new
+      // resolved URL must load even there, then its load handler can reveal it.
+      // Restore lazy loading once the retry finishes; ordinary images keep it.
+      if (image.hidden && image.loading === 'lazy') {
+        const restore = () => {
+          image.removeEventListener('load', restore); image.removeEventListener('error', restore);
+          if (image.loading === 'eager') image.loading = 'lazy';
+        };
+        image.addEventListener('load', restore, { once: true }); image.addEventListener('error', restore, { once: true });
+        image.loading = 'eager';
+      }
+      delete image.dataset.lvImageError; image.setAttribute('src', uri);
+    }
     else image.removeAttribute('src');
   }
 }

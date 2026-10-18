@@ -10,6 +10,9 @@ import type { LiMRExtensionApi } from '../api';
 import { validateFileSettings } from './file-settings';
 import { validateTransaction } from './transactions';
 import { resolveReaderLink } from './links';
+import { ReaderNavigation, type ReaderLocation } from './navigation';
+import { QuestionService } from './question-service';
+import { EditCoalescer } from './edit-coalescer';
 import { resolveReaderImage } from './images';
 import { SourceSyntaxHighlighting } from './syntax-highlighting';
 import { ScrollThrottle } from './shared/scroll-sync';
@@ -65,14 +68,12 @@ export function activate(context: vscode.ExtensionContext): LiMRExtensionApi {
       throw new Error(loadErrorMessage('too-large', readerSettings(target).locale));
     const document = await vscode.workspace.openTextDocument(target);
     if (!isMarkdown(document)) { await vscode.window.showInformationMessage(localized(target, 'LiMR 支持 .md 和 .markdown 文件。', 'LiMR supports .md and .markdown files.')); return; }
-    if (beside) {
-      const editor = vscode.window.visibleTextEditors.find(item => item.document.uri.toString() === target.toString());
-      await vscode.window.showTextDocument(document, { viewColumn: editor?.viewColumn ?? vscode.ViewColumn.Active, preview: false });
-    }
-    await vscode.commands.executeCommand('vscode.openWith', target, viewType, { viewColumn: beside ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active, preview: false });
+    await provider.navigation.open(target, beside);
   };
   command('limr.openPreview', (uri?: vscode.Uri) => open(uri, false));
   command('limr.openPreviewToSide', (uri?: vscode.Uri) => open(uri, true));
+  command('limr.navigateBack', () => provider.requestHistory('back'));
+  command('limr.navigateForward', () => provider.requestHistory('forward'));
   command('limr.openSource', async (uri?: vscode.Uri) => { const target = resource(uri); if (target) await provider.openSource(target); });
   command('limr.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:linloir.limr-vscode'));
   command('limr.loadingAction', () => provider.loadingAction());
@@ -120,6 +121,11 @@ export function activate(context: vscode.ExtensionContext): LiMRExtensionApi {
 }
 
 class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposable {
+  readonly navigation: ReaderNavigation;
+  private readonly questions: QuestionService;
+  private readonly navigationTargets = new Map<string, ReaderLocation>();
+  private readonly readyPanels = new Set<vscode.WebviewPanel>();
+  private readonly editedDocuments = new EditCoalescer<vscode.TextDocument>(document => { if (!document.isClosed) this.broadcast(document); });
   private readonly panels = new Map<vscode.WebviewPanel, vscode.TextDocument>();
   private readonly sentDocuments = new Map<vscode.WebviewPanel, { uri: string; version: number; aligned?: boolean }>();
   private readonly subscriptions: vscode.Disposable[] = [];
@@ -149,6 +155,15 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   });
   activeUri: vscode.Uri | undefined;
   constructor(private readonly context: vscode.ExtensionContext, private readonly pluginRegistry: PluginRegistry) {
+    this.questions = new QuestionService(context);
+    this.subscriptions.push(this.questions);
+    this.subscriptions.push(this.editedDocuments);
+    this.navigation = new ReaderNavigation((location, column) => {
+      this.navigationTargets.set(`${column}:${location.uri}`, location);
+      for (const [panel, document] of this.panels) if (panel.viewColumn === column && document.uri.toString() === location.uri)
+        this.flushNavigation(panel, document);
+    });
+    this.subscriptions.push(this.navigation);
     this.status.name = 'LiMR Reader';
     this.status.command = 'limr.toggleEditing';
     this.loadingStatus.name = 'LiMR loading';
@@ -175,8 +190,11 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       this.loadingStatus,
       this.loadWatchdog,
       pluginRegistry.onDidChange(() => { void this.reloadPlugins(); }),
-      vscode.workspace.onDidChangeTextDocument(event => { if (event.contentChanges.length) this.broadcast(event.document); }),
-      vscode.workspace.onDidSaveTextDocument(document => this.broadcast(document)),
+      vscode.workspace.onDidChangeTextDocument(event => {
+        if (event.contentChanges.length) this.editedDocuments.schedule(event.document.uri.toString(), event.document,
+          event.document.offsetAt(new vscode.Position(event.document.lineCount, 0)) >= 256 * 1024);
+      }),
+      vscode.workspace.onDidSaveTextDocument(document => { this.editedDocuments.cancel(document.uri.toString()); this.broadcast(document); }),
       vscode.workspace.onDidChangeConfiguration(event => {
         for (const uri of new Map([...this.panels.values()].map(document => [document.uri.toString(), document.uri])).values()) {
           if (event.affectsConfiguration('limr.translationMode', uri) && this.settings(uri).fileOverrides.translationMode === undefined) this.notifyTranslationIntent(uri);
@@ -282,6 +300,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   }
   resolveCustomTextEditor(document: vscode.TextDocument, panel: vscode.WebviewPanel): void {
     this.panels.set(panel, document); this.activeUri = document.uri;
+    void this.navigation.readerOpened(document.uri, panel.viewColumn).catch(error => console.error('LiMR single reader', error));
     if (panel.visible) this.loadWatchdog.start(panel, document.version);
     void maybePromptSkillInstall(this.context, document.uri).catch(error => console.error('LiMR skill prompt', error));
     panel.webview.options = { enableScripts: true, localResourceRoots: this.baseResourceRoots(document) };
@@ -293,6 +312,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       panel.onDidChangeViewState(() => { if (panel.active) this.activeUri = document.uri; if (panel.visible) this.sendState(panel, document); else if (this.readerScrollOwners.get(document.uri.toString())?.panel === panel) this.releaseReaderInput(document.uri); this.updateStatus(); }),
     ];
     panel.onDidDispose(() => {
+      this.readyPanels.delete(panel);
       events.forEach(event => event.dispose()); this.panels.delete(panel); this.sentDocuments.delete(panel);
       this.loadWatchdog.stop(panel); this.timedOut.delete(panel);
       if (this.readerScrollOwners.get(document.uri.toString())?.panel === panel) this.releaseReaderInput(document.uri);
@@ -329,6 +349,16 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   private settings(uri: vscode.Uri) { return readerSettings(uri, this.context.workspaceState.get<ReaderFileSettings>(`limr.fileSettings:${uri.toString()}`, {})); }
   private text(uri: vscode.Uri | undefined, zh: string, en: string) { return localized(uri, zh, en); }
   private post(panel: vscode.WebviewPanel, message: HostMessage) { void panel.webview.postMessage(message); }
+  requestHistory(direction: 'back' | 'forward') {
+    const panel = [...this.panels.keys()].find(panel => panel.active);
+    if (panel) this.post(panel, { type: 'requestHistory', direction });
+  }
+  private flushNavigation(panel: vscode.WebviewPanel, document: vscode.TextDocument) {
+    const key = `${panel.viewColumn}:${document.uri.toString()}`, location = this.navigationTargets.get(key);
+    if (!location || !this.readyPanels.has(panel)) return;
+    this.navigationTargets.delete(key);
+    this.post(panel, { type: 'navigateTo', location });
+  }
   private sendState(panel: vscode.WebviewPanel, document: vscode.TextDocument) {
     // Retained hidden readers receive the latest revision when revealed. Do not
     // clone and reparse every editor keystroke into each background webview.
@@ -338,6 +368,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       this.post(panel, { type: 'configuration', configuration: this.configuration(document, panel.webview), document: this.documentMetadata(document) });
     } else {
       if (this.timedOut.get(panel) !== document.version) this.timedOut.delete(panel);
+      this.readyPanels.delete(panel);
       this.loadWatchdog.start(panel, document.version);
       const state = this.state(document, panel.webview);
       if (state.loadError) {
@@ -346,7 +377,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
           error: loadErrorMessage(state.loadError, state.settings.locale) });
       }
       this.post(panel, readerStateMessage(state));
-      this.sentDocuments.set(panel, { uri, version: document.version });
+      this.sentDocuments.set(panel, { uri, version: document.version, aligned: previous?.uri === uri && previous.aligned });
     }
   }
   private loadTimedOut(panel: vscode.WebviewPanel, version: number) {
@@ -576,18 +607,26 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     return existing?.viewColumn ?? others.sort((a, b) => Math.abs(a.viewColumn - readerColumn) - Math.abs(b.viewColumn - readerColumn))[0]?.viewColumn ?? vscode.ViewColumn.Beside;
   }
   async openSource(uri: vscode.Uri, offset?: number, readerColumn?: vscode.ViewColumn): Promise<void> {
-    const document = await vscode.workspace.openTextDocument(uri);
-    const existing = readerColumn === undefined ? vscode.window.visibleTextEditors.find(editor => editor.document.uri.toString() === uri.toString()) : undefined;
-    const editor = await vscode.window.showTextDocument(document, { viewColumn: existing?.viewColumn ?? this.fileViewColumn(uri, readerColumn), preview: false });
-    if (Number.isSafeInteger(offset)) {
-      const position = document.positionAt(Math.max(0, offset!)); editor.selection = new vscode.Selection(position, position);
-      editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-    }
+    return this.navigation.explicit(async () => {
+      const document = await vscode.workspace.openTextDocument(uri);
+      const existing = readerColumn === undefined ? vscode.window.visibleTextEditors.find(editor => editor.document.uri.toString() === uri.toString()) : undefined;
+      const editor = await vscode.window.showTextDocument(document, { viewColumn: existing?.viewColumn ?? this.fileViewColumn(uri, readerColumn), preview: false });
+      if (Number.isSafeInteger(offset)) {
+        const position = document.positionAt(Math.max(0, offset!)); editor.selection = new vscode.Selection(position, position);
+        editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+      }
+    });
   }
   private async message(document: vscode.TextDocument, panel: vscode.WebviewPanel, candidate: unknown): Promise<void> {
     if (!this.panels.has(panel) || !candidate || typeof candidate !== 'object' || !('type' in candidate)) return;
     const message = candidate as WebviewMessage;
     switch (message.type) {
+      case 'prepareQuestionContext': {
+        if (typeof message.requestId !== 'string') break;
+        try { this.post(panel, { type: 'questionContext', requestId: message.requestId, context: await this.questions.prepare(document, message.input, message.version) }); }
+        catch (error) { this.post(panel, { type: 'questionContext', requestId: message.requestId, error: error instanceof Error ? error.message : String(error) }); }
+        break;
+      }
       case 'retryLoad': this.retryLoad(panel); break;
       case 'loadProgress': {
         const progress = message.progress;
@@ -602,11 +641,11 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
         if (progress.status === 'loading') this.loadWatchdog.start(panel, progress.version, progress.requestId);
         else this.loadWatchdog.stop(panel);
         if (progress.status === 'ready') {
+          this.readyPanels.add(panel);
           this.loadProgress.delete(panel);
           const sent = this.sentDocuments.get(panel)!;
-          // A replacement async reader has fresh geometry even if editing did
-          // not move the native viewport. Align once per completed revision,
-          // using the latest visible range, without parsing or polling again.
+          // Initial/restored guests align once. Source revisions retain their
+          // reader position; a second editor alignment would move the viewport.
           if (!sent.aligned && panel.visible && progress.version === document.version) {
             sent.aligned = true;
             if (readerSettings(document.uri).syncScroll && !this.readerScrollOwners.has(progress.uri)) {
@@ -621,6 +660,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
           }
         }
         else this.loadProgress.set(panel, progress);
+        if (progress.status === 'ready') this.flushNavigation(panel, document);
         // Progress must not rebroadcast source/configuration or touch toolbar
         // contexts on every tick.
         this.updateLoadingStatus(); break;
@@ -740,7 +780,9 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
         if (typeof message.text !== 'string') return;
         await vscode.env.clipboard.writeText(message.text);
         void vscode.window.showInformationMessage(this.text(document.uri, 'LiMR：已复制文本上下文，可粘贴给 AI 助手。', 'LiMR: Context copied. Paste it into your AI assistant.')); break;
-      case 'openLink': if (typeof message.href === 'string') await this.openLink(document.uri, message.href, panel.viewColumn); break;
+      case 'openLink': if (typeof message.href === 'string') await this.openLink(document.uri, message.href, panel.viewColumn, message.position); break;
+      case 'navigateHistory': if (message.direction === 'back' || message.direction === 'forward')
+        await this.navigation.history(message.direction, { uri: document.uri.toString(), position: message.position }, panel.viewColumn); break;
     }
   }
   private async applySourceEdit(document: vscode.TextDocument, panel: vscode.WebviewPanel, message: Extract<WebviewMessage, { type: 'edit' }>): Promise<void> {
@@ -761,11 +803,15 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       this.post(panel, { type: 'editResult', requestId: message.requestId, success: false, error: error instanceof Error ? error.message : String(error), state: this.state(document, panel.webview) });
     }
   }
-  private async openLink(documentUri: vscode.Uri, href: string, readerColumn?: vscode.ViewColumn): Promise<void> {
+  private async openLink(documentUri: vscode.Uri, href: string, readerColumn?: vscode.ViewColumn, position?: ReaderLocation['position']): Promise<void> {
     const link = resolveReaderLink({ documentUri: documentUri.toString(), workspaceUri: vscode.workspace.getWorkspaceFolder(documentUri)?.uri.toString(), href });
     if (link.kind === 'external') { await vscode.env.openExternal(vscode.Uri.parse(link.uri)); return; }
     if (link.kind === 'anchor') return;
     const uri = vscode.Uri.parse(link.uri);
+    if (/\.(?:md|markdown)$/i.test(uri.path)) {
+      await this.navigation.follow({ uri: documentUri.toString(), position }, { uri: link.uri, fragment: link.fragment, line: link.line }, readerColumn);
+      return;
+    }
     if (!/\.(?:md|markdown)$/i.test(uri.path) && link.line === undefined) {
       await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: this.fileViewColumn(uri, readerColumn), preview: false }); return;
     }

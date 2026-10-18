@@ -15,6 +15,19 @@ export function listen(listener: (message: HostMessage) => void) {
   return () => window.removeEventListener('message', receive);
 }
 
+export function prepareQuestionContext(version: number, input: Extract<WebviewMessage, { type: 'prepareQuestionContext' }>['input']) {
+  return new Promise<import('../src/shared/ai-context').AIContext>((resolve, reject) => {
+    const requestId = crypto.randomUUID();
+    const timer = setTimeout(() => { dispose(); reject(new Error('Could not prepare question context. Please retry.')); }, 10000);
+    const dispose = listen(message => {
+      if (message.type !== 'questionContext' || message.requestId !== requestId) return;
+      clearTimeout(timer); dispose();
+      if (message.context) resolve(message.context); else reject(new Error(message.error));
+    });
+    post({ type: 'prepareQuestionContext', requestId, version, input });
+  });
+}
+
 /** Keep both representations: Codex consumes file-mention HTML; other tools get precise text. */
 export async function copyClipboard(text: string, html?: string): Promise<'rich' | 'text' | 'host'> {
   try {

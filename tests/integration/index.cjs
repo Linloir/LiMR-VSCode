@@ -108,6 +108,15 @@ exports.run = async function run() {
             else { await execution; result = snapshot(); }
             break;
           }
+          case 'editBurst': {
+            for (let i = 0; i < command.count; i++) {
+              const edit = new vscode.WorkspaceEdit();
+              edit.insert(uri, document.positionAt(command.start), command.text);
+              assert.equal(await vscode.workspace.applyEdit(edit), true);
+              await delay(command.interval ?? 20);
+            }
+            result = { version: document.version }; break;
+          }
           case 'editSource': {
             const edit = new vscode.WorkspaceEdit();
             edit.replace(uri, new vscode.Range(document.positionAt(command.start), document.positionAt(command.end ?? command.start)), command.text);

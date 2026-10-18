@@ -31,7 +31,10 @@ export async function runImageAcceptance({ page, frame, host, fixture, artifacts
   await save({ check: 'Native webview decodes real document-relative, workspace-rooted, absolute and URL-encoded files, including figure and plugin images', dimensions: [121, 121, 121, 143, 162, 121] });
 
   const missing = frame.getByAltText('Missing', { exact: true });
-  await missing.scrollIntoViewIfNeeded();
+  const missingFallback = missing.locator('..').locator('[data-limr-image-fallback]');
+  await expect(missingFallback).toBeVisible();
+  await missingFallback.scrollIntoViewIfNeeded();
+  await expect(missing).toBeHidden();
   expect(await missing.getAttribute('src')).toBeNull();
   await expect(missing).toHaveAttribute('data-lv-image-error', 'missing');
   expect(await missing.evaluate(element => element.naturalWidth)).toBe(0);

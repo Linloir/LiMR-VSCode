@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReaderImages } from './images';
 
-class ElementFixture {
+class ElementFixture extends EventTarget {
   images: ImageFixture[] = [];
   contains(image: ImageFixture) { return this.images.includes(image); }
   querySelectorAll() { return this.images; }
 }
 class ImageFixture extends ElementFixture {
   dataset: Record<string, string> = {};
+  hidden = false;
+  loading = 'lazy';
   constructor(public src: string) { super(); }
   getAttribute(name: string) { return name === 'src' ? this.src : null; }
   setAttribute(name: string, value: string) { if (name === 'src') this.src = value; }
@@ -49,10 +51,22 @@ describe('local image bridge lifecycle', () => {
     expect(root.images[0].src).toBe('https://resource/new.svg');
     expect(send).toHaveBeenCalledTimes(2);
   });
+  it('loads a repaired hidden core image and restores its lazy policy after success or failure', () => {
+    for (const outcome of ['load', 'error']) {
+      const { root, reply } = setup('./repaired.svg');
+      const image = root.images[0]; image.hidden = true;
+      reply(0, 'https://resource/repaired.svg');
+      expect(image.loading).toBe('eager');
+      image.dispatchEvent(new Event(outcome));
+      expect(image.loading).toBe('lazy');
+    }
+  });
   it('does not loop on failures, but newly rendered images can retry after a file appears', () => {
     const { root, send, reply } = setup('./missing.svg');
+    const error = vi.fn(); root.images[0].addEventListener('error', error);
     reply(0); changed(root.images[0]); added(root.images[0]);
     expect(send).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledTimes(1);
     expect(root.images[0].dataset.lvImageError).toBe('missing');
     const next = new ImageFixture('./missing.svg'); root.images.push(next); added(next);
     expect(send).toHaveBeenCalledTimes(2);

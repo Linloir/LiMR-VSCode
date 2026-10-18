@@ -59,7 +59,7 @@ export function preserveReaderViewState(root: HTMLElement, uri: string, getReade
   };
   const interrupt = () => { restoring = false; cancelAnimationFrame(frame); frame = 0; observer?.disconnect(); };
   const ready = () => { if (restoring && !frame) frame = requestAnimationFrame(restore); else if (!restoring) save(); };
-  const receive = (event: MessageEvent) => { if (event.data?.type === 'reveal') interrupt(); };
+  const receive = (event: MessageEvent) => { if (event.data?.type === 'reveal' || event.data?.type === 'navigateTo') interrupt(); };
   const unload = () => { if (!restoring) save(); };
   const inputEvents = ['wheel', 'pointerdown', 'touchstart', 'keydown'];
   root.addEventListener('scroll', scroll, { passive: true });

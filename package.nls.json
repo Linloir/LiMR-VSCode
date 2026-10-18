@@ -80,5 +80,18 @@
   "limr.loadingMode.description": "How large Markdown files become available. Progress appears below the editor tabs and in the VS Code status bar. Previews are limited to 75 MiB and 60 seconds per load.",
   "limr.tableLayout.enabled.description": "Optimize table column widths and long cell content. Enabled by default. Disable to use native table layout and reduce measurement work for long tables.",
   "limr.loadingMode.option.blocking": "Finish loading the complete document before reading.",
-  "limr.loadingMode.option.progressive": "Preview first (default): show a read-only opening while parsing continues in the background. Some plugins require complete loading."
+  "limr.loadingMode.option.progressive": "Preview first (default): show a read-only opening while parsing continues in the background. Some plugins require complete loading.",
+  "limr.markdownOpenMode.description": "Default behavior when opening Markdown files. None preserves VS Code behavior. Explicit source actions remain available.",
+  "limr.markdownOpenMode.option.none": "None (preserve current behavior)",
+  "limr.markdownOpenMode.option.reader": "Open in LiMR",
+  "limr.markdownOpenMode.option.sideBySide": "Open the source and LiMR side by side",
+  "limr.markdownLinkMode.description": "Behavior for links to other Markdown files. Reuses another editor group when available. Current-reader navigation supports mouse back/forward buttons and Alt+arrow keys.",
+  "limr.markdownLinkMode.option.currentReader": "Navigate in the current LiMR reader",
+  "limr.markdownLinkMode.option.besideReader": "Open LiMR in another group (current group in single-reader mode)",
+  "limr.markdownLinkMode.option.besideEditor": "Open the default text editor in another group",
+  "limr.markdownLinkMode.option.editorAndReader": "Open the source beside the reader and navigate LiMR; back restores the previous files",
+  "limr.markdownLinkMode.option.smart": "Smart: synchronize a source/reader pair for the same document; otherwise navigate only the current reader",
+  "limr.singleReader.description": "Reuse one LiMR reader, closing other saved reader tabs after opening. Unsaved tabs are retained to protect edits.",
+  "command.navigateBack": "Go Back in Reader",
+  "command.navigateForward": "Go Forward in Reader"
 }

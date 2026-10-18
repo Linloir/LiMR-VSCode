@@ -15,7 +15,7 @@ LiMR 是一个注重阅读体验的 Markdown 阅读器。这个扩展将 [LiMR](
 - **可调整的阅读方式**：字体、行距、正文宽度、目录、翻译显示和排版均可配置；源码与阅读器支持滚动同步。
 - **简易的扩展能力**：用工作区 CSS 调整外观，用 JavaScript 模块添加组件、语法、标注或操作；也可以做成独立的 VS Code 附加扩展。
 
-LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 `@linloir/limr 1.3.1`。你可以在 [Playground](https://linloir.github.io/LiMR/) 体验阅读与编辑，在 [语法文档](https://linloir.github.io/LiMR/#/docs/zh-CN/syntax) 查看更多内容模块。
+LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 `@linloir/limr 1.3.4`。你可以在 [Playground](https://linloir.github.io/LiMR/) 体验阅读与编辑，在 [语法文档](https://linloir.github.io/LiMR/#/docs/zh-CN/syntax) 查看更多内容模块。
 
 ## 开始使用与配置
 
@@ -23,7 +23,9 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 2. 用阅读器工具栏切换主题、排版与翻译显示。需要添加标注或修改任务复选框时，点击编辑按钮开启编辑；更改沿用 VS Code 的保存与撤销操作。
 3. 点击设置按钮，或执行 **LiMR: Reader Settings**。在 VS Code 设置中搜索 `@ext:linloir.limr-vscode`，选择“用户”可调整个人默认值，选择“工作区”仅对当前项目生效。
 
-网页链接直接交给浏览器打开。文件链接优先使用其他分栏中已有的目标文件，其次复用其他分栏；只有一个分栏时才新建旁栏。同一文档内的标题链接在阅读器中滚动。
+网页链接交给浏览器打开。内部 Markdown 链接默认智能跳转：同文档的源码/阅读双栏一起更新，其余布局只更新当前阅读器。可切换五种跳转方式；需旁栏时优先复用已有分栏。鼠标侧键或 Alt+左右键支持阅读器历史，双栏模式同时恢复另一栏的原文件。同一文档内的标题链接在阅读器中滚动。
+
+达到 256 KiB（按 UTF-16 字符数计）的文档会合并连续输入：停顿 250 毫秒后刷新，持续输入时最长等待 1.2 秒。较小文档即时更新。异步刷新期间保留已显示的内容，完整结果就绪后在原阅读位置接替。
 
 ### 常见设置
 
@@ -38,6 +40,9 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 | `limr.typography` | `"standard"` | `standard` 标准排版；`justify` 两端对齐；`knuth-plass` 使用段落级断行优化。 |
 | `limr.tableLayout.enabled` | `true` | 启用表格优化布局；关闭后使用原生表格，减少长表格的测量开销。 |
 | `limr.loadingMode` | `"progressive"` | 默认先显示只读预览，后台继续解析全文，完成后保留阅读位置；`blocking` 等解析完成后再展示。部分插件需要完整加载。 |
+| `limr.markdownOpenMode` | `"none"` | `none` 保持当前打开方式；`reader` 直接阅读；`sideBySide` 同时打开源码和阅读器。 |
+| `limr.markdownLinkMode` | `"smart"` | `currentReader` 当前栏阅读；`besideReader` 另一栏阅读；`besideEditor` 另一栏编辑；`editorAndReader` 双栏一起跳转；`smart` 仅在同文档的源码/阅读双栏中联动。支持鼠标侧键和 Alt+左右键回退/前进。 |
+| `limr.singleReader` | `false` | 复用单个阅读器；与 `besideReader` 冲突时改为当前栏跳转。未保存的旧阅读页签会保留，避免丢失编辑。 |
 | `limr.sidebarMode` | `"content"` | `content` 有旁注时显示；`always` 始终启用；`hidden` 隐藏。窄窗口通过浮层查看标注。 |
 | `limr.sidebarAutoCollapse` | `true` | 自动折叠密集的旁注条目；关闭后逐项排布。 |
 | `limr.tocMode` | `"always"` | `always` 宽屏显示侧目录、窄屏显示折叠目录；`wide` 仅宽屏显示；`hidden` 隐藏。 |
@@ -128,7 +133,7 @@ export default ({ React, limr }) => limr.defineBlock({
 
 ### 围绕文档提问与标注
 
-划选原文，点击 **提问上下文**，再粘贴给 AI 并输入问题。开启编辑后，Skill 要求助手在回答后把问题、回答和高亮写回 Markdown；翻译块中的原文与译文对应片段共用同一条问答标注。生成论文类文档时，建议使用 `figure` / `figures` 展示带图注的图片。扩展本身不调用模型；AI 对 Markdown 的修改会同步显示。详细用法见 [AI 指引](docs/ai-guide.md)。
+划选原文，点击 **提问上下文**，再粘贴给 AI 并输入问题。精简的上下文要求 AI 先显示答案，再通过附带脚本回写；脚本直接操作当前 VS Code 缓冲区（支持未保存内容和撤销），失败才重新读取文件定位。开启编辑后，Skill 要求助手在回答后把问题、回答和高亮写回 Markdown；翻译块中的原文与译文对应片段共用同一条问答标注。生成论文类文档时，建议使用 `figure` / `figures` 展示带图注的图片。扩展本身不调用模型；AI 对 Markdown 的修改会同步显示。详细用法见 [AI 指引](docs/ai-guide.md)。
 
 开发与构建请参阅 [开发说明](docs/development.md)。
 
@@ -149,7 +154,7 @@ LiMR is a Markdown reader designed for comfortable reading. This extension bring
 - **Reading preferences**: configure fonts, spacing, article width, contents, translation display, and paragraph layout. Source and reader can scroll together.
 - **Simple extensibility**: use workspace CSS to change appearance and JavaScript modules to add components, syntax, annotations, or actions. Reusable modules can also ship as VS Code add-ons.
 
-LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.1`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
+LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.4`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
 
 ## Get started and configure
 
@@ -157,7 +162,9 @@ LiMR is also a Markdown rendering library for React projects. This extension use
 2. Use the reader toolbar to choose a theme, typography, or translation display. Enable editing with the edit button to add annotations or change task checkboxes; use VS Code's usual save and undo actions.
 3. Click settings or run **LiMR: Reader Settings**. Search VS Code Settings for `@ext:linloir.limr-vscode`. Choose **User** for personal defaults or **Workspace** for project settings.
 
-Web links open directly in your browser. File links reuse the target file in another editor group when available, otherwise use another existing group. A side group is created only when there is no other group. Heading links within the current document scroll inside the reader.
+Web links open in your browser. Markdown links default to smart navigation: a source/reader pair for the same document updates together; other layouts update only the current reader. Choose among five link modes; side targets reuse existing groups. Mouse back/forward or Alt+arrow keys restore reader history and the previous companion file. Same-document heading links scroll within the reader.
+
+Documents of at least 256 KiB of UTF-16 text coalesce edits for 250 ms, with a 1.2 s maximum wait during continuous typing. Smaller documents update immediately. Asynchronous refresh keeps the accepted content visible until a complete replacement is ready at the same reading position.
 
 ### Common settings
 
@@ -172,6 +179,9 @@ Web links open directly in your browser. File links reuse the target file in ano
 | `limr.typography` | `"standard"` | `standard` normal layout; `justify` justified text; `knuth-plass` paragraph-wide line-breaking optimization. |
 | `limr.tableLayout.enabled` | `true` | Optimize table layout; disable for native tables with less measurement work on long tables. |
 | `limr.loadingMode` | `"progressive"` | Show a read-only preview while the complete document parses in the background, preserving your reading position when ready. Choose `blocking` to wait before showing content. Some plugins require complete loading. |
+| `limr.markdownOpenMode` | `"none"` | `none` preserves current opening behavior; `reader` opens LiMR; `sideBySide` opens source and reader together. |
+| `limr.markdownLinkMode` | `"smart"` | `currentReader`, `besideReader`, `besideEditor`, `editorAndReader`, or `smart`. Smart updates both columns only when they show source and reader for the same document. Mouse back/forward and Alt+arrow keys restore navigation. |
+| `limr.singleReader` | `false` | Reuse one reader; `besideReader` falls back to the current group. Unsaved old reader tabs remain available to protect edits. |
 | `limr.sidebarMode` | `"content"` | `content` shows the sidebar when notes exist; `always` always enables it; `hidden` hides it. Narrow readers display annotations in overlays. |
 | `limr.sidebarAutoCollapse` | `true` | Fold crowded sidebar items automatically; turn off to lay them out individually. |
 | `limr.tocMode` | `"always"` | `always` shows side contents on wide screens and collapsible contents on narrow ones; `wide` shows only side contents; `hidden` hides both. |
@@ -262,6 +272,6 @@ For reuse across projects, package modules as a separate VS Code add-on and regi
 
 ### Ask questions and annotate documents
 
-Select text, choose **Question context**, then paste into your assistant and add your question. With editing enabled, the skill requires writing the question, answer, and highlighting back to Markdown. Corresponding original/translated passages share one question annotation. For papers, it recommends `figure` / `figures` for captioned images. The extension does not call an AI model; changes your assistant makes to Markdown appear in the reader. See the [AI guide](docs/ai-guide.en.md).
+Select text, choose **Question context**, then paste into your assistant and add your question. Compact context asks the assistant to answer first, then use the bundled script against the live VS Code buffer, including unsaved edits and undo. It rereads and relocates only if quick writeback fails. With editing enabled, the skill requires writing the question, answer, and highlighting back to Markdown. Corresponding original/translated passages share one question annotation. For papers, it recommends `figure` / `figures` for captioned images. The extension does not call an AI model; changes your assistant makes to Markdown appear in the reader. See the [AI guide](docs/ai-guide.en.md).
 
 For extension development and builds, see the [development guide](docs/development.md).

@@ -38,7 +38,7 @@ export async function runNavigationAcceptance({ page, host, ready, artifacts, ex
   }
   expect(ready.language).toBe('skill');
   expect(ready.automaticallyActivated).toBe(true);
-  await host('configure', { values: { previewButtonMode: 'separate', syncScroll: false } });
+  await host('configure', { values: { previewButtonMode: 'separate', syncScroll: false, markdownLinkMode: 'besideEditor' } });
   await expect(readerButton()).toBeVisible();
   await expect(readerButton()).toHaveClass(/codicon-book/);
   await expect(builtinButton()).toBeVisible();

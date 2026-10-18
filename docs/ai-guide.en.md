@@ -2,7 +2,7 @@
 
 [简体中文](ai-guide.md) · [Skill instructions](../skills/limr-annotations/SKILL.md)
 
-LiMR copies question context to your clipboard for your chosen AI assistant. It needs no API key or message hook. Annotations live in Markdown and can be committed with the document. The bundled skill covers LiMR 1.3.0 annotations and VS Code reader style/syntax plugins.
+LiMR copies question context to your clipboard for your chosen AI assistant. It needs no API key or message hook. Annotations live in Markdown and can be committed with the document. The bundled skill covers LiMR 1.3.4 annotations and VS Code reader style/syntax plugins.
 
 ## Install the skill
 
@@ -27,15 +27,15 @@ Only choosing installation copies files; showing a prompt creates no skill direc
 
 1. Select reader text and click **Question context** in its selection toolbar.
 2. Paste into an existing or new AI conversation, add the actual question, and send it.
-3. The assistant reads the current file, answers, and saves both the question and answer in a `question` annotation with highlighting when editing is allowed.
+3. The assistant displays the answer first, then prefers the script to save the complete question/answer and shared highlight. It reads and relocates source only if the script fails, the context is stale, or an existing annotation needs updating.
 
-Context includes the file path, UTF-16 source offsets, 1-based line/column positions, raw Markdown, readable selection, surrounding text, and available range/annotation IDs. Clipboard output tries to include both a file mention and full plain text; the plain text retains every locator.
+`limr-context-v3` sends the file, UTF-16 offsets, selected text, short surrounding excerpts and necessary IDs, without duplicate coordinates or syntax instructions. Bilingual selections include the hidden counterpart. Clipboard output retains file mentions and plain text.
 
 Enable editing with the toolbar button, **LiMR: Toggle Markdown Editing**, or `limr.editingEnabled`. The context then requests writeback after answering, without another confirmation: one `question` body contains Question and Answer sections, and ranges without an explicit highlight get a `highlight` definition. Existing visibility, colors, and styles are preserved. Otherwise it asks for an answer without automatic edits; you can still explicitly request a change. Copying context itself never changes the file.
 
 For a selection inside `translations`, the assistant reads both the original and translation, gives the corresponding passages separate range IDs, and links both to the same question/answer annotation and shared highlight. This includes the hidden side when the reader displays only one language. An ambiguous counterpart is reported instead of guessed. The answer is stored once and can be opened from either language.
 
-Save before sending to reduce differences between disk and unsaved editor text. The assistant still needs to reread and verify the selection. Conversation IDs are only recorded when the assistant has a reliable current ID; questions and markers work without them.
+The script uses a local pipe to the issuing VS Code window. It verifies the buffer version and selection, serializes/reparses with LiMR and applies one undoable edit; no npm install is needed. Existing unsaved work stays in the buffer (`saved: false`); clean files are saved when possible. Identical retries do not duplicate annotations. Closed windows, changed documents, disabled editing or contexts older than 24 hours trigger the skill fallback. Unknown conversation IDs are omitted.
 
 ## Example requests
 
@@ -53,7 +53,7 @@ Replace the body of n-cache with the following explanation, keeping its ID, link
 
 Annotations use paired `::%%limr%%{<#r1}` / `::%%limr%%{>#r1}` boundaries and `:::limr-annotation` definitions. Ranges may cross paragraphs, nest, or overlap. Prefer meaningful, nonempty text of appropriate length; multiple annotations on the same exact text reuse its named range and add only definitions. Prefer a paired `<ref>` around a source mention or the full sentence it supports, and pair translations by complete paragraph. Marker-only citations and finer translation units remain available when intended. See the [source annotation reference](../skills/limr-annotations/references/source-annotations.md) for the complete contract.
 
-Installation also includes an [offline LiMR 1.3.0 syntax guide](../skills/limr-annotations/references/limr-syntax.md) with citation, paragraph translation, footnote, and component examples plus official documentation links. No additional skill or LiMR source checkout is required.
+Installation also includes an [offline LiMR 1.3.4 syntax guide](../skills/limr-annotations/references/limr-syntax.md) with citation, paragraph translation, footnote, and component examples plus official documentation links. No additional skill or LiMR source checkout is required.
 
 When generating LiMR Markdown for papers or research notes, the skill recommends `figure` for a single captioned image and `figures` for related panels. Preserve real image paths, figure numbers, panel labels, and captions; use `figcaption` for rich Markdown captions.
 

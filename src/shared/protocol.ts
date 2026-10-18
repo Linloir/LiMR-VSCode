@@ -79,6 +79,9 @@ export interface SourceEdit { range: { start: number; end: number }; text: strin
 /** View preferences never carry another copy of the Markdown buffer. */
 export type ReaderConfiguration = Omit<ReaderState, 'document'>;
 export type HostMessage =
+  | { type: 'questionContext'; requestId: string; context?: import('./ai-context').AIContext; error?: string }
+  | { type: 'requestHistory'; direction: 'back' | 'forward' }
+  | { type: 'navigateTo'; location: import('../navigation').ReaderLocation }
   | { type: 'loadingAction'; requestId: string; action: 'cancel' | 'retry' }
   | { type: 'translationIntent'; uri: string; epoch: number }
   | { type: 'state'; state: ReaderState; sourceBytes?: ArrayBuffer; sourceCharacters?: number }
@@ -89,6 +92,7 @@ export type HostMessage =
   | { type: 'scrollIntent'; active: false; generation: number; epoch?: number }
   | { type: 'notice'; message: string; error?: boolean };
 export type WebviewMessage =
+  | { type: 'prepareQuestionContext'; requestId: string; version: number; input: Pick<import('./ai-context').AIContextInput, 'ranges' | 'selectedText' | 'rangeIds' | 'annotationIds' | 'peers'> }
   | { type: 'retryLoad' }
   | { type: 'loadProgress'; progress: ReaderLoadProgress }
   | { type: 'ready' }
@@ -103,6 +107,7 @@ export type WebviewMessage =
   | { type: 'setEditing'; enabled: boolean }
   | { type: 'setFileSettings'; settings: ReaderFileSettings; translationEpoch?: number; documentVersion?: number }
   | { type: 'copyFallback'; text: string }
-  | { type: 'openLink'; href: string }
+  | { type: 'openLink'; href: string; position?: { source: number; offset: number } }
+  | { type: 'navigateHistory'; direction: 'back' | 'forward'; position?: { source: number; offset: number } }
   | { type: 'revealSource'; offset: number; epoch: number; generation: number }
   | { type: 'scrollIntent'; active: boolean; epoch: number; generation: number };

@@ -80,5 +80,18 @@
   "limr.loadingMode.description": "大文档的加载方式。解析进度显示在编辑器页签下方和 VS Code 底部状态栏。 预览文档最大 75 MiB，每次加载最多 60 秒。",
   "limr.tableLayout.enabled.description": "启用表格优化布局算法，优化列宽和较长单元格的展示。默认开启；关闭后使用原生表格布局，减少长表格的测量开销。",
   "limr.loadingMode.option.blocking": "完整加载后开始阅读。",
-  "limr.loadingMode.option.progressive": "优先预览（默认）：先展示只读的开头内容，后台继续解析全文。部分插件需要等待完整加载。"
+  "limr.loadingMode.option.progressive": "优先预览（默认）：先展示只读的开头内容，后台继续解析全文。部分插件需要等待完整加载。",
+  "limr.markdownOpenMode.description": "打开 Markdown 文件时的默认行为；无表示保留 VS Code 当前行为。显式打开源码不受影响。",
+  "limr.markdownOpenMode.option.none": "无（保持当前打开方式）",
+  "limr.markdownOpenMode.option.reader": "直接打开 LiMR 阅读器",
+  "limr.markdownOpenMode.option.sideBySide": "一栏编辑 Markdown，一栏 LiMR 预览",
+  "limr.markdownLinkMode.description": "点击阅读器中其他 Markdown 文件链接时的行为；优先复用已有的另一栏。当前栏阅读器支持鼠标侧键或 Alt+方向键回退/前进。",
+  "limr.markdownLinkMode.option.currentReader": "当前栏跳转 LiMR",
+  "limr.markdownLinkMode.option.besideReader": "另一栏打开 LiMR（单阅读器模式下改为当前栏）",
+  "limr.markdownLinkMode.option.besideEditor": "另一栏打开默认文本编辑器",
+  "limr.markdownLinkMode.option.editorAndReader": "另一栏编辑，同时当前栏跳转 LiMR；回退时恢复原文件",
+  "limr.markdownLinkMode.option.smart": "智能：同文档编辑/阅读双栏联动，其余布局只跳转当前 LiMR",
+  "limr.singleReader.description": "复用一个 LiMR 阅读器，打开后关闭其他已保存的 LiMR 页签；未保存的页签保留以保护编辑内容。",
+  "command.navigateBack": "阅读器后退",
+  "command.navigateForward": "阅读器前进"
 }

@@ -2,7 +2,7 @@
   "name": "limr-vscode",
   "displayName": "LiMR — Markdown Reader",
   "description": "Read and annotate Markdown beside your editor with LiMR. Inline notes, highlights, AI context, and VS Code themes.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "linloir",
   "license": "MIT",
   "engines": {
@@ -156,6 +156,16 @@
         "title": "%limr.reloadPlugins%",
         "category": "LiMR",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "limr.navigateBack",
+        "title": "%command.navigateBack%",
+        "category": "LiMR"
+      },
+      {
+        "command": "limr.navigateForward",
+        "title": "%command.navigateForward%",
+        "category": "LiMR"
       }
     ],
     "menus": {
@@ -608,6 +618,48 @@
             "%limr.loadingMode.option.progressive%"
           ],
           "scope": "resource"
+        },
+        "limr.markdownOpenMode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "reader",
+            "sideBySide"
+          ],
+          "default": "none",
+          "description": "%limr.markdownOpenMode.description%",
+          "enumDescriptions": [
+            "%limr.markdownOpenMode.option.none%",
+            "%limr.markdownOpenMode.option.reader%",
+            "%limr.markdownOpenMode.option.sideBySide%"
+          ],
+          "scope": "resource"
+        },
+        "limr.markdownLinkMode": {
+          "type": "string",
+          "enum": [
+            "currentReader",
+            "besideReader",
+            "besideEditor",
+            "editorAndReader",
+            "smart"
+          ],
+          "default": "smart",
+          "description": "%limr.markdownLinkMode.description%",
+          "enumDescriptions": [
+            "%limr.markdownLinkMode.option.currentReader%",
+            "%limr.markdownLinkMode.option.besideReader%",
+            "%limr.markdownLinkMode.option.besideEditor%",
+            "%limr.markdownLinkMode.option.editorAndReader%",
+            "%limr.markdownLinkMode.option.smart%"
+          ],
+          "scope": "resource"
+        },
+        "limr.singleReader": {
+          "type": "boolean",
+          "default": false,
+          "description": "%limr.singleReader.description%",
+          "scope": "window"
         }
       }
     },
@@ -694,6 +746,18 @@
           "highContrastLight": "textLink.foreground"
         }
       }
+    ],
+    "keybindings": [
+      {
+        "command": "limr.navigateBack",
+        "key": "alt+left",
+        "when": "activeCustomEditorId == limr.reader"
+      },
+      {
+        "command": "limr.navigateForward",
+        "key": "alt+right",
+        "when": "activeCustomEditorId == limr.reader"
+      }
     ]
   },
   "scripts": {
@@ -703,7 +767,7 @@
     "test": "vitest run",
     "test:browser": "npm run test:vscode",
     "test:vscode": "node scripts/test-vscode.mjs",
-    "package": "vsce package --no-dependencies --githubBranch main -o artifacts/limr-vscode-1.0.2.vsix",
+    "package": "vsce package --no-dependencies --githubBranch main -o artifacts/limr-vscode-1.0.3.vsix",
     "vscode:prepublish": "npm run build",
     "test:animations": "node scripts/test-vscode.mjs --animations",
     "test:regressions": "node scripts/test-vscode.mjs --regressions",
@@ -721,7 +785,7 @@
   },
   "dependencies": {
     "@fontsource-variable/noto-serif-sc": "5.3.1",
-    "@linloir/limr": "1.3.1",
+    "@linloir/limr": "1.3.4",
     "js-yaml": "4.3.2",
     "mdast-util-math": "3.0.0",
     "micromark-extension-math": "3.1.0",

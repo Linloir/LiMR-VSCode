@@ -21,7 +21,7 @@ import { fileHashes } from '../benchmarks/reading/build.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillSuite = process.env.LIMR_TEST_SUITE === 'skills' || process.argv.includes('--skills');
 const syntaxSuite = process.env.LIMR_TEST_SUITE === 'syntax-highlighting' || process.argv.includes('--syntax-highlighting');
-const navigationSuite = process.env.LIMR_TEST_SUITE === 'navigation' || process.argv.includes('--navigation');
+const navigationSuite = process.env.LIMR_TEST_SUITE === 'navigation' || process.argv.includes('--navigation') || process.argv.includes('--navigation-modes');
 const extensionPluginSuite = process.env.LIMR_TEST_SUITE === 'extension-plugins' || process.argv.includes('--extension-plugins');
 const largePluginSuite = process.env.LIMR_TEST_SUITE === 'large-plugins' || process.argv.includes('--large-plugins');
 // Fixtures and the integration host stay in this repository. Only the actual
@@ -222,7 +222,9 @@ try {
     if (session) await session.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   }
   const runAcceptance = skillSuite ? runSkillAcceptance
+    : process.argv.includes('--core-compatibility') ? (await import('../tests/browser/core-compatibility.mjs')).runCoreCompatibilityAcceptance
     : process.env.LIMR_TEST_SUITE === 'annotations' || process.argv.includes('--annotations') ? (await import('../tests/browser/annotations.mjs')).runAnnotationAcceptance
+    : process.argv.includes('--navigation-modes') ? (await import('../tests/browser/navigation-modes.mjs')).runNavigationModesAcceptance
     : navigationSuite ? (await import('../tests/browser/navigation.mjs')).runNavigationAcceptance
     : process.env.LIMR_TEST_SUITE === 'image-preview' || process.argv.includes('--image-preview') ? (await import('../tests/browser/image-preview.mjs')).runImagePreviewAcceptance
     : process.argv.includes('--limits') ? (await import('../tests/browser/load-limits.mjs')).runLoadLimitsAcceptance
