@@ -21,23 +21,28 @@ export class ReaderScrollSync {
   private readerInput = false;
   private inputEpoch = 0;
   private sourceGeneration = 0;
-  private readonly observer: MutationObserver;
+  private readonly observer?: MutationObserver;
 
   constructor(private readonly root: HTMLElement, private readonly enabled: () => boolean, private readonly send: (offset: number, epoch: number, generation: number) => void,
     private readonly inputChanged: (active: boolean, epoch: number, generation: number) => void = () => {},
     private readonly getReader?: () => ReaderScrollBridge | null) {
-    this.observer = new MutationObserver(records => {
-      // Popovers, inline highlights and lazy block renderers can mutate while
-      // scrolling without changing the article's source-block index.
-      const article = this.article;
-      if (!article?.isConnected || records.some(record => record.type === 'attributes'
-        ? (record.target as Element).parentElement === article
-        : record.target === article || record.target instanceof Element && record.target.contains(article))) {
-        this.blocks = undefined;
-        if (this.pendingReveal !== undefined) this.schedule();
-      }
-    });
-    this.observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-source-start', 'data-source-end'] });
+    // The public bridge owns its source index and gets an explicit refresh when
+    // loading completes. Observe DOM mutations only for the legacy fallback;
+    // KP layout and virtual mounts otherwise produce unused subtree records.
+    if (!getReader) {
+      this.observer = new MutationObserver(records => {
+        // Popovers, inline highlights and lazy block renderers can mutate while
+        // scrolling without changing the article's source-block index.
+        const article = this.article;
+        if (!article?.isConnected || records.some(record => record.type === 'attributes'
+          ? (record.target as Element).parentElement === article
+          : record.target === article || record.target instanceof Element && record.target.contains(article))) {
+          this.blocks = undefined;
+          if (this.pendingReveal !== undefined) this.schedule();
+        }
+      });
+      this.observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-source-start', 'data-source-end'] });
+    }
     root.addEventListener('scroll', this.onScroll, { passive: true });
     // A new user gesture takes control immediately, even within the same frame.
     root.addEventListener('wheel', this.onIntent, { passive: true });
@@ -58,7 +63,7 @@ export class ReaderScrollSync {
   }
   dispose() {
     this.onLeave();
-    cancelAnimationFrame(this.frame); this.observer.disconnect();
+    cancelAnimationFrame(this.frame); this.observer?.disconnect();
     this.root.removeEventListener('scroll', this.onScroll);
     this.root.removeEventListener('wheel', this.onIntent);
     this.root.removeEventListener('touchstart', this.onIntent);
@@ -74,9 +79,14 @@ export class ReaderScrollSync {
     cancelAnimationFrame(this.frame); this.frame = 0;
   }
   sourceInput(generation: number, epoch?: number) {
-    if (generation < this.sourceGeneration) return;
-    if (generation > this.sourceGeneration) { this.sourceGeneration = generation; this.release(); }
-    else if (epoch !== undefined) this.release(epoch);
+    if (generation > this.sourceGeneration) this.sourceGeneration = generation;
+    else if (generation < this.sourceGeneration || epoch !== this.inputEpoch) return;
+    this.readerInput = false; this.lastOffset = undefined;
+    // Ownership updates can arrive between a throttled source reveal and its
+    // animation frame. Keep that latest source target and its original frame;
+    // cancelling it on every generation makes continuous input wait for quiet.
+    // A reader gesture still cancels the target immediately in onIntent.
+    if (this.pendingReveal === undefined) { cancelAnimationFrame(this.frame); this.frame = 0; }
   }
   reset() { this.onLeave(); this.release(); this.appliedScrollTop = undefined; }
   /** Loading may finish after a source reveal. Retry it with the public bridge. */

@@ -47,3 +47,57 @@ it('lets a reader gesture cancel a queued source restore', () => {
   sync.reveal(1000); root.dispatchEvent(new Event('wheel')); vi.advanceTimersByTime(16);
   expect(restoreReadingPosition).not.toHaveBeenCalled();
 });
+
+it('follows each received source location when a newer source generation arrives before its animation frame', () => {
+  const root = new ScrollRoot(), restoreReadingPosition = vi.fn(), send = vi.fn();
+  sync = new ReaderScrollSync(root as unknown as HTMLElement, () => true, send, undefined,
+    () => ({ restoreReadingPosition, getReadingPosition: () => null }));
+  // Observed CMOS sequence: source ranges advance every ~32 ms, while the
+  // next range's ownership message can follow the preceding reveal by 0–2 ms.
+  // The old implementation dropped all three intermediate locations.
+  sync.sourceInput(675); sync.reveal(13101);
+  vi.advanceTimersByTime(2); sync.sourceInput(676); vi.advanceTimersByTime(14);
+  expect(restoreReadingPosition.mock.calls.map(([position]) => position.source)).toEqual([13101]);
+  for (const [source, generation] of [[13244, 677], [13304, 678]]) {
+    vi.advanceTimersByTime(16); sync.reveal(source); sync.sourceInput(generation); vi.advanceTimersByTime(16);
+  }
+  expect(restoreReadingPosition.mock.calls.map(([position]) => position.source)).toEqual([13101, 13244, 13304]);
+  expect(send).not.toHaveBeenCalled();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('coalesces source updates into the existing frame without postponing it on each generation', () => {
+  const root = new ScrollRoot(), restoreReadingPosition = vi.fn();
+  sync = new ReaderScrollSync(root as unknown as HTMLElement, () => true, vi.fn(), undefined,
+    () => ({ restoreReadingPosition, getReadingPosition: () => null }));
+  sync.sourceInput(1); sync.reveal(1000);
+  vi.advanceTimersByTime(8); sync.sourceInput(2); sync.reveal(2000);
+  vi.advanceTimersByTime(8);
+  expect(restoreReadingPosition).toHaveBeenCalledExactlyOnceWith({ source: 2000, offset: 18 });
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('invalidates old reader output on source takeover while ignoring stale generations and epochs', () => {
+  const root = new ScrollRoot(), send = vi.fn(), inputChanged = vi.fn();
+  sync = new ReaderScrollSync(root as unknown as HTMLElement, () => true, send, inputChanged,
+    () => ({ restoreReadingPosition: vi.fn(), getReadingPosition: () => ({ source: 900, offset: 18 }) }));
+  sync.sourceInput(5); root.dispatchEvent(new Event('wheel')); root.scrollTo({ top: 450 });
+  sync.sourceInput(4, 1); sync.sourceInput(5, 0); vi.advanceTimersByTime(16);
+  expect(send).toHaveBeenCalledExactlyOnceWith(900, 1, 5);
+  send.mockClear(); root.scrollTo({ top: 500 }); sync.sourceInput(6); vi.advanceTimersByTime(16);
+  expect(send).not.toHaveBeenCalled();
+  root.dispatchEvent(new Event('wheel')); root.scrollTo({ top: 550 }); vi.advanceTimersByTime(16);
+  expect(send).toHaveBeenCalledExactlyOnceWith(900, 2, 6);
+  expect(inputChanged.mock.calls).toEqual([[true, 1, 5], [true, 2, 6]]);
+});
+
+it('still gives a new reader gesture priority over a source restore preserved across generations', () => {
+  const root = new ScrollRoot(), restoreReadingPosition = vi.fn(), send = vi.fn();
+  sync = new ReaderScrollSync(root as unknown as HTMLElement, () => true, send, undefined,
+    () => ({ restoreReadingPosition, getReadingPosition: () => ({ source: 900, offset: 18 }) }));
+  sync.sourceInput(1); sync.reveal(1000); sync.sourceInput(2);
+  root.dispatchEvent(new Event('wheel')); vi.advanceTimersByTime(16);
+  expect(restoreReadingPosition).not.toHaveBeenCalled();
+  root.scrollTo({ top: 450 }); vi.advanceTimersByTime(16);
+  expect(send).toHaveBeenLastCalledWith(900, 1, 2);
+});

@@ -105,6 +105,9 @@ describe('reader scroll input ownership', () => {
     sync.dispose();
   });
   it('waits for loading before revealing unmounted source through the public reader bridge', () => {
+    // The bridge's explicit readiness notification must suffice without
+    // collecting mutations from every virtual mount and typography update.
+    vi.stubGlobal('MutationObserver', class { constructor() { throw new Error('Unexpected legacy DOM observer'); } });
     const root = new Root(), send = vi.fn(), restoreReadingPosition = vi.fn();
     let ready = false;
     const bridge = { getReadingPosition: () => ({ source: 4200, offset: -4 }), restoreReadingPosition };

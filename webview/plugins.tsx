@@ -3,6 +3,10 @@ import * as limr from '@linloir/limr';
 import type { PluginEntry } from '../src/plugin-manifest';
 import { instantiateWorkspacePlugin } from './plugin-factory';
 
+// A fresh empty array invalidates the reader's extension configuration on
+// every host render, resetting virtual layout and pending source navigation.
+const noPlugins: readonly limr.RendererExtension[] = Object.freeze([]);
+
 /** Factories share the reader's React and LiMR instances; plugins need no bundler. */
 export function useWorkspacePlugins(entries: readonly PluginEntry[], notify: (message: string, error?: boolean) => void) {
   const [loaded, setLoaded] = React.useState<{ key: string; extensions: limr.RendererExtension[] }>({ key: '', extensions: [] });
@@ -40,7 +44,7 @@ export function useWorkspacePlugins(entries: readonly PluginEntry[], notify: (me
     });
     return () => { cancelled = true; styles.forEach(link => link.remove()); };
   }, [key, notify]);
-  return loaded.key === key ? loaded.extensions : [];
+  return loaded.key === key ? loaded.extensions : noPlugins;
 }
 
 export class PluginBoundary extends React.Component<{
@@ -52,5 +56,5 @@ export class PluginBoundary extends React.Component<{
   static getDerivedStateFromError() { return { failed: true }; }
   componentDidCatch(error: Error) { this.props.notify(`LiMR plugin: ${error.message}`, true); }
   componentDidUpdate(previous: Readonly<typeof this.props>) { if (previous.plugins !== this.props.plugins && this.state.failed) this.setState({ failed: false }); }
-  render() { return this.props.children(this.state.failed ? [] : this.props.plugins); }
+  render() { return this.props.children(this.state.failed ? noPlugins : this.props.plugins); }
 }

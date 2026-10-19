@@ -173,7 +173,8 @@ if (process.env.LIMR_TEST_FONT_DIR) {
 delete environment.ELECTRON_RUN_AS_NODE;
 delete environment.VSCODE_IPC_HOOK_CLI;
 const child = spawn(executable, [
-  '--no-sandbox', '--disable-gpu', '--disable-workspace-trust', '--locale=en', '--skip-welcome', '--skip-release-notes',
+  '--no-sandbox', ...(process.env.LIMR_TEST_GPU === '1' ? [] : ['--disable-gpu']), '--disable-workspace-trust', '--locale=en', '--skip-welcome', '--skip-release-notes',
+  ...(process.env.LIMR_TEST_NATIVE_DEVICE_SCALE ? [`--force-device-scale-factor=${Number(process.env.LIMR_TEST_NATIVE_DEVICE_SCALE)}`] : []),
   '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
   `--remote-debugging-port=${port}`, `--user-data-dir=${userData}`, `--extensions-dir=${extensionDirectory}`,
   `--extensionDevelopmentPath=${developmentPath}`, `--extensionTestsPath=${path.join(root, 'tests', 'integration', 'index.cjs')}`, workspace,
@@ -210,7 +211,8 @@ try {
   // A remote WSL adapter tunnels a different Windows loopback port locally.
   endpoint.hostname = '127.0.0.1'; endpoint.port = String(port);
   browser = await chromium.connectOverCDP(endpoint.toString());
-  const ready = await until(async () => JSON.parse(await readFile(path.join(ipc, 'ready.json'), 'utf8')), 60_000);
+  const ready = await until(async () => JSON.parse(await readFile(path.join(ipc, 'ready.json'), 'utf8')),
+    Number(process.env.LIMR_TEST_HOST_READY_TIMEOUT ?? 60_000));
   assert.equal(ready.trusted, true);
   console.log(`Extension host ready: ${JSON.stringify(ready)}`);
   const page = await until(async () => browser.contexts().flatMap(context => context.pages()).find(page => page.url().includes('workbench')));
@@ -235,6 +237,11 @@ try {
     : largePluginSuite ? (await import('../tests/browser/large-plugins.mjs')).runLargePluginsAcceptance
     : process.env.LIMR_TEST_SUITE === 'images' || process.argv.includes('--images') ? (await import('../tests/browser/images.mjs')).runImageAcceptance
     : process.env.LIMR_TEST_SUITE === 'sidebar-mode' || process.argv.includes('--sidebar-mode') ? (await import('../tests/browser/sidebar-mode.mjs')).runSidebarModeAcceptance
+    : process.argv.includes('--scroll-layout-anchor') ? (await import('../tests/browser/scroll-layout-anchor.mjs')).runScrollLayoutAnchorAcceptance
+    : process.argv.includes('--scroll-idle') ? (await import('../tests/browser/scroll-idle.mjs')).runScrollIdleAcceptance
+    : process.argv.includes('--host-shortcuts') ? (await import('../tests/browser/host-shortcuts.mjs')).runHostShortcutsAcceptance
+    : process.argv.includes('--large-scroll') ? (await import('../tests/browser/large-scroll.mjs')).runLargeScrollAcceptance
+    : process.argv.includes('--scroll-reload') ? (await import('../tests/browser/scroll-reload.mjs')).runScrollReloadAcceptance
     : process.argv.includes('--scroll-refresh') ? (await import('../tests/browser/scroll-refresh.mjs')).runScrollRefreshAcceptance
     : process.env.LIMR_TEST_SUITE === 'scroll-sync' || process.argv.includes('--scroll-sync') ? (await import('../tests/browser/scroll-sync.mjs')).runScrollSyncAcceptance
     : process.env.LIMR_TEST_SUITE === 'scroll-jitter' || process.argv.includes('--scroll-jitter') ? (await import('../tests/browser/scroll-jitter.mjs')).runScrollJitterAcceptance

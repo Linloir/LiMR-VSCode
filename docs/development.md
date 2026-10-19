@@ -4,6 +4,14 @@ Node.js 22.12+ is recommended.
 
 The dependency is pinned to npm's `@linloir/limr@1.3.4`. Run `npm ci` with the lockfile; no neighboring repository or local tarball is required.
 
+The webview build applies a reviewed scroll compatibility patch to LiMR 1.3.4 via `scripts/limr-scroll.mjs`, alongside the short annotation ID adapter. It corrects estimated source seeks, invisible closing markup, and wheel takeover in reader gutters. Resized slots are measured in the existing ResizeObserver delivery so core's height correction runs before paint; deferring it to another animation frame exposed a changed paragraph height for one frame before restoring the visible text. This retains core's measured height index and scroll compensation, without adding a visual translation or another reading anchor. Source refinement uses the measured block index and permits up to 16 synchronous commit measurements per animation frame; further work waits for the next frame. Hidden viewports retain their measurements and latest navigation request until the scroll root has a size again. The host also keeps the empty plugin list stable, so unrelated host renders do not recreate the reader's extension configuration and lose that request. The adapter verifies the published module's SHA-256 and fails on version or source drift; `node_modules` remains unchanged. Remove it after reviewing an upstream release with equivalent fixes.
+
+Release builds contain no scroll diagnostic commands, message handlers or global recording hooks. The functional scroll and typography corrections remain enabled.
+
+Typography can also move a word between lines without changing its block height. The separate typography adapter uses the reader scroll container for advance layout, as described below; the removed DOM-mutation/translation compensation must not be restored.
+
+The host reserves Ctrl/Cmd+P and Ctrl/Cmd+Shift+P for VS Code. It prevents the embedded reader's print handler while preserving event propagation to the workbench, including custom keybindings. Otherwise LiMR 1.3.4 treats both shortcuts as print preparation and can create a second full-document render. Initial source delivery and worker loading both use the top progress bar.
+
 ```bash
 npm ci
 npm run typecheck
@@ -47,6 +55,20 @@ Run `npm run test:navigation` for skill-language toolbar and real link navigatio
 `npm run test:annotations` checks source annotation creation, highlight visibility, range deletion and Undo, bilingual question/answer anchors, and clicking collapsed sidebar previews.
 
 ## Loading and performance checks
+
+`node scripts/test-vscode.mjs --large-scroll` checks continuous scrolling in both panes, gutter takeover, source/DOM continuity and per-frame reading anchors in a large document. Set `LIMR_TEST_LARGE_DOCUMENT` to a local Markdown file to exercise a copy of it in the disposable workspace; the original is never edited. `LIMR_TEST_WIDTH` selects a narrower test window.
+
+`--scroll-layout-anchor` changes a real decoded image's height inside the reading block and in its preceding block, both during wheel input and at rest. It tracks the reading glyph, detects missing anchors and loading overlays, and retains negative-control evidence with `LIMR_TEST_OBSERVE_ONLY=1`. `--host-shortcuts` verifies real focused-webview keyboard events open the workbench pickers without a print-preparation popup or a duplicate full-document render; it also accepts `LIMR_TEST_LARGE_DOCUMENT`.
+
+With the same document environment variable, `--scroll-reload` checks source navigation while the viewport is hidden or has zero height, followed by two webview reloads with immediate source-wheel input. It uses Knuth–Plass typography and an unwrapped editor, checks that pending navigation converges without replacing the reader, and fails on React update-depth errors. `LIMR_TEST_READER_SETTINGS` and `LIMR_TEST_EDITOR_SETTINGS` accept JSON overrides for the continuous-scroll suite; `LIMR_TEST_HEIGHT` controls the window height.
+
+`--scroll-idle` uses isolated wheel gestures followed by idle observation, including the CMOS translator's preface, wrapped source lines, and returning from the middle of the book. `LIMR_TEST_IDLE_PASSIVE=1` avoids observers, animation-frame probes and geometry reads during the idle interval. `LIMR_TEST_GPU=1` keeps GPU acceleration enabled. `LIMR_TEST_NATIVE_DEVICE_SCALE=2` starts the disposable Electron process at DPR 2; page-only CDP emulation does not necessarily reach the webview iframe. Passing these isolated scenarios does not establish that a reported restored-window incident is fixed.
+
+The previous host-added glyph translation/MutationObserver compensation has been removed after reported autonomous scrolling. Core height measurement remains responsible for scrolling. The synthetic `--scroll-layout-anchor` stress probe is retained for upstream media/typography reflow investigation; its earlier passing reports describe the superseded compensation build, not a guarantee for this rollback.
+
+For LiMR 1.3.4, the guarded typography adapter observes the configured reader scroll container with the existing 600 px margin. A page-level observer's margin cannot extend an inner overflow clip, which previously delayed Knuth–Plass preparation until a paragraph became visible. The adapter preserves core's batched reads/writes and 6 ms asynchronous budget. Notifications from obsolete observers are ignored, scroll-root changes move jobs to the appropriate observer, and unused observers are released. The adapter does not write scroll positions.
+
+Failed figures keep the pending media height instead of growing from the 120 px placeholder to a 156 px error box. The host override only affects the figure fallback; long hints can scroll inside it, and ordinary inline/successful images keep their sizing.
 
 `node scripts/test-vscode.mjs --loading` exercises progressive/blocking loading, native status actions, toolbar icons, and stale revision handling. `--limits` checks the exact 75 MiB boundary and waits for the real 60-second host timeout, then verifies worker teardown and retry. `--large-plugins` checks pure view plugins, explicit rejection of large incompatible grammars, and small-document compatibility.
 

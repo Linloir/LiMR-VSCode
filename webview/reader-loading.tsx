@@ -49,6 +49,11 @@ export function ReaderLoadingIndicator({ progress, locale, retry }: { progress?:
     <span>{label}{progress.error ? `: ${progress.error}` : ''}</span>
     <button type="button" onClick={retry}>{locale === 'zh-CN' ? '重试' : 'Retry'}</button>
   </div>;
+  return <ReaderProgressBar label={label} percent={progress.percent} />;
+}
+
+/** Initial host delivery and worker parsing share the same non-blocking UI. */
+export function ReaderProgressBar({ label, percent }: { label: string; percent?: number }) {
   return <div className="lv-load-progress" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100}
-    aria-valuenow={progress.percent} style={{ '--lv-load-fraction': `${Math.max(5, progress.percent)}%` } as CSSProperties}><span /></div>;
+    aria-valuenow={percent} style={{ '--lv-load-fraction': `${Math.max(5, percent ?? 25)}%` } as CSSProperties}><span /></div>;
 }

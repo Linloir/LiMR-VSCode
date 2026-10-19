@@ -9,6 +9,8 @@ import { languageTypography } from './typography';
 import { useTranslationParameters } from './translations';
 import { readerCodeHighlight } from './reader-extensions';
 import { HostedReader, ReaderIntegration, type ReaderCommands } from './reader-integration';
+import { ReaderProgressBar } from './reader-loading';
+import { preserveWorkbenchShortcuts } from './workbench-shortcuts';
 import { PluginBoundary, useWorkspacePlugins } from './plugins';
 import { ReaderScrollSync } from './scroll-sync';
 import { ReaderImages } from './images';
@@ -258,12 +260,14 @@ export function App() {
       post({ type: 'navigateHistory', direction: event.key === 'ArrowLeft' ? 'back' : 'forward', position: readerCommands.current?.getReadingPosition() ?? undefined });
     };
     for (const name of ['mousedown', 'mouseup', 'auxclick'] as const) document.addEventListener(name, historyMouse, true);
+    document.addEventListener('keydown', preserveWorkbenchShortcuts, true);
     document.addEventListener('keydown', historyKey, true);
     document.addEventListener('click', click);
     document.addEventListener('auxclick', click);
     return () => {
       document.removeEventListener('click', click); document.removeEventListener('auxclick', click);
       for (const name of ['mousedown', 'mouseup', 'auxclick'] as const) document.removeEventListener(name, historyMouse, true);
+      document.removeEventListener('keydown', preserveWorkbenchShortcuts, true);
       document.removeEventListener('keydown', historyKey, true);
     };
   }, []);
@@ -297,7 +301,7 @@ export function App() {
     return () => observer.disconnect();
   }, [scrollRoot]);
 
-  if (!state) return <div className="lv-loading" role="status"><p>Opening Markdown…</p></div>;
+  if (!state) return <ReaderProgressBar label="Opening Markdown…" />;
   const centeredToc = readerWidth >= state.settings.maxWidth + 2 * (200 + 24);
   const sideTocAvailable = sidebarEnabled && readerWidth >= 1120 || centeredToc;
   const tocVisible = state.settings.tocMode === 'always' || state.settings.tocMode === 'wide' && sideTocAvailable;

@@ -149,7 +149,8 @@ export async function runCoreCompatibilityAcceptance({ page, frame, host, artifa
         await expect(card).toHaveAttribute('data-active', 'true');
         await expect.poll(() => reference.evaluate(element => {
           const range = document.createRange(); range.selectNodeContents(element);
-          return Math.abs(range.getBoundingClientRect().top - document.querySelector('.limr-sidebar-card[data-active="true"]').getBoundingClientRect().top);
+          const active = document.querySelector('.limr-sidebar-card[data-active="true"]');
+          return active ? Math.abs(range.getBoundingClientRect().top - active.getBoundingClientRect().top) : Infinity;
         })).toBeLessThan(1);
         const after = await positions();
         await writeFile(path.join(artifacts, `sidebar-hover-${windowed}-${collapse}-${index}-${n}.json`), JSON.stringify({ before, after }, null, 2));
@@ -168,7 +169,8 @@ export async function runCoreCompatibilityAcceptance({ page, frame, host, artifa
         await page.mouse.wheel(0, step); await expect(current).toHaveAttribute('data-active', 'true');
         await expect.poll(() => reference.evaluate(element => {
           const range = document.createRange(); range.selectNodeContents(element);
-          return Math.abs(range.getBoundingClientRect().top - document.querySelector('.limr-sidebar-card[data-active="true"]').getBoundingClientRect().top);
+          const active = document.querySelector('.limr-sidebar-card[data-active="true"]');
+          return active ? Math.abs(range.getBoundingClientRect().top - active.getBoundingClientRect().top) : Infinity;
         })).toBeLessThan(1);
         const after = await positions();
         expect(Math.max(...after.filter(card => stack.some(old => old.id === card.id)).map(card => Math.abs(card.viewportTop + distance - stack.find(old => old.id === card.id).viewportTop)))).toBeLessThan(1.5);

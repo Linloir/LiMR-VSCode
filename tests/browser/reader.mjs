@@ -117,7 +117,13 @@ export async function runReaderAcceptance({ page, frame, host, source, artifacts
   expect(copied).toContain('reader.md');
   expect(copied).toContain(fixture);
   expect(copied).toContain('selected words');
-  expect(copied).toMatch(/3[:：]|line|行/i);
+  const context = JSON.parse(copied.match(/```json\n([\s\S]*?)\n```/)?.[1] ?? 'null');
+  expect(context).toMatchObject({ format: 'limr-context-v3', file: fixture, version: initial.version,
+    allowSourceEdits: false, selectedText: 'selected words' });
+  const selectedStart = source.indexOf('**selected words**');
+  expect(context.selections).toHaveLength(1);
+  expect(context.selections[0]).toMatchObject({ start: selectedStart, end: selectedStart + '**selected words**'.length,
+    raw: '**selected words**' });
   expect((await host('snapshot')).source).toBe(source);
   evidence.push({ check: 'Read-only mode disables Markdown mutation while AI context copying writes real HTML file mentions and a plain text fallback', clipboard: copied, clipboardHTML: richClipboard });
   await page.keyboard.press('Escape');

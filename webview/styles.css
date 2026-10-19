@@ -111,6 +111,12 @@ body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button:focus
 .lv-load-error button:focus-visible { outline: 1px solid var(--vscode-focusBorder, var(--lv-link)); }
 .lv-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 18px clamp(28px, 3vw, 40px) 50px; scrollbar-color: color-mix(in srgb, var(--lv-secondary) 40%, transparent) transparent; scrollbar-width: thin; }
 .lv-reader { --limr-content-width: var(--lv-content-width, 860px); --limr-reader-width: none; --limr-column-gap: 24px; --limr-sidebar-width: minmax(300px, 1fr); --limr-toc-width: clamp(200px, 16%, 260px); --limr-sticky-top: 0px; --limr-reader-bottom-space: 50px; }
+/* Native scrolling can reach the compositor before core updates its document-
+   positioned fade mask. That stale viewport-sized mask briefly hides whole
+   paragraphs despite unchanged glyph coordinates. The host already clips the
+   article at .lv-scroll; keep its body unmasked. Independent TOC/sidebar fades
+   retain their own styling. */
+.lv-reader > .limr-reader-content { mask-image: none; }
 /* The body keeps its reading measure. Extra editor width belongs to the notes
    instead of centered outer gutters; both outside edges use the same padding. */
 .lv-reader[data-sidebar] { grid-template-columns: minmax(0, var(--limr-content-width)) var(--limr-sidebar-width); }
@@ -162,6 +168,13 @@ body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button:focus
    animation. Keep the viewport invariant; wheel, touch and drag still pan. */
 .limr-image-preview-stage { scrollbar-width: none; }
 .limr-image-preview-stage::-webkit-scrollbar { width: 0; height: 0; }
+/* A failed figure keeps the same reserved media height as its pending image.
+   Core's 156px fallback would otherwise enlarge the default 120px placeholder
+   and move an already visible caption. Long hints remain readable by scrolling. */
+.limr-figure-media .limr-image-fallback {
+  height: var(--limr-figure-min-height); min-height: var(--limr-figure-min-height);
+  padding-block: 12px; overflow: auto; justify-content: safe center;
+}
 /* Unlayered host resets otherwise win over the new native toolbar skin. */
 .limr-image-preview-toolbar > button { color: var(--limr-secondary); background: transparent; }
 .limr-image-preview-toolbar > button:enabled:hover { color: var(--limr-text); background: color-mix(in srgb, var(--limr-text) 9%, transparent); }
