@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { TabReferences } from './tab-references';
 
 export const readerViewType = 'limr.reader';
 export type MarkdownOpenMode = 'none' | 'reader' | 'sideBySide';
@@ -41,7 +42,9 @@ export class ReaderNavigation implements vscode.Disposable {
   private readonly readerTabs = new WeakMap<vscode.Tab, string>();
   private readonly explicitSources = new WeakMap<vscode.Tab, string>();
   private readonly pairs = new Set<ReaderPair>();
+  private readonly references = new TabReferences(vscode.window.tabGroups.all);
   private lastSource?: { tab: vscode.Tab; uri: string };
+  private openModeRevision = 0;
   private readonly subscriptions: vscode.Disposable[] = [];
   private suppressed = 0;
   private queue = Promise.resolve();
@@ -58,7 +61,7 @@ export class ReaderNavigation implements vscode.Disposable {
       if (event.affectsConfiguration('limr.markdownOpenMode')) {
         // A Quick Pick can change the setting without changing the active tab.
         // Reconsider that source, while retaining explicit Open Source choices.
-        this.lastSource = undefined;
+        this.openModeRevision++; this.lastSource = undefined;
         schedule();
       }
     }), vscode.window.onDidChangeActiveTextEditor(schedule),
@@ -86,6 +89,20 @@ export class ReaderNavigation implements vscode.Disposable {
           this.histories.delete(group);
           for (const pair of this.pairs) if (pair.source === group || pair.reader === group) this.pairs.delete(pair);
         }
+        for (const { before, after, tabs } of this.references.update(vscode.window.tabGroups.all, event)) {
+          const history = this.histories.get(before);
+          if (history) { this.histories.delete(before); this.histories.set(after, history); }
+          for (const pair of this.pairs) {
+            if (pair.source === before) pair.source = after;
+            if (pair.reader === before) pair.reader = after;
+          }
+          for (const [old, current] of tabs) {
+            const source = this.explicitSources.get(old), reader = this.readerTabs.get(old);
+            if (source) this.explicitSources.set(current, source);
+            if (reader) this.readerTabs.set(current, reader);
+            if (this.lastSource?.tab === old) this.lastSource.tab = current;
+          }
+        }
         schedule();
       }));
     schedule();
@@ -98,13 +115,16 @@ export class ReaderNavigation implements vscode.Disposable {
     return next;
   }
   async explicit<T>(task: () => Promise<T>, rememberSource = true): Promise<T> {
+    const revision = this.openModeRevision;
     this.suppressed++;
     try { return await task(); }
     finally {
       const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
       const uri = uriOf(tab);
-      this.lastSource = tab && uri ? { tab, uri: uri.toString() } : undefined;
-      if (rememberSource && this.lastSource && tab?.input instanceof vscode.TabInputText) this.explicitSources.set(tab, this.lastSource.uri);
+      const location = tab && uri ? { tab, uri: uri.toString() } : undefined;
+      // A newer opening mode must still run after this awaited editor operation.
+      this.lastSource = revision === this.openModeRevision ? location : undefined;
+      if (rememberSource && location && tab?.input instanceof vscode.TabInputText) this.explicitSources.set(tab, location.uri);
       this.suppressed--;
     }
   }
@@ -112,21 +132,25 @@ export class ReaderNavigation implements vscode.Disposable {
     return vscode.window.tabGroups.all.find(group => group.viewColumn === column) ?? vscode.window.tabGroups.activeTabGroup;
   }
   private otherGroup(uri: vscode.Uri, current: vscode.TabGroup, reader = false) {
+    current = this.references.group(current);
     const others = vscode.window.tabGroups.all.filter(group => group !== current);
     return others.find(group => group.tabs.some(tab => sameUri(uriOf(tab), uri) && isReader(tab) === reader))
       ?? others.sort((a, b) => Math.abs(a.viewColumn - current.viewColumn) - Math.abs(b.viewColumn - current.viewColumn))[0];
   }
   private companion(uri: vscode.Uri, current: vscode.TabGroup) {
+    current = this.references.group(current);
     return vscode.window.tabGroups.all.find(group => group !== current && group.activeTab?.input instanceof vscode.TabInputText
       && sameUri(group.activeTab.input.uri, uri));
   }
   private rememberPair(source: vscode.TabGroup, reader: vscode.TabGroup) {
+    source = this.references.group(source); reader = this.references.group(reader);
     if (source === reader) return;
     for (const pair of this.pairs) if (pair.source === source || pair.reader === source || pair.source === reader || pair.reader === reader) this.pairs.delete(pair);
     this.pairs.add({ source, reader });
     for (const tab of source.tabs) if (tab.input instanceof vscode.TabInputText && sameUri(tab.input.uri, uriOf(reader.activeTab))) this.explicitSources.delete(tab);
   }
   private async showPair(document: vscode.TextDocument, current: vscode.TabGroup, transient?: vscode.Tab, preserveFocus = true) {
+    current = this.references.group(current);
     const uri = document.uri, groups = vscode.window.tabGroups.all;
     const remembered = [...this.pairs].find(pair => (pair.source === current || pair.reader === current) && groups.includes(pair.source) && groups.includes(pair.reader));
     const existingReader = groups.find(group => group.tabs.some(tab => isReader(tab) && sameUri(uriOf(tab), uri)));
@@ -139,21 +163,25 @@ export class ReaderNavigation implements vscode.Disposable {
       ?? (current !== reader ? current : this.otherGroup(uri, current));
     const editor = await vscode.window.showTextDocument(document, { viewColumn: source?.viewColumn ?? vscode.ViewColumn.Beside, preview: false });
     const sourceGroup = this.group(editor.viewColumn);
-    const target = reader && reader !== sourceGroup ? reader : this.otherGroup(uri, sourceGroup, true);
+    const latestReader = reader && this.references.group(reader);
+    const target = latestReader && latestReader !== sourceGroup ? latestReader : this.otherGroup(uri, sourceGroup, true);
     const readerGroup = await this.showReader({ uri: uri.toString() }, target?.viewColumn ?? vscode.ViewColumn.Beside, undefined, preserveFocus);
     this.rememberPair(sourceGroup, readerGroup);
     // The pinned source now owns the same buffer in its original column. Only
     // remove a redundant, clean tab created on the reader side by this open.
-    if (transient && current !== sourceGroup && current.tabs.includes(transient) && !transient.isDirty)
-      await vscode.window.tabGroups.close(transient, true);
+    const latestTransient = transient && this.references.tab(transient);
+    if (latestTransient && this.references.group(current) !== this.references.group(sourceGroup) && this.references.group(current).tabs.includes(latestTransient) && !latestTransient.isDirty)
+      await vscode.window.tabGroups.close(latestTransient, true);
   }
   private captureEditor(group?: vscode.TabGroup): EditorLocation | undefined {
+    if (group) group = this.references.group(group);
     const tab = group?.activeTab, uri = uriOf(tab);
     if (!uri || !tab) return;
     const editor = vscode.window.visibleTextEditors.find(editor => editor.viewColumn === group!.viewColumn && sameUri(editor.document.uri, uri));
     return { uri, viewType: tab.input instanceof vscode.TabInputCustom ? tab.input.viewType : 'default', selection: editor?.selection };
   }
   private async showEditor(location: EditorLocation, group: vscode.TabGroup | undefined, preserveFocus = false) {
+    if (group) group = this.references.group(group);
     await vscode.commands.executeCommand('vscode.openWith', location.uri, location.viewType,
       { viewColumn: group?.viewColumn ?? vscode.ViewColumn.Beside, preview: false, preserveFocus, selection: location.selection });
     return this.group(vscode.window.visibleTextEditors.find(editor => sameUri(editor.document.uri, location.uri)
@@ -167,8 +195,9 @@ export class ReaderNavigation implements vscode.Disposable {
     if (!markdown(document)) throw new Error('LiMR supports Markdown files.');
     await vscode.commands.executeCommand('vscode.openWith', uri, readerViewType, { viewColumn: column, preview: false, preserveFocus });
     const group = column === vscode.ViewColumn.Beside
-      ? vscode.window.tabGroups.all.find(group => group !== origin && group.activeTab && isReader(group.activeTab) && sameUri(uriOf(group.activeTab), uri)) ?? this.group()
+      ? vscode.window.tabGroups.all.find(group => group !== this.references.group(origin) && group.activeTab && isReader(group.activeTab) && sameUri(uriOf(group.activeTab), uri)) ?? this.group()
       : this.group(column);
+    if (previous) previous = this.references.tab(previous);
     this.reveal(location, group.viewColumn);
     const close = navigationSettings(uri).single
       ? vscode.window.tabGroups.all.flatMap(group => group.tabs).filter(tab => isReader(tab) && tab !== group.activeTab)
@@ -234,7 +263,8 @@ export class ReaderNavigation implements vscode.Disposable {
         await this.showReader({ uri: key }, group.viewColumn);
         // A source view is only replaced when its buffer is safe to retain via
         // the custom text editor. Dirty tabs remain available for explicit save.
-        if (!tab.isDirty && group.tabs.includes(tab)) await vscode.window.tabGroups.close(tab, true);
+        const current = this.references.tab(tab);
+        if (!current.isDirty && this.references.group(group).tabs.includes(current)) await vscode.window.tabGroups.close(current, true);
       } else {
         await this.showPair(editor.document, group, tab);
       }
@@ -242,7 +272,8 @@ export class ReaderNavigation implements vscode.Disposable {
   }
   follow(from: ReaderLocation, to: ReaderLocation, column?: vscode.ViewColumn) {
     return this.serial(() => this.explicit(async () => {
-      const current = this.group(column), uri = vscode.Uri.parse(to.uri), settings = navigationSettings(vscode.Uri.parse(from.uri));
+      let current = this.group(column);
+      const uri = vscode.Uri.parse(to.uri), settings = navigationSettings(vscode.Uri.parse(from.uri));
       const paired = this.companion(vscode.Uri.parse(from.uri), current);
       const mode = settings.link === 'smart' ? paired ? 'editorAndReader' : 'currentReader'
         : settings.link === 'besideReader' && settings.single ? 'currentReader' : settings.link;
@@ -258,8 +289,10 @@ export class ReaderNavigation implements vscode.Disposable {
         const group = await this.showEditor(after, companion);
         step.companion = { group, before, after };
       }
+      current = this.references.group(current);
       const previous = current.activeTab;
       await this.showReader(to, current.viewColumn, previous);
+      current = this.references.group(current);
       if (step.companion) this.rememberPair(step.companion.group, current);
       const history = this.histories.get(current) ?? { back: [], forward: [] };
       history.back.push(step); if (history.back.length > 100) history.back.shift(); history.forward = [];
@@ -278,7 +311,7 @@ export class ReaderNavigation implements vscode.Disposable {
       await this.showReader(target, group.viewColumn, previous);
       const companion = step.companion;
       const editorTarget = direction === 'back' ? companion?.before : companion?.after;
-      if (companion && editorTarget && vscode.window.tabGroups.all.includes(companion.group)) {
+      if (companion && editorTarget && vscode.window.tabGroups.all.includes(this.references.group(companion.group))) {
         // A closed/missing companion file must not break the reader's history.
         try { await this.showEditor(editorTarget, companion.group, true); } catch (error) { this.report(error); }
       }

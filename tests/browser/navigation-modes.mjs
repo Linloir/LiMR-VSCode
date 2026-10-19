@@ -62,6 +62,13 @@ export async function runNavigationModesAcceptance({ page, host, artifacts }) {
   await sideKey('Page C'); await current(1, 'b.md'); await current(2, 'b.md', 'limr.reader');
   await record('Smart paired navigation, heading fragments, multi-step history and mouse back/forward restore both columns');
 
+  await host('openRelativeReader', { relative: 'b.md', viewColumn: 2 });
+  await host('command', { command: 'workbench.action.moveActiveEditorGroupLeft', args: [] });
+  await current(1, 'b.md', 'limr.reader'); await current(2, 'b.md');
+  await sideKey('Page B'); await current(1, 'a.md', 'limr.reader'); await current(2, 'a.md');
+  await sideKey('Page A', 'forward'); await current(1, 'b.md', 'limr.reader'); await current(2, 'b.md');
+  await record('Moving editor groups preserves reader history and the identity of its source companion');
+
   for (const mode of ['smart', 'currentReader']) {
     frame = await reset(mode, false, true); await frame.getByRole('link', { name: 'Go B' }).click();
     await current(1, 'c.md'); await current(2, 'b.md', 'limr.reader');

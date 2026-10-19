@@ -93,3 +93,5 @@ The [1.0.2 measured results](performance-1.0.2.md) describe the tested hardware,
 `--preview-default` verifies the default LiMR preview button, Alt-click access to the built-in preview, and live separate/merged setting changes. On Cursor it also records the independent native breadcrumb Preview editor and verifies the return path to LiMR.
 
 `--toc-colors` checks neutral and active TOC colors, hover, keyboard focus, heading navigation, and prose link colors in wide/narrow readers across four palettes. The Cursor runner supplies measured pixel sizes for editor layout changes because its existing-group layout path treats fractional sizes as pixels.
+
+Navigation tracks replacement tab/group wrappers as well as stable VS Code objects. Cursor can replace all wrappers on a full tab-model update. `tests/tab-references.test.ts` covers replacement, reordering, and close/recreate boundaries; `--navigation-modes` validates real linked navigation, history, moving groups, default splits, and explicit source access on both hosts.

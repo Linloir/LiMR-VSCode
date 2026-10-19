@@ -50,6 +50,14 @@ export async function runOpenModesAcceptance({ page, host, artifacts }) {
     if (mode === 'sideBySide') await current(2, 'change.md', 'limr.reader');
     await record(`Changing the setting immediately applies ${mode} to the current source`);
   }
+  await reset(); await host('openRelativeSource', { relative: 'change.md', viewColumn: 1 });
+  await host('configure', { values: { markdownOpenMode: 'reader' } });
+  await host('configure', { values: { markdownOpenMode: 'sideBySide' } });
+  await expect.poll(async () => {
+    const tabs = (await host('snapshot')).groups.flatMap(group => group.tabs);
+    return tabs.some(tab => tab.label === 'change.md' && !tab.custom) && tabs.some(tab => tab.label === 'change.md' && tab.custom === 'limr.reader');
+  }).toBe(true);
+  await record('A newer split setting takes effect even while the previous reader-open operation is finishing');
   await reset(); await host('openRelativeReader', { relative: 'change.md', viewColumn: 1 });
   await host('command', { command: 'workbench.action.closeAllEditors', args: [] });
   await host('configure', { values: { markdownOpenMode: 'sideBySide' } });
