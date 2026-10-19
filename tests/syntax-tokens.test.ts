@@ -7,6 +7,14 @@ const named = (body: string, definition = ':::limr-annotation{#note ranges="r1" 
 const pair = '::%%limr%%{<#r1}selected::%%limr%%{>#r1}';
 
 describe('native Markdown LiMR source colors', () => {
+  it('preserves colon prose and exact annotation tokens next to multilingual strong text', () => {
+    const source = named('\uFEFF前**http:www\\.baidu.com**后 **12:30** :unknown[literal]\r\n\r\n::%%limr%%{<#r1}**“中文！”**::%%limr%%{>#r1}');
+    const spans = tokens(source);
+    expect(spans.filter(item => item.kind === 'annotation').map(item => item.text)).toEqual(['::%%limr%%{<#r1}', '::%%limr%%{>#r1}']);
+    expect(spans.filter(item => item.kind === 'tag').map(item => item.text)).toEqual(['limr-annotation']);
+    expect(spans.every(item => item.start >= source.indexOf('::%%limr%%{<#r1}'))).toBe(true);
+  });
+
   it('colors every exact attribute and quoted value in translation, figure and list reference headers', () => {
     const source = readFileSync(new URL('./syntax-attributes.md', import.meta.url), 'utf8').replaceAll('\n', '\r\n');
     const spans = tokens(source);

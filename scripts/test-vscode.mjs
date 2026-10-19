@@ -233,6 +233,7 @@ try {
     : process.argv.includes('--toc-colors') ? (await import('../tests/browser/toc-colors.mjs')).runTocColorsAcceptance
     : process.argv.includes('--annotation-selection') ? (await import('../tests/browser/annotation-selection.mjs')).runAnnotationSelectionAcceptance
     : process.argv.includes('--core-compatibility') ? (await import('../tests/browser/core-compatibility.mjs')).runCoreCompatibilityAcceptance
+    : process.argv.includes('--strong-syntax') ? (await import('../tests/browser/strong-syntax.mjs')).runStrongSyntaxAcceptance
     : process.env.LIMR_TEST_SUITE === 'annotations' || process.argv.includes('--annotations') ? (await import('../tests/browser/annotations.mjs')).runAnnotationAcceptance
     : process.argv.includes('--navigation-modes') ? (await import('../tests/browser/navigation-modes.mjs')).runNavigationModesAcceptance
     : navigationSuite ? (await import('../tests/browser/navigation.mjs')).runNavigationAcceptance

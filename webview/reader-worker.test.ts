@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createDocument, createDocumentSession, hasDocumentSyntax, standard, workerExtensionDescriptor, type DocumentSnapshot, type DocumentWorkerResponse, type RendererExtension, type VirtualizedTextContext } from '@linloir/limr';
+import { createDocument, createDocumentSession, hasDocumentSyntax, rangeOf, standard, textContent, walk, workerExtensionDescriptor, type DocumentSnapshot, type DocumentWorkerResponse, type MarkdownNode, type RendererExtension, type VirtualizedTextContext } from '@linloir/limr';
 import { createDocumentWorkerHandler } from '@linloir/limr/worker-api';
 import { readerWorkerOptions, readerWorkerRegistry } from '../src/shared/reader-worker-registry';
 import { frontmatterNodeType, readerSyntaxIds } from '../src/shared/reader-syntax';
@@ -13,17 +13,17 @@ const hostExtensions = () => [
   readerCodeHighlight({ darkTheme: 'one-dark-pro', lightTheme: 'light-plus' }),
   readerFrontmatter(), readingAnnotations('en'), languageTypography(),
 ];
-async function workerSnapshot(source: string, extensions: RendererExtension[]) {
+async function workerSnapshot(source: string, extensions: RendererExtension[], mode: 'blocking' | 'progressive' = 'blocking') {
   const messages: DocumentWorkerResponse[] = [];
   const descriptors = extensions.filter(hasDocumentSyntax).map(extension => {
     const descriptor = workerExtensionDescriptor(extension);
     expect(descriptor, extension.name).toBeDefined();
     return descriptor!;
   });
-  await createDocumentWorkerHandler(readerWorkerRegistry, readerWorkerOptions)({ type: 'load', revision: 1, id: 'host-parity', input: source, mode: 'blocking', extensions: descriptors },
+  await createDocumentWorkerHandler(readerWorkerRegistry, readerWorkerOptions)({ type: 'load', revision: 1, id: 'host-parity', input: source, mode, extensions: descriptors },
     response => messages.push(structuredClone(response)));
   expect(messages.filter(message => message.type === 'error')).toEqual([]);
-  const response = messages.find(message => message.type === 'snapshot');
+  const response = messages.find(message => message.type === 'snapshot' && message.complete);
   if (response?.type !== 'snapshot') throw new Error('Worker did not publish a snapshot.');
   expect(response.complete).toBe(true);
   return response.snapshot;
@@ -35,6 +35,25 @@ const semantic = (snapshot: DocumentSnapshot) => ({
 });
 
 describe('host parser worker contracts', () => {
+  it.each(['blocking', 'progressive'] as const)('retains strong text and decoded link coordinates through host frontmatter and annotations in %s loading', async mode => {
+    const source = '\uFEFF---\r\nname: Host strong mapping\r\n---\r\n\r\n# 正文\r\n\r\n𠀀前::%%limr%%{<#r1}**“中&amp;文\\!”**和**http:www\\.baidu.com**::%%limr%%{>#r1}后\r\n\r\n:::limr-annotation{#n1 ranges="r1" type="question"}\r\n前**“批注！”**后\r\n:::\r\n';
+    const extensions = hostExtensions();
+    const host = createDocument(source, { id: 'host-parity', extensions }).getSnapshot();
+    const result = await workerSnapshot(source, extensions, mode);
+    expect(semantic(result)).toEqual(semantic(host));
+    const nodes: MarkdownNode[] = [];
+    result.blocks.forEach(block => walk(block.node, node => { nodes.push(node); }));
+    expect(nodes.filter(node => node.type === 'strong').map(textContent)).toEqual(['“中&文!”', 'http:www.baidu.com']);
+    const link = nodes.find(node => node.type === 'link')!;
+    expect(link.url).toBe('http://www.baidu.com');
+    const range = rangeOf(link);
+    expect(source.slice(range.start, range.end)).toBe('www\\.baidu.com');
+    expect(result.annotationRanges.size).toBe(1);
+    expect(result.annotations.find(annotation => annotation.id === 'n1')).toMatchObject({
+      type: 'question', data: { body: '前**“批注！”**后' }, source: { rangeIds: ['r1'] },
+    });
+  });
+
   it.each([
     '\uFEFF---\r\nname: 元信息😀\r\ndescription: >\r\n  First line\r\n  第二行\r\ntags: [reader, AI]\r\n---\r\n\r\n# Body\r\n\r\nLatin &amp; 中文😀 τέλος.\r\n',
     'Before ::%%limr%%{<#r1}selected &amp; 中文😀::%%limr%%{>#r1} after.\n\n:::limr-annotation{#n1 ranges="r1" type="highlight"}\nA note\n:::\n',
