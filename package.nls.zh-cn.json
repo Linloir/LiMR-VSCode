@@ -68,6 +68,7 @@
   "limr.language.option.zh-CN": "简体中文",
   "limr.language.option.en": "English",
   "limr.previewButtonMode.option.separate": "分别显示预览按钮",
+  "limr.cursor.pinTitleActions.description": "首次在 Cursor 激活时，将 LiMR 按钮加入 cursor.general.pinnedTitleActions，并保留已有条目。之后从该列表移除的按钮不会自动加回；可在首次激活前关闭此项，保留 Cursor 默认隐藏按钮的行为。",
   "limr.previewButtonMode.option.merged": "合并预览按钮，默认打开 LiMR",
   "limr.syntaxHighlighting.enabled.description": "在 Markdown 原文编辑器中补充 LiMR 语法高亮，默认开启；开关立即生效。仅着色已支持语法的标记、标签与属性，保留现有 Markdown／代码高亮。",
   "limr.syntax.punctuation.description": "Markdown 原文中的 LiMR 语法标点颜色。",

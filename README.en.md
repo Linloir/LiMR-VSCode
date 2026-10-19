@@ -23,6 +23,8 @@ LiMR is also a Markdown rendering library for React projects. This extension use
 2. Use the reader toolbar to choose a theme, typography, or translation display. Enable editing with the edit button to add annotations or change task checkboxes; use VS Code's usual save and undo actions.
 3. Click settings or run **LiMR: Reader Settings**. Search VS Code Settings for `@ext:linloir.limr-vscode`. Choose **User** for personal defaults or **Workspace** for project settings.
 
+Shortcuts: `Ctrl+Shift+V` opens LiMR in the current group; `Ctrl+Alt+V` opens it beside the source (use `Cmd` on macOS). VS Code also supports `Ctrl+K V`; Cursor uses `Ctrl+K` for AI editing. On first activation in Cursor, LiMR adds its buttons to `cursor.general.pinnedTitleActions`, preserving existing entries. Later removals from that list are respected. Disable `limr.cursor.pinTitleActions` before first activation to retain Cursor’s hidden buttons.
+
 Web links open in your browser. Markdown links default to smart navigation: a source/reader pair for the same document updates together; other layouts update only the current reader. Choose among five link modes; side targets reuse existing groups. Mouse back/forward or Alt+arrow keys restore reader history and the previous companion file. Same-document heading links scroll within the reader.
 
 Documents of at least 256 KiB of UTF-16 text coalesce edits for 250 ms, with a 1.2 s maximum wait during continuous typing. Smaller documents update immediately. Asynchronous refresh keeps the accepted content visible until a complete replacement is ready at the same reading position.

@@ -31,6 +31,8 @@ npm run package
 
 The real Electron/Playwright test uses isolated profiles, extension directories, and temporary fixtures. `VSCODE_TEST_VERSION` selects the runtime; `LIMR_TEST_THEME_DIR` supplies a local One Dark Pro theme. Linux/WSLg needs a working display server.
 
+`--entrypoints` verifies source/reader title buttons and the current-group/side-group preview shortcuts. For Windows Cursor + WSL, use `scripts/vscode-wsl-launcher.mjs` as `VSCODE_EXECUTABLE_PATH`, point `LIMR_TEST_WINDOWS_CODE` to `Cursor.exe`, `LIMR_TEST_WSL_EXTENSION` to the installed Cursor Remote WSL extension, and `LIMR_TEST_TEMP_ROOT` to a Windows-mounted temporary directory. The launcher skips first-run onboarding only in that disposable profile and cleans up only processes using that profile. The integration host probes optional layout commands instead of assuming Cursor has VS Code's auxiliary-sidebar command.
+
 `test:animations` samples animation playback in the same real editor, checking intermediate frames and final states for toolbars, overlays, highlights, sidebars, and reading controls. Evidence and screenshots are saved under `artifacts`.
 
 `test:regressions` checks mixed-format selections, toolbar widths, overlay switching, focus styles, bulk deletion and Undo, and wide/narrow reader layouts.

@@ -20,6 +20,7 @@ import type { HostMessage, ReaderState, WebviewMessage, ReaderFileSettings, Read
 import { isReaderLoadProgress, loadProgressLabel } from './shared/loading';
 import { LoadWatchdog, MAX_DOCUMENT_BYTES, loadErrorMessage } from './shared/load-limits';
 import { previewBuffer, readerStateMessage } from './reader-buffer';
+import { initializeCursorTitleActions } from './cursor';
 
 const viewType = 'limr.reader';
 const localized = (uri: vscode.Uri | undefined, zh: string, en: string) => readerLocale(vscode.workspace.getConfiguration('limr', uri).get('language', 'auto')) === 'zh-CN' ? zh : en;
@@ -46,6 +47,7 @@ function settingScope(uri: vscode.Uri | undefined, key: string) {
 }
 
 export function activate(context: vscode.ExtensionContext): LiMRExtensionApi {
+  void initializeCursorTitleActions(context).catch(error => console.warn('LiMR: could not pin Cursor title actions.', error));
   context.subscriptions.push(new SourceSyntaxHighlighting(context.asAbsolutePath('dist/syntax-worker.cjs')));
   const pluginRegistry = new PluginRegistry();
   context.subscriptions.push(pluginRegistry);

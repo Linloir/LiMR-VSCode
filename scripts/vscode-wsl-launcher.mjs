@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Optional adapter for the acceptance runner: real Windows VS Code UI with a
+// Optional adapter for the acceptance runner: real Windows VS Code/Cursor UI with a
 // WSL extension host. Only the runner's disposable profile is opened.
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -24,7 +24,7 @@ const port = Number(valueOf('remote-debugging-port'));
 const desktopPort = port === 19385 ? 19386 : 19385;
 const userData = valueOf('user-data-dir');
 const extensionDirectory = valueOf('extensions-dir');
-await cp(remoteExtension, path.join(extensionDirectory, 'ms-vscode-remote.remote-wsl'), { recursive: true });
+await cp(remoteExtension, path.join(extensionDirectory, path.basename(remoteExtension)), { recursive: true });
 const extensionEnvironment = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('LIMR_TEST_')));
 const args = input.flatMap(argument => {
   if (argument.startsWith('--remote-debugging-port=')) return [`--remote-debugging-port=${desktopPort}`];
@@ -33,6 +33,7 @@ const args = input.flatMap(argument => {
   if (!argument.startsWith('--')) return [`--folder-uri=${remotePath(argument)}`];
   return [argument];
 });
+if (path.basename(executable).toLowerCase() === 'cursor.exe') args.push('--skip-onboarding', '--suppress-popups-on-startup');
 args.push(`--remote=wsl+${distribution}`, `--extensionEnvironment=${JSON.stringify(extensionEnvironment)}`);
 const environment = { ...process.env };
 delete environment.ELECTRON_RUN_AS_NODE;
@@ -64,7 +65,8 @@ function close() {
   // WSL process signals do not always terminate Windows GUI descendants.
   // Match this unique disposable profile, never the user's current window.
   const match = windowsPath(userData).replaceAll("'", "''");
-  const cleanup = spawn('/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Get-CimInstance Win32_Process -Filter "Name = 'Code.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('${match}') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: 'ignore' });
+  const processName = path.basename(executable).replaceAll("'", "''");
+  const cleanup = spawn('/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Get-CimInstance Win32_Process -Filter "Name = '${processName}'" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('${match}') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: 'ignore' });
   cleanup.on('exit', () => process.exit(desktop.exitCode ?? 0));
   setTimeout(() => process.exit(desktop.exitCode ?? 0), 5000).unref();
 }

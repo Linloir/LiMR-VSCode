@@ -31,13 +31,14 @@ exports.run = async function run() {
     assert.ok(commands.includes(id), `${id} must be registered.`);
   }
   if (!sourceOnly) await vscode.commands.executeCommand('limr.openPreviewToSide', uri);
-  await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar');
-  await vscode.commands.executeCommand('workbench.action.closeSidebar');
+  for (const id of ['workbench.action.closeAuxiliaryBar', 'workbench.action.closeSidebar']) {
+    if (commands.includes(id)) await vscode.commands.executeCommand(id);
+  }
   if (!sourceOnly) {
     assert.ok(vscode.window.tabGroups.all.length >= 2, 'Source and reader are open in separate editor groups.');
     assert.ok(vscode.window.tabGroups.all.some(group => group.tabs.some(tab => tab.input instanceof vscode.TabInputCustom && tab.input.viewType === 'limr.reader')));
   }
-  await writeJson(path.join(directory, 'ready.json'), { version: vscode.version, platform: process.platform, remoteName: vscode.env.remoteName, trusted: vscode.workspace.isTrusted, groups: vscode.window.tabGroups.all.length, theme: vscode.workspace.getConfiguration('workbench').get('colorTheme'), themeInstalled: !!vscode.extensions.getExtension('zhuangtongfa.material-theme'), sourceOnly, language: document.languageId, automaticallyActivated: sourceOnly && extension.isActive });
+  await writeJson(path.join(directory, 'ready.json'), { appName: vscode.env.appName, version: vscode.version, platform: process.platform, remoteName: vscode.env.remoteName, trusted: vscode.workspace.isTrusted, groups: vscode.window.tabGroups.all.length, theme: vscode.workspace.getConfiguration('workbench').get('colorTheme'), themeInstalled: !!vscode.extensions.getExtension('zhuangtongfa.material-theme'), sourceOnly, language: document.languageId, automaticallyActivated: sourceOnly && extension.isActive });
 
   const snapshot = () => ({
     source: document.getText(), version: document.version, isDirty: document.isDirty,

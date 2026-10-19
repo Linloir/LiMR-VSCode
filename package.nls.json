@@ -68,6 +68,7 @@
   "limr.language.option.zh-CN": "简体中文",
   "limr.language.option.en": "English",
   "limr.previewButtonMode.option.separate": "Separate preview buttons",
+  "limr.cursor.pinTitleActions.description": "On first activation in Cursor, add LiMR buttons to cursor.general.pinnedTitleActions while preserving existing entries. Later removals from that list are respected. Disable before activation to keep Cursor's default hidden buttons.",
   "limr.previewButtonMode.option.merged": "One preview button, default to LiMR",
   "limr.syntaxHighlighting.enabled.description": "Add LiMR syntax colors in Markdown source editors (enabled by default). Changes apply immediately. Colors supported delimiters, tags and attributes while preserving existing Markdown and code highlighting.",
   "limr.syntax.punctuation.description": "Color of LiMR syntax punctuation in Markdown source editors.",

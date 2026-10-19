@@ -556,6 +556,12 @@
           ],
           "scope": "resource"
         },
+        "limr.cursor.pinTitleActions": {
+          "type": "boolean",
+          "default": true,
+          "description": "%limr.cursor.pinTitleActions.description%",
+          "scope": "window"
+        },
         "limr.skills.promptOnStartup": {
           "type": "boolean",
           "default": true,
@@ -762,6 +768,24 @@
       }
     ],
     "keybindings": [
+      {
+        "command": "limr.openPreview",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorTextFocus && !notebookEditorFocused && (editorLangId =~ /^(markdown|prompt|instructions|chatagent|skill)$/ || resourceExtname =~ /^\\.(md|markdown)$/i)"
+      },
+      {
+        "command": "limr.openPreviewToSide",
+        "key": "ctrl+k v",
+        "mac": "cmd+k v",
+        "when": "editorTextFocus && !notebookEditorFocused && (editorLangId =~ /^(markdown|prompt|instructions|chatagent|skill)$/ || resourceExtname =~ /^\\.(md|markdown)$/i)"
+      },
+      {
+        "command": "limr.openPreviewToSide",
+        "key": "ctrl+alt+v",
+        "mac": "cmd+alt+v",
+        "when": "editorTextFocus && !notebookEditorFocused && (editorLangId =~ /^(markdown|prompt|instructions|chatagent|skill)$/ || resourceExtname =~ /^\\.(md|markdown)$/i)"
+      },
       {
         "command": "limr.navigateBack",
         "key": "alt+left",

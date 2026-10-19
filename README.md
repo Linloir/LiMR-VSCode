@@ -23,6 +23,8 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 2. 用阅读器工具栏切换主题、排版与翻译显示。需要添加标注或修改任务复选框时，点击编辑按钮开启编辑；更改沿用 VS Code 的保存与撤销操作。
 3. 点击设置按钮，或执行 **LiMR: Reader Settings**。在 VS Code 设置中搜索 `@ext:linloir.limr-vscode`，选择“用户”可调整个人默认值，选择“工作区”仅对当前项目生效。
 
+快捷键：`Ctrl+Shift+V` 在当前栏打开 LiMR，`Ctrl+Alt+V` 在侧栏打开（macOS 使用 `Cmd`）。VS Code 还支持 `Ctrl+K V`；Cursor 的 `Ctrl+K` 用于 AI 编辑。Cursor 首次激活时会将 LiMR 按钮补入 `cursor.general.pinnedTitleActions`，保留已有条目；之后从该列表删除的按钮不会自动加回。可在首次激活前关闭 `limr.cursor.pinTitleActions`。
+
 网页链接交给浏览器打开。内部 Markdown 链接默认智能跳转：同文档的源码/阅读双栏一起更新，其余布局只更新当前阅读器。可切换五种跳转方式；需旁栏时优先复用已有分栏。鼠标侧键或 Alt+左右键支持阅读器历史，双栏模式同时恢复另一栏的原文件。同一文档内的标题链接在阅读器中滚动。
 
 达到 256 KiB（按 UTF-16 字符数计）的文档会合并连续输入：停顿 250 毫秒后刷新，持续输入时最长等待 1.2 秒。较小文档即时更新。异步刷新期间保留已显示的内容，完整结果就绪后在原阅读位置接替。
@@ -162,6 +164,8 @@ LiMR is also a Markdown rendering library for React projects. This extension use
 1. Open a `.md`, `.markdown`, or `SKILL.md` file and click the **book icon** in the editor title bar to open LiMR beside it. The Command Palette also offers **LiMR: Open Reader to the Side** and **LiMR: Open Markdown Reader** for the current group.
 2. Use the reader toolbar to choose a theme, typography, or translation display. Enable editing with the edit button to add annotations or change task checkboxes; use VS Code's usual save and undo actions.
 3. Click settings or run **LiMR: Reader Settings**. Search VS Code Settings for `@ext:linloir.limr-vscode`. Choose **User** for personal defaults or **Workspace** for project settings.
+
+Shortcuts: `Ctrl+Shift+V` opens LiMR in the current group; `Ctrl+Alt+V` opens it beside the source (use `Cmd` on macOS). VS Code also supports `Ctrl+K V`; Cursor uses `Ctrl+K` for AI editing. On first activation in Cursor, LiMR adds its buttons to `cursor.general.pinnedTitleActions`, preserving existing entries. Later removals from that list are respected. Disable `limr.cursor.pinTitleActions` before first activation to retain Cursor’s hidden buttons.
 
 Web links open in your browser. Markdown links default to smart navigation: a source/reader pair for the same document updates together; other layouts update only the current reader. Choose among five link modes; side targets reuse existing groups. Mouse back/forward or Alt+arrow keys restore reader history and the previous companion file. Same-document heading links scroll within the reader.
 
