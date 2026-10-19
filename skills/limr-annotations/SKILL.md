@@ -28,4 +28,4 @@ Context offsets are 0-based UTF-16 with exclusive ends. V3 omits repeated syntax
 - Converting papers, authoring translations, citations or figures: read [authoring choices](references/authoring.md) and relevant sections of [LiMR syntax](references/limr-syntax.md). Preserve paragraph-level original/translation pairs and use `figure`/`figures` for captioned paper images.
 - Customizing reader styles/syntax or creating a companion extension: read [reader plugins](references/reader-plugins.md).
 
-These resources are bundled; no separate skill, AI API key, message hook or annotation database is required. LiMR 1.3.5 source annotations use paired `::%%limr%%{<#ID}` / `::%%limr%%{>#ID}` boundaries and `:::limr-annotation` definitions.
+These resources are bundled; no separate skill, AI API key, message hook or annotation database is required. LiMR 1.3.6 source annotations use paired `::%%limr%%{<#ID}` / `::%%limr%%{>#ID}` boundaries and `:::limr-annotation` definitions.
