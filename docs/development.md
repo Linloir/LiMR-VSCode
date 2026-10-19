@@ -87,3 +87,5 @@ Large source messages use the public `Webview.postMessage` ArrayBuffer support (
 See [the benchmark harness](../benchmarks/reading/README.md) for frozen builds, real Electron timing, memory/long-task observations, and GPU evidence. Keep the default GPU policy for representative measurements. An extension cannot enable GPU acceleration on behalf of the VS Code client; do not change user launch flags or global renderer settings for a benchmark.
 
 The [1.0.2 measured results](performance-1.0.2.md) describe the tested hardware, host overhead, 75 MiB boundary, and remaining fast-scroll cost.
+
+`--open-modes` exercises native Quick Open under all three Markdown opening modes, changes the mode while the same source tab remains active, reuses existing split groups, and preserves explicit Reopen with Text Editor choices. Run it in both VS Code and Windows Cursor + WSL.

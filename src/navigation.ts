@@ -54,7 +54,14 @@ export class ReaderNavigation implements vscode.Disposable {
       clearTimeout(this.timer);
       this.timer = setTimeout(() => { void this.serial(() => this.autoOpen()).catch(error => this.report(error)); }, 40);
     };
-    this.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(schedule),
+    this.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
+      if (event.affectsConfiguration('limr.markdownOpenMode')) {
+        // A Quick Pick can change the setting without changing the active tab.
+        // Reconsider that source, while retaining explicit Open Source choices.
+        this.lastSource = undefined;
+        schedule();
+      }
+    }), vscode.window.onDidChangeActiveTextEditor(schedule),
       vscode.window.tabGroups.onDidChangeTabs(event => {
         if (!this.suppressed) {
           for (const tab of event.changed) if (tab.input instanceof vscode.TabInputText && this.readerTabs.get(tab) === tab.input.uri.toString())
@@ -79,6 +86,7 @@ export class ReaderNavigation implements vscode.Disposable {
           this.histories.delete(group);
           for (const pair of this.pairs) if (pair.source === group || pair.reader === group) this.pairs.delete(pair);
         }
+        schedule();
       }));
     schedule();
   }
@@ -94,8 +102,9 @@ export class ReaderNavigation implements vscode.Disposable {
     try { return await task(); }
     finally {
       const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
-      this.lastSource = tab?.input instanceof vscode.TabInputText ? { tab, uri: tab.input.uri.toString() } : undefined;
-      if (rememberSource && this.lastSource) this.explicitSources.set(this.lastSource.tab, this.lastSource.uri);
+      const uri = uriOf(tab);
+      this.lastSource = tab && uri ? { tab, uri: uri.toString() } : undefined;
+      if (rememberSource && this.lastSource && tab?.input instanceof vscode.TabInputText) this.explicitSources.set(tab, this.lastSource.uri);
       this.suppressed--;
     }
   }
@@ -200,6 +209,17 @@ export class ReaderNavigation implements vscode.Disposable {
   private async autoOpen() {
     if (this.suppressed) return;
     const editor = vscode.window.activeTextEditor, group = this.group(), tab = group.activeTab;
+    if (tab && isReader(tab)) {
+      const uri = uriOf(tab)!, key = uri.toString();
+      if (this.lastSource?.tab === tab && this.lastSource.uri === key) return;
+      this.lastSource = { tab, uri: key };
+      // Native Quick Open remembers the last editor type. It can open a reader
+      // directly, without the source-editor event normally used for auto-open.
+      if (navigationSettings(uri).open === 'sideBySide' && !this.companion(uri, group)) await this.explicit(async () => {
+        await this.showPair(await vscode.workspace.openTextDocument(uri), group);
+      }, false);
+      return;
+    }
     if (!editor || !tab || !(tab.input instanceof vscode.TabInputText) || !sameUri(tab.input.uri, editor.document.uri)) { this.lastSource = undefined; return; }
     const key = editor.document.uri.toString();
     if (this.lastSource?.tab === tab && this.lastSource.uri === key) return;

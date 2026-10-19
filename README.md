@@ -42,7 +42,7 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 | `limr.typography` | `"standard"` | `standard` 标准排版；`justify` 两端对齐；`knuth-plass` 使用段落级断行优化。 |
 | `limr.tableLayout.enabled` | `true` | 启用表格优化布局；关闭后使用原生表格，减少长表格的测量开销。 |
 | `limr.loadingMode` | `"progressive"` | 默认先显示只读预览，后台继续解析全文，完成后保留阅读位置；`blocking` 等解析完成后再展示。部分插件需要完整加载。 |
-| `limr.markdownOpenMode` | `"none"` | `none` 保持当前打开方式；`reader` 直接阅读；`sideBySide` 同时打开常驻的源码和阅读器标签，并保持两栏顺序。手动切换到文本编辑器后保留该选择，关闭文件后再次打开才重新应用默认方式。 |
+| `limr.markdownOpenMode` | `"none"` | `none` 保持当前打开方式；`reader` 直接阅读；`sideBySide` 同时打开常驻的源码和阅读器标签，并保持两栏顺序。修改设置会立即应用于当前源码标签。手动切换到文本编辑器后保留该选择，关闭文件后再次打开才重新应用默认方式。 |
 | `limr.markdownLinkMode` | `"smart"` | `currentReader` 当前栏阅读；`besideReader` 另一栏阅读；`besideEditor` 另一栏编辑；`editorAndReader` 双栏一起跳转；`smart` 仅在同文档的源码/阅读双栏中联动。支持鼠标侧键和 Alt+左右键回退/前进。 |
 | `limr.singleReader` | `false` | 复用单个阅读器；与 `besideReader` 冲突时改为当前栏跳转。未保存的旧阅读页签会保留，避免丢失编辑。 |
 | `limr.sidebarMode` | `"content"` | `content` 有旁注时显示；`always` 始终启用；`hidden` 隐藏。窄窗口通过浮层查看标注。 |
@@ -184,7 +184,7 @@ Documents of at least 256 KiB of UTF-16 text coalesce edits for 250 ms, with a 1
 | `limr.typography` | `"standard"` | `standard` normal layout; `justify` justified text; `knuth-plass` paragraph-wide line-breaking optimization. |
 | `limr.tableLayout.enabled` | `true` | Optimize table layout; disable for native tables with less measurement work on long tables. |
 | `limr.loadingMode` | `"progressive"` | Show a read-only preview while the complete document parses in the background, preserving your reading position when ready. Choose `blocking` to wait before showing content. Some plugins require complete loading. |
-| `limr.markdownOpenMode` | `"none"` | `none` preserves current opening behavior; `reader` opens LiMR; `sideBySide` opens permanent source and reader tabs in a stable column order. Switching to the text editor is respected until the file is closed and opened again. |
+| `limr.markdownOpenMode` | `"none"` | `none` preserves current opening behavior; `reader` opens LiMR; `sideBySide` opens permanent source and reader tabs in a stable column order. Setting changes also apply to the current source tab. Switching to the text editor is respected until the file is closed and opened again. |
 | `limr.markdownLinkMode` | `"smart"` | `currentReader`, `besideReader`, `besideEditor`, `editorAndReader`, or `smart`. Smart updates both columns only when they show source and reader for the same document. Mouse back/forward and Alt+arrow keys restore navigation. |
 | `limr.singleReader` | `false` | Reuse one reader; `besideReader` falls back to the current group. Unsaved old reader tabs remain available to protect edits. |
 | `limr.sidebarMode` | `"content"` | `content` shows the sidebar when notes exist; `always` always enables it; `hidden` hides it. Narrow readers display annotations in overlays. |
