@@ -91,3 +91,5 @@ The [1.0.2 measured results](performance-1.0.2.md) describe the tested hardware,
 `--open-modes` exercises native Quick Open under all three Markdown opening modes, changes the mode while the same source tab remains active, reuses existing split groups, and preserves explicit Reopen with Text Editor choices. Run it in both VS Code and Windows Cursor + WSL.
 
 `--preview-default` verifies the default LiMR preview button, Alt-click access to the built-in preview, and live separate/merged setting changes. On Cursor it also records the independent native breadcrumb Preview editor and verifies the return path to LiMR.
+
+`--toc-colors` checks neutral and active TOC colors, hover, keyboard focus, heading navigation, and prose link colors in wide/narrow readers across four palettes. The Cursor runner supplies measured pixel sizes for editor layout changes because its existing-group layout path treats fractional sizes as pixels.

@@ -191,7 +191,7 @@ exports.run = async function run() {
             if (scratchTab) await vscode.window.tabGroups.close(scratchTab, true);
             result = snapshot(); break;
           }
-          case 'layout': await vscode.commands.executeCommand('vscode.setEditorLayout', { orientation: 0, groups: [{ size: command.sourceSize }, { size: 1 - command.sourceSize }] }); result = snapshot(); break;
+          case 'layout': await vscode.commands.executeCommand('vscode.setEditorLayout', { orientation: 0, groups: [{ size: command.sourceSize * (command.totalSize ?? 1) }, { size: (1 - command.sourceSize) * (command.totalSize ?? 1) }] }); result = snapshot(); break;
           case 'scrollSource': {
             const editor = vscode.window.visibleTextEditors.find(editor => editor.document.uri.toString() === uri.toString());
             assert.ok(editor, 'The Markdown source must be visible.');

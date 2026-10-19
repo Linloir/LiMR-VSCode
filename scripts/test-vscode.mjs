@@ -230,6 +230,7 @@ try {
     : entrypointsSuite ? (await import('../tests/browser/entrypoints.mjs')).runEntrypointsAcceptance
     : openModesSuite ? (await import('../tests/browser/open-modes.mjs')).runOpenModesAcceptance
     : previewDefaultSuite ? (await import('../tests/browser/preview-default.mjs')).runPreviewDefaultAcceptance
+    : process.argv.includes('--toc-colors') ? (await import('../tests/browser/toc-colors.mjs')).runTocColorsAcceptance
     : process.argv.includes('--annotation-selection') ? (await import('../tests/browser/annotation-selection.mjs')).runAnnotationSelectionAcceptance
     : process.argv.includes('--core-compatibility') ? (await import('../tests/browser/core-compatibility.mjs')).runCoreCompatibilityAcceptance
     : process.env.LIMR_TEST_SUITE === 'annotations' || process.argv.includes('--annotations') ? (await import('../tests/browser/annotations.mjs')).runAnnotationAcceptance
@@ -259,7 +260,16 @@ try {
     : process.env.LIMR_TEST_SUITE === 'sidebar-motion' ? runSidebarMotionAcceptance
     : process.env.LIMR_TEST_SUITE === 'block-motion' ? runBlockMotion
     : process.env.LIMR_TEST_SUITE === 'animations' || process.argv.includes('--animations') ? runAnimationAcceptance : runReaderAcceptance;
-  const evidence = await runAcceptance({ browser, page, frame, host, source, fixture, artifacts, theme, ready, externalOpens });
+  const browserHost = async (action, data = {}) => {
+    // Cursor's existing-group layout path interprets fractional sizes as pixels.
+    // Use measured pixels so wide/narrow acceptance exercises the intended UI.
+    if (action === 'layout' && /cursor/i.test(ready.appName)) {
+      const totalSize = await page.locator('.editor-group-container').evaluateAll(elements => elements.reduce((sum, element) => sum + element.getBoundingClientRect().width, 0));
+      return host(action, { ...data, totalSize });
+    }
+    return host(action, data);
+  };
+  const evidence = await runAcceptance({ browser, page, frame, host: browserHost, source, fixture, artifacts, theme, ready, externalOpens });
   await writeFile(path.join(artifacts, 'result.json'), JSON.stringify({ ...ready, theme, fixture, build, suite: runAcceptance.name, clientUserAgent: await page.evaluate(() => navigator.userAgent), evidence }, null, 2));
   await Promise.all(['failure.png', 'failure.log'].map(name => rm(path.join(artifacts, name), { force: true })));
   await host('finish');

@@ -71,6 +71,10 @@ button, select { -webkit-tap-highlight-color: transparent; }
 /* The palette ring denotes the selected color, independently of focus. */
 [data-limr-appearance] .limr-color-swatch:is(:focus,:focus-visible) { outline: 2px solid transparent; outline-offset: 0; }
 [data-limr-appearance] .limr-color-swatch[aria-pressed='true']:is(:focus,:focus-visible) { outline-color: var(--swatch); }
+/* Host webviews inject unlayered anchor colors/hover decorations. Navigation
+   links use the reader's neutral palette; prose links keep their link color. */
+[data-limr-appearance] .limr-toc a { color: var(--limr-muted, var(--lv-muted)); text-decoration: none; }
+[data-limr-appearance] .limr-toc a:is([aria-current],:hover) { color: var(--limr-heading, var(--lv-heading)); text-decoration: none; }
 [data-limr-appearance] .limr-toc a:focus-visible { text-decoration: underline; text-underline-offset: .2em; }
 /* LiMR's copy skin is layered; the host's unlayered button reset otherwise
    replaces its icon/status colors while leaving a fixed white glass surface. */
