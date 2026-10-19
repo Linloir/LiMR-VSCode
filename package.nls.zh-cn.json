@@ -93,5 +93,8 @@
   "limr.markdownLinkMode.option.smart": "智能：同文档编辑/阅读双栏联动，其余布局只跳转当前 LiMR",
   "limr.singleReader.description": "复用一个 LiMR 阅读器，打开后关闭其他已保存的 LiMR 页签；未保存的页签保留以保护编辑内容。",
   "command.navigateBack": "阅读器后退",
-  "command.navigateForward": "阅读器前进"
+  "command.navigateForward": "阅读器前进",
+  "limr.contentAlignment.description": "没有批注侧栏且显示侧边目录时，将正文相对整个阅读窗口居中，或相对目录右侧的剩余空间居中。",
+  "limr.contentAlignment.option.window": "相对阅读窗口居中",
+  "limr.contentAlignment.option.remaining": "相对目录右侧剩余空间居中"
 }

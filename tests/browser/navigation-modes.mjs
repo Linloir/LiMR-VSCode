@@ -10,6 +10,20 @@ export async function runNavigationModesAcceptance({ page, host, artifacts }) {
   const current = async (column, name, custom) => {
     await expect.poll(async () => { const tab = active(await tabs(), column); return tab ? [tab.label, tab.custom] : null; }, { timeout: 15000 }).toEqual([name, custom]);
   };
+  const settledCurrent = async (column, name, custom) => {
+    await current(column, name, custom);
+    // Auto-open is debounced. Check again after its queued native tab events.
+    await new Promise(resolve => setTimeout(resolve, 300));
+    await current(column, name, custom);
+  };
+  const permanentPair = async (name, source = 1, reader = 2) => {
+    await settledCurrent(source, name);
+    await settledCurrent(reader, name, 'limr.reader');
+    const groups = await tabs();
+    expect(active(groups, source).preview).toBe(false);
+    expect(active(groups, reader).preview).toBe(false);
+    expect(groups.find(group => group.viewColumn === reader).tabs.filter(tab => tab.label === name && !tab.custom)).toHaveLength(0);
+  };
   const reader = async title => {
     let frame;
     await expect.poll(async () => {
@@ -83,26 +97,66 @@ export async function runNavigationModesAcceptance({ page, host, artifacts }) {
     await reset('smart');
     await host('command', { command: 'workbench.action.closeAllEditors', args: [] });
     await host('configure', { values: { markdownOpenMode: mode } });
-    await host('openRelativeSource', { relative: 'b.md', viewColumn: 1 });
+    await host('openRelativeSource', { relative: 'b.md', viewColumn: 1, preview: true });
     await current(1, 'b.md', mode === 'reader' ? 'limr.reader' : undefined);
     if (mode === 'sideBySide') {
-      await current(2, 'b.md', 'limr.reader');
+      await permanentPair('b.md');
       expect((await host('snapshot')).activeEditor?.uri).toMatch(/b\.md$/);
+      await host('openRelativeReader', { relative: 'b.md', viewColumn: 2 });
+      await host('openRelativeSource', { relative: 'b.md', viewColumn: 2, preview: true });
+      await permanentPair('b.md');
+      await host('openRelativeReader', { relative: 'b.md', viewColumn: 2 });
+      await host('openRelativeDefault', { relative: 'a.md', viewColumn: 2, repeat: 2 });
+      await permanentPair('a.md');
+      await record('Default split pins both tabs and reuses source-left/reader-right when reopened repeatedly from the reader group');
       await host('openRelativeSource', { relative: 'a.md', viewColumn: 1 });
       await current(2, 'a.md', 'limr.reader');
       await host('openRelativeSource', { relative: 'b.md', viewColumn: 1 });
       await current(2, 'b.md', 'limr.reader');
+      await (await reader('Page B')).getByRole('link', { name: 'Go C' }).click();
+      await permanentPair('c.md');
+      await host('openRelativeSource', { relative: 'b.md', viewColumn: 1 });
+      await permanentPair('b.md');
+      await host('openRelativeSource', { relative: 'c.md', viewColumn: 1 });
+      await permanentPair('c.md');
+      await host('openRelativeSource', { relative: 'b.md', viewColumn: 1 });
+      await permanentPair('b.md');
+      await record('Source tabs created by paired link navigation keep following the default split when revisited');
       await host('configure', { values: { markdownLinkMode: 'besideEditor' } });
       const pairedFrame = await reader('Page B'); await pairedFrame.getByRole('link', { name: 'Go C' }).click();
       await current(1, 'c.md'); await current(2, 'b.md', 'limr.reader');
     }
     if (mode === 'none') expect((await tabs()).flatMap(group => group.tabs).filter(tab => tab.custom)).toHaveLength(0);
     if (mode === 'reader') {
+      await host('command', { command: 'workbench.action.reopenTextEditor', args: [] });
+      await settledCurrent(1, 'b.md');
+      await host('openRelativeSource', { relative: 'a.md', viewColumn: 1 });
+      await current(1, 'a.md', 'limr.reader');
+      await host('openRelativeSource', { relative: 'b.md', viewColumn: 1 });
+      await settledCurrent(1, 'b.md');
+      await record('Native Reopen with Text Editor stays in source mode after switching away and back');
+      await host('command', { command: 'workbench.action.closeAllEditors', args: [] });
+      await host('openRelativeSource', { relative: 'b.md', viewColumn: 1 });
+      await settledCurrent(1, 'b.md', 'limr.reader');
       await host('command', { command: 'limr.openSource', args: [] });
-      await current(2, 'b.md');
+      await settledCurrent(2, 'b.md');
     }
   }
   await record('All three Markdown-open settings work; explicit source access remains usable in reader mode');
+  await reset('smart');
+  await host('openRelativeSource', { relative: 'a.md', viewColumn: 2 });
+  await host('configure', { values: { markdownOpenMode: 'sideBySide', singleReader: true } });
+  await host('openRelativeSource', { relative: 'b.md', viewColumn: 2, preview: true });
+  await permanentPair('b.md', 2, 1);
+  await host('openRelativeSource', { relative: 'c.md', viewColumn: 1, preview: true });
+  await permanentPair('c.md', 2, 1);
+  expect((await tabs()).flatMap(group => group.tabs).filter(tab => tab.custom === 'limr.reader')).toHaveLength(1);
+  await record('An existing reader-left/source-right layout also retains its order, including single-reader mode');
+  await host('openRelativeReader', { relative: 'c.md', viewColumn: 1 });
+  await host('command', { command: 'workbench.action.reopenTextEditor', args: [] });
+  await settledCurrent(1, 'c.md');
+  expect((await tabs()).flatMap(group => group.tabs).filter(tab => tab.custom === 'limr.reader')).toHaveLength(0);
+  await record('Native Reopen with Text Editor also overrides the default split without recreating the reader');
   await page.screenshot({ path: path.join(artifacts, 'navigation-modes.png') });
   return evidence;
 }

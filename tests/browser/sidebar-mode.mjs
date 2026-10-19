@@ -21,7 +21,9 @@ export async function runSidebarModeAcceptance({ page, frame, host, artifacts })
     const style = getComputedStyle(scroll);
     const left = viewport.left + scroll.clientLeft + parseFloat(style.paddingLeft);
     const width = scroll.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-    return { centerDelta: body.left + body.width / 2 - (left + width / 2), bodyWidth: body.width, availableWidth: width,
+    const toc = document.querySelector('.limr-reader-toc'), rail = toc?.getBoundingClientRect();
+    const remainingLeft = rail?.width ? rail.right + 24 : left;
+    return { centerDelta: body.left + body.width / 2 - (left + width / 2), remainingCenterDelta: body.left + body.width / 2 - (remainingLeft + left + width) / 2, bodyWidth: body.width, availableWidth: width,
       sidebar: !!document.querySelector('.limr-reader[data-sidebar]'), markers: document.querySelectorAll('.limr-reader-content [data-limr-anchor]').length };
   });
   const save = async (check, name) => {
@@ -50,9 +52,19 @@ export async function runSidebarModeAcceptance({ page, frame, host, artifacts })
   await centered();
   await expect(frame.locator('.limr-reader-toc .limr-toc')).toBeVisible();
   await save('Default content mode leaves empty documents centered with a real wide TOC', 'empty-centered');
+  await host('configure', { values: { contentAlignment: 'remaining' } });
+  await expect(frame.locator('.limr-reader-toc .limr-toc')).toBeVisible();
+  await expect.poll(async () => Math.abs((await geometry()).remainingCenterDelta)).toBeLessThan(1);
+  expect((await geometry()).centerDelta).toBeGreaterThan(100);
+  await save('Remaining-space alignment centers prose to the right of the TOC', 'remaining-centered');
+  await host('configure', { values: { contentAlignment: 'window' } });
+  await centered();
 
   await host('configure', { values: { editingEnabled: true } });
   await expect(frame.locator('.lv-app')).toHaveAttribute('data-editing', 'true');
+  // Synthetic selection does not grant the webview the input focus that a
+  // user's drag does. Enter the paragraph before exercising toolbar autofocus.
+  await article().locator('p').first().click();
   await article().locator('p').first().evaluate(element => {
     const range = document.createRange(), selection = getSelection();
     range.selectNodeContents(element);
@@ -63,7 +75,15 @@ export async function runSidebarModeAcceptance({ page, frame, host, artifacts })
   await sidebar(1);
   const draft = rail().getByRole('textbox', { name: '旁注内容', exact: true });
   await expect(draft).toBeEnabled();
-  await expect(draft).toBeFocused();
+  try { await expect(draft).toBeFocused(); }
+  catch (error) {
+    await writeFile(path.join(artifacts, 'draft-focus.json'), JSON.stringify(await draft.evaluate(element => {
+      const describe = node => node && ({ tag: node.tagName, class: node.className, disabled: node.disabled, inert: node.inert, active: node.getAttribute('data-active'), editing: node.getAttribute('data-editing') });
+      const ancestors = []; for (let node = element; node; node = node.parentElement) ancestors.push(describe(node));
+      return { focused: document.hasFocus(), active: describe(document.activeElement), ancestors, app: describe(document.querySelector('.lv-app')) };
+    }), null, 2));
+    throw error;
+  }
   await draft.fill('A draft follows the automatic sidebar transition.');
   await draft.press('Escape');
   await centered();
@@ -83,6 +103,11 @@ export async function runSidebarModeAcceptance({ page, frame, host, artifacts })
   await replace(note());
   await sidebar(2);
   await expect(rail()).toContainText('A shared sidebar note.');
+  const sidebarGeometry = await geometry();
+  await host('configure', { values: { contentAlignment: 'remaining' } });
+  await sidebar(2);
+  expect(Math.abs((await geometry()).centerDelta - sidebarGeometry.centerDelta)).toBeLessThan(1);
+  await host('configure', { values: { contentAlignment: 'window' } });
   await save('Adding a note with two anchors creates both actual sidebar cards', 'multi-anchor');
 
   await replace(plain);
@@ -156,6 +181,13 @@ export async function runSidebarModeAcceptance({ page, frame, host, artifacts })
   await centered();
   await expect(frame.locator('.limr-reader-mobile-toc')).toHaveCount(0);
   await save('Content mode still uses narrow-screen overlays and wide-only TOC stays absent', 'narrow');
+  await host('configure', { values: { contentAlignment: 'remaining' } });
+  await centered();
+  await expect(frame.locator('.limr-reader-mobile-toc')).toHaveCount(0);
+  await host('configure', { values: { tocMode: 'always' } });
+  await centered();
+  await expect(frame.locator('.limr-reader-mobile-toc')).toBeVisible();
+  await save('Remaining-space alignment also uses centered prose and compact contents on narrow screens', 'remaining-narrow');
   expect(errors).toEqual([]);
   return evidence;
 }

@@ -45,7 +45,7 @@ exports.run = async function run() {
     activeCustom: vscode.window.tabGroups.activeTabGroup.activeTab?.input instanceof vscode.TabInputCustom ? vscode.window.tabGroups.activeTabGroup.activeTab.input.viewType : undefined,
     visibleRanges: vscode.window.visibleTextEditors.filter(editor => editor.document.uri.toString() === uri.toString()).flatMap(editor => editor.visibleRanges.map(range => ({ start: range.start.line, end: range.end.line }))),
     activeEditor: vscode.window.activeTextEditor && { uri: vscode.window.activeTextEditor.document.uri.toString(), language: vscode.window.activeTextEditor.document.languageId, line: vscode.window.activeTextEditor.selection.active.line },
-    groups: vscode.window.tabGroups.all.map(group => ({ viewColumn: group.viewColumn, active: group.isActive, tabs: group.tabs.map(tab => ({ label: tab.label, active: tab.isActive, uri: tab.input.uri?.toString(), custom: tab.input instanceof vscode.TabInputCustom ? tab.input.viewType : undefined, webview: tab.input instanceof vscode.TabInputWebview ? tab.input.viewType : undefined })) })),
+    groups: vscode.window.tabGroups.all.map(group => ({ viewColumn: group.viewColumn, active: group.isActive, tabs: group.tabs.map(tab => ({ label: tab.label, active: tab.isActive, preview: tab.isPreview, dirty: tab.isDirty, uri: tab.input.uri?.toString(), custom: tab.input instanceof vscode.TabInputCustom ? tab.input.viewType : undefined, webview: tab.input instanceof vscode.TabInputWebview ? tab.input.viewType : undefined })) })),
   });
   let scrollSeries;
   const scrollEvents = [];
@@ -157,7 +157,15 @@ exports.run = async function run() {
             assert.ok(target.fsPath.startsWith(folder.fsPath + path.sep), 'Source fixtures must stay inside the disposable workspace.');
             let doc = await vscode.workspace.openTextDocument(target);
             if (command.language) doc = await vscode.languages.setTextDocumentLanguage(doc, command.language);
-            await vscode.window.showTextDocument(doc, { viewColumn: command.viewColumn ?? vscode.ViewColumn.One, preview: false });
+            await vscode.window.showTextDocument(doc, { viewColumn: command.viewColumn ?? vscode.ViewColumn.One, preview: command.preview ?? false });
+            result = snapshot(); break;
+          }
+          case 'openRelativeDefault': {
+            const folder = vscode.workspace.getWorkspaceFolder(uri)?.uri ?? vscode.Uri.file(path.dirname(uri.fsPath));
+            const target = vscode.Uri.joinPath(folder, command.relative);
+            assert.ok(target.fsPath.startsWith(folder.fsPath + path.sep), 'Open fixtures must stay inside the disposable workspace.');
+            for (let index = 0; index < (command.repeat ?? 1); index++)
+              await vscode.commands.executeCommand('vscode.open', target, { viewColumn: command.viewColumn ?? vscode.ViewColumn.Active, preview: command.preview ?? true });
             result = snapshot(); break;
           }
           case 'openRelativeReader': {

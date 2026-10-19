@@ -41,7 +41,7 @@ export function App() {
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
   const [readerWidth, setReaderWidth] = useState(0);
   const readerCommands = useRef<ReaderCommands | null>(null);
-  const [readerContent, setReaderContent] = useState<{ uri: string; source: string; complete: boolean; hasContent: boolean } | null>(null);
+  const [readerContent, setReaderContent] = useState<{ uri: string; source: string; complete: boolean; hasContent: boolean; hasTableContent: boolean } | null>(null);
   const stateRef = useRef(state), pending = useRef<PendingEdit | null>(null);
   const drafts = useRef(new DraftStore());
   const scrollSync = useRef<ReaderScrollSync | null>(null);
@@ -80,16 +80,18 @@ export function App() {
     [state?.document.uri, state?.document.version, source]);
   const { parameters, onDocument: translationDocument, cancel: cancelPendingTranslation } = useTranslationParameters(state?.settings, updateFileSettings, translationRequest, state?.translationEpoch ?? 0);
   const readerParameters = useMemo(() => ({ ...parameters, tableLayout: state?.settings.tableLayoutEnabled === false ? false as const : undefined }), [parameters, state?.settings.tableLayoutEnabled]);
-  const readerAvailable = useCallback((commands: ReaderCommands, document: DocumentSnapshot, hasContent: boolean) => {
+  const readerAvailable = useCallback((commands: ReaderCommands, document: DocumentSnapshot, hasContent: boolean, hasTableContent: boolean) => {
     readerCommands.current = commands;
     const complete = commands.isDocumentComplete();
     translationDocument(document, complete);
     setReaderContent(previous => {
       // Derived table notes leave the DOM with their table. Keep the rail stable
       // for this revision once it was needed; ordinary source edits reset it.
-      const content = hasContent || previous?.uri === document.id && previous.source === document.source && previous.hasContent;
-      return previous?.uri === document.id && previous.source === document.source && previous.complete === complete && previous.hasContent === content
-        ? previous : { uri: document.id, source: document.source, complete, hasContent: content };
+      // Other annotations must release their space when a plugin is disabled.
+      const tableContent = hasTableContent || previous?.uri === document.id && previous.source === document.source && previous.hasTableContent;
+      const content = hasContent || tableContent;
+      return previous?.uri === document.id && previous.source === document.source && previous.complete === complete && previous.hasContent === content && previous.hasTableContent === tableContent
+        ? previous : { uri: document.id, source: document.source, complete, hasContent: content, hasTableContent: tableContent };
     });
     scrollSync.current?.refresh();
   }, [translationDocument]);
@@ -302,8 +304,9 @@ export function App() {
   }, [scrollRoot]);
 
   if (!state) return <ReaderProgressBar label="Opening Markdown…" />;
-  const centeredToc = readerWidth >= state.settings.maxWidth + 2 * (200 + 24);
-  const sideTocAvailable = sidebarEnabled && readerWidth >= 1120 || centeredToc;
+  const remainingToc = !sidebarEnabled && state.settings.contentAlignment === 'remaining' && readerWidth >= 800;
+  const centeredToc = (sidebarEnabled || state.settings.contentAlignment !== 'remaining') && readerWidth >= state.settings.maxWidth + 2 * (200 + 24);
+  const sideTocAvailable = sidebarEnabled && readerWidth >= 1120 || centeredToc || remainingToc;
   const tocVisible = state.settings.tocMode === 'always' || state.settings.tocMode === 'wide' && sideTocAvailable;
   return <div className={`lv-app${busy ? ' is-saving' : ''}`} data-testid="reader-app" data-editing={editingEnabled} data-reader-ready={readerReady} aria-busy={busy || !readerReady}>
     <div className="lv-scroll" ref={setScrollRoot} data-testid="reader-scroll">
@@ -312,7 +315,7 @@ export function App() {
         {state.loadError === 'timeout' && <button type="button" onClick={() => post({ type: 'retryLoad' })}>{locale === 'zh-CN' ? '重试' : 'Retry'}</button>}
         <button type="button" onClick={() => post({ type: 'openSource' })}>{locale === 'zh-CN' ? '打开源码' : 'Open source'}</button>
       </div> : <EditorContext.Provider value={editorSession}>
-        <PluginBoundary plugins={workspacePlugins} notify={notify}>{plugins => <MemoReader key={state.document.uri} className={`lv-reader${centeredToc ? ' lv-centered-toc' : ''}`} source={source} documentId={state.document.uri}
+        <PluginBoundary plugins={workspacePlugins} notify={notify}>{plugins => <MemoReader key={state.document.uri} className={`lv-reader${centeredToc ? ' lv-centered-toc' : remainingToc ? ' lv-remaining-toc' : ''}`} source={source} documentId={state.document.uri}
           theme={isDark ? 'dark' : 'light'} appearance={playground ? 'classic' : 'vscode'} locale={locale === 'zh-CN' ? chinese : english} extensions={extensions} plugins={plugins}
           actions={actions} annotations={noExternalAnnotations} onSourceChange={editingEnabled ? editSource : undefined}
           typography={state.settings.typography} parameters={readerParameters} loadingMode={state.settings.loadingMode} documentVersion={state.document.version}

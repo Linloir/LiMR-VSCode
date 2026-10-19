@@ -15,7 +15,7 @@ LiMR 是一个注重阅读体验的 Markdown 阅读器。这个扩展将 [LiMR](
 - **可调整的阅读方式**：字体、行距、正文宽度、目录、翻译显示和排版均可配置；源码与阅读器支持滚动同步。
 - **简易的扩展能力**：用工作区 CSS 调整外观，用 JavaScript 模块添加组件、语法、标注或操作；也可以做成独立的 VS Code 附加扩展。
 
-LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 `@linloir/limr 1.3.4`。你可以在 [Playground](https://linloir.github.io/LiMR/) 体验阅读与编辑，在 [语法文档](https://linloir.github.io/LiMR/#/docs/zh-CN/syntax) 查看更多内容模块。
+LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 `@linloir/limr 1.3.5`。你可以在 [Playground](https://linloir.github.io/LiMR/) 体验阅读与编辑，在 [语法文档](https://linloir.github.io/LiMR/#/docs/zh-CN/syntax) 查看更多内容模块。
 
 ## 开始使用与配置
 
@@ -40,12 +40,13 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 | `limr.typography` | `"standard"` | `standard` 标准排版；`justify` 两端对齐；`knuth-plass` 使用段落级断行优化。 |
 | `limr.tableLayout.enabled` | `true` | 启用表格优化布局；关闭后使用原生表格，减少长表格的测量开销。 |
 | `limr.loadingMode` | `"progressive"` | 默认先显示只读预览，后台继续解析全文，完成后保留阅读位置；`blocking` 等解析完成后再展示。部分插件需要完整加载。 |
-| `limr.markdownOpenMode` | `"none"` | `none` 保持当前打开方式；`reader` 直接阅读；`sideBySide` 同时打开源码和阅读器。 |
+| `limr.markdownOpenMode` | `"none"` | `none` 保持当前打开方式；`reader` 直接阅读；`sideBySide` 同时打开常驻的源码和阅读器标签，并保持两栏顺序。手动切换到文本编辑器后保留该选择，关闭文件后再次打开才重新应用默认方式。 |
 | `limr.markdownLinkMode` | `"smart"` | `currentReader` 当前栏阅读；`besideReader` 另一栏阅读；`besideEditor` 另一栏编辑；`editorAndReader` 双栏一起跳转；`smart` 仅在同文档的源码/阅读双栏中联动。支持鼠标侧键和 Alt+左右键回退/前进。 |
 | `limr.singleReader` | `false` | 复用单个阅读器；与 `besideReader` 冲突时改为当前栏跳转。未保存的旧阅读页签会保留，避免丢失编辑。 |
 | `limr.sidebarMode` | `"content"` | `content` 有旁注时显示；`always` 始终启用；`hidden` 隐藏。窄窗口通过浮层查看标注。 |
 | `limr.sidebarAutoCollapse` | `true` | 自动折叠密集的旁注条目；关闭后逐项排布。 |
 | `limr.tocMode` | `"always"` | `always` 宽屏显示侧目录、窄屏显示折叠目录；`wide` 仅宽屏显示；`hidden` 隐藏。 |
+| `limr.contentAlignment` | `"window"` | 没有批注侧栏时，`window` 将正文相对阅读窗口居中；`remaining` 相对侧目录右侧的剩余空间居中。 |
 | `limr.translationMode` | `"paragraph"` | `paragraph` 遵循各段配置；`bilingual` 原译对照；`original` 仅原文；`translated` 仅译文。用于已有翻译内容，不自动翻译。 |
 | `limr.syncScroll` | `true` | 源码与阅读器双向同步滚动。 |
 | `limr.previewButtonMode` | `"separate"` | `separate` 同时显示 LiMR 书本按钮与内置预览按钮；`merged` 只保留 LiMR 入口，Alt 点击打开内置预览，也可在“更多操作 → Markdown 预览”中选择。 |
@@ -154,7 +155,7 @@ LiMR is a Markdown reader designed for comfortable reading. This extension bring
 - **Reading preferences**: configure fonts, spacing, article width, contents, translation display, and paragraph layout. Source and reader can scroll together.
 - **Simple extensibility**: use workspace CSS to change appearance and JavaScript modules to add components, syntax, annotations, or actions. Reusable modules can also ship as VS Code add-ons.
 
-LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.4`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
+LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.5`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
 
 ## Get started and configure
 
@@ -179,12 +180,13 @@ Documents of at least 256 KiB of UTF-16 text coalesce edits for 250 ms, with a 1
 | `limr.typography` | `"standard"` | `standard` normal layout; `justify` justified text; `knuth-plass` paragraph-wide line-breaking optimization. |
 | `limr.tableLayout.enabled` | `true` | Optimize table layout; disable for native tables with less measurement work on long tables. |
 | `limr.loadingMode` | `"progressive"` | Show a read-only preview while the complete document parses in the background, preserving your reading position when ready. Choose `blocking` to wait before showing content. Some plugins require complete loading. |
-| `limr.markdownOpenMode` | `"none"` | `none` preserves current opening behavior; `reader` opens LiMR; `sideBySide` opens source and reader together. |
+| `limr.markdownOpenMode` | `"none"` | `none` preserves current opening behavior; `reader` opens LiMR; `sideBySide` opens permanent source and reader tabs in a stable column order. Switching to the text editor is respected until the file is closed and opened again. |
 | `limr.markdownLinkMode` | `"smart"` | `currentReader`, `besideReader`, `besideEditor`, `editorAndReader`, or `smart`. Smart updates both columns only when they show source and reader for the same document. Mouse back/forward and Alt+arrow keys restore navigation. |
 | `limr.singleReader` | `false` | Reuse one reader; `besideReader` falls back to the current group. Unsaved old reader tabs remain available to protect edits. |
 | `limr.sidebarMode` | `"content"` | `content` shows the sidebar when notes exist; `always` always enables it; `hidden` hides it. Narrow readers display annotations in overlays. |
 | `limr.sidebarAutoCollapse` | `true` | Fold crowded sidebar items automatically; turn off to lay them out individually. |
 | `limr.tocMode` | `"always"` | `always` shows side contents on wide screens and collapsible contents on narrow ones; `wide` shows only side contents; `hidden` hides both. |
+| `limr.contentAlignment` | `"window"` | Without an annotation sidebar, `window` centers the article in the reader window; `remaining` centers it in the space to the right of the side TOC. |
 | `limr.translationMode` | `"paragraph"` | `paragraph` follows each block; `bilingual` shows both versions; `original` or `translated` shows one. Displays existing translations; does not generate them. |
 | `limr.syncScroll` | `true` | Synchronize scrolling between source and reader in both directions. |
 | `limr.previewButtonMode` | `"separate"` | `separate` shows the LiMR book and built-in preview buttons; `merged` keeps one LiMR entry. Alt-click opens the built-in preview; both choices are also in **More Actions → Markdown Preview**. |

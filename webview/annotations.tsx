@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   AnnotationCard, AnnotationEditor, AnnotationMarkdown, ToolIcon, useAnnotationState,
   useAnnotations, useLiMR, useLocale, registerWorkerExtension, type Annotation, type AnnotationContentProps,
@@ -51,6 +51,33 @@ function NoteContent({ annotation, data, editing, presentation }: AnnotationCont
   const body = bodyOf(data), draft = useDraft(annotation.id, body);
   const canEdit = session.editingEnabled && !!annotation.source && commands.canEditAnnotation(annotation.id);
   const conflict = body !== draft.base && body !== draft.value && !draft.saving;
+  const content = useRef<HTMLDivElement>(null);
+  const [focusReady, setFocusReady] = useState(false);
+  const requestFocus = !!editing && !session.busy && (presentation !== 'preview' || activeHere);
+  useLayoutEffect(() => {
+    setFocusReady(false);
+    const element = content.current;
+    if (!requestFocus || !element) return;
+    // A measured sidebar cluster can still have hidden descendants for a
+    // frame. Let core autofocus only after the actual editor is visible.
+    let frame = 0, attempts = 0;
+    const stop = () => { cancelAnimationFrame(frame); mutations.disconnect(); resize.disconnect(); };
+    const check = () => {
+      frame = 0;
+      // Visibility inheritance can settle after the final layout mutation.
+      const field = element.querySelector('textarea');
+      if (field?.getClientRects().length && getComputedStyle(field).visibility === 'visible' && !field.closest('[inert]') && !field.matches(':disabled')) {
+        stop(); setFocusReady(true);
+      } else if (++attempts < 30) frame = requestAnimationFrame(check);
+    };
+    const schedule = () => { attempts = 0; if (!frame) frame = requestAnimationFrame(check); };
+    const mutations = new MutationObserver(schedule), resize = new ResizeObserver(schedule);
+    mutations.observe(element.closest('.limr-sidebar-cluster,.limr-overlay-positioner') ?? element,
+      { attributes: true, subtree: true, attributeFilter: ['style', 'inert', 'data-ready', 'data-open'] });
+    resize.observe(element);
+    schedule();
+    return stop;
+  }, [requestFocus, annotation.id, presentation]);
   useEffect(() => {
     const current = session.drafts.get(annotation.id, body);
     if (!current.saving && body !== current.base && (current.value === current.base || current.value === body)) {
@@ -106,10 +133,10 @@ function NoteContent({ annotation, data, editing, presentation }: AnnotationCont
     if (wasEditing.current && !editing) void saveRef.current();
     wasEditing.current = editing;
   }, [editing, annotation.id, body, session.drafts]);
-  return <div className="lv-note-content" data-limr-card-interactive="true" data-annotation-id={annotation.id}>
+  return <div ref={content} className="lv-note-content" data-limr-card-interactive="true" data-annotation-id={annotation.id}>
     {editing && canEdit ? <fieldset className="lv-editor-fieldset" disabled={session.busy || draft.saving}>
       <AnnotationEditor value={draft.value} label={zh ? `${labelFor(annotation.type, zh)}内容` : `${labelFor(annotation.type, zh)} content`} placeholder={annotation.type === 'question' ? (zh ? '写下你想进一步理解的问题…' : 'What would you like to understand?') : (zh ? '记录你的想法，可以使用 Markdown…' : 'Write your thoughts using Markdown…')}
-        autoFocus={!session.busy && (presentation !== 'preview' || activeHere)}
+        autoFocus={focusReady && requestFocus}
         onChange={value => session.drafts.set(annotation.id, { ...session.drafts.get(annotation.id, body), value, error: undefined })}
         onSubmit={() => void save()} onCancel={() => void cancel()} onBlur={() => void save()} submitLabel={zh ? '保存' : 'Save'} cancelLabel={zh ? '取消' : 'Cancel'} />
     </fieldset> : <>

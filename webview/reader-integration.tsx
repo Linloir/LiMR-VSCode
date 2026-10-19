@@ -5,14 +5,15 @@ import { ReaderLoadingIndicator, useReaderLoading } from './reader-loading';
 
 export type ReaderCommands = ReturnType<typeof useLiMR>;
 export interface ReaderIntegrationProps {
-  onReader(commands: ReaderCommands, document: DocumentSnapshot, hasContent: boolean): void;
+  onReader(commands: ReaderCommands, document: DocumentSnapshot, hasContent: boolean, hasTableContent: boolean): void;
   onDispose(commands: ReaderCommands): void;
 }
 /** Host integrations use public core state, independent of the current DOM window. */
 export function ReaderIntegration({ onReader, onDispose }: ReaderIntegrationProps) {
   const commands = useLiMR(), document = useDocument(), { annotations, occurrences } = useAnnotations();
   const hasContent = occurrences.some(item => item.annotationIds.some(id => annotations.get(id)?.type !== 'highlight'));
-  useLayoutEffect(() => { onReader(commands, document, hasContent); }, [commands, document, hasContent, onReader]);
+  const hasTableContent = occurrences.some(item => item.annotationIds.some(id => annotations.get(id)?.type === 'table-cell-overflow'));
+  useLayoutEffect(() => { onReader(commands, document, hasContent, hasTableContent); }, [commands, document, hasContent, hasTableContent, onReader]);
   useLayoutEffect(() => () => onDispose(commands), [commands, onDispose]);
   return null;
 }

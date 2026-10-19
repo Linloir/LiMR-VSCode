@@ -15,6 +15,7 @@ interface NavigationStep {
   companion?: { group: vscode.TabGroup; before?: EditorLocation; after: EditorLocation };
 }
 interface History { back: NavigationStep[]; forward: NavigationStep[] }
+interface ReaderPair { source: vscode.TabGroup; reader: vscode.TabGroup }
 const markdown = (document: vscode.TextDocument) => /\.(md|markdown)$/i.test(document.uri.path)
   || /^(markdown|prompt|instructions|chatagent|skill)$/.test(document.languageId);
 const isReader = (tab: vscode.Tab) => tab.input instanceof vscode.TabInputCustom && tab.input.viewType === readerViewType;
@@ -36,34 +37,65 @@ export function navigationSettings(uri: vscode.Uri) {
  * paired source can return with its reader without disturbing other groups. */
 export class ReaderNavigation implements vscode.Disposable {
   private readonly histories = new Map<vscode.TabGroup, History>();
+  private readonly readerResources = new Set<string>();
+  private readonly readerTabs = new WeakMap<vscode.Tab, string>();
+  private readonly explicitSources = new WeakMap<vscode.Tab, string>();
+  private readonly pairs = new Set<ReaderPair>();
   private lastSource?: { tab: vscode.Tab; uri: string };
   private readonly subscriptions: vscode.Disposable[] = [];
   private suppressed = 0;
   private queue = Promise.resolve();
   private timer: ReturnType<typeof setTimeout> | undefined;
   constructor(private readonly reveal: (location: ReaderLocation, column: vscode.ViewColumn) => void) {
+    for (const tab of vscode.window.tabGroups.all.flatMap(group => group.tabs)) if (isReader(tab)) {
+      const uri = uriOf(tab)!.toString(); this.readerTabs.set(tab, uri); this.readerResources.add(uri);
+    }
     const schedule = () => {
       clearTimeout(this.timer);
       this.timer = setTimeout(() => { void this.serial(() => this.autoOpen()).catch(error => this.report(error)); }, 40);
     };
     this.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(schedule),
-      vscode.window.tabGroups.onDidChangeTabs(schedule),
-      vscode.window.tabGroups.onDidChangeTabGroups(event => { for (const group of event.closed) this.histories.delete(group); }));
+      vscode.window.tabGroups.onDidChangeTabs(event => {
+        if (!this.suppressed) {
+          for (const tab of event.changed) if (tab.input instanceof vscode.TabInputText && this.readerTabs.get(tab) === tab.input.uri.toString())
+            this.explicitSources.set(tab, tab.input.uri.toString());
+          // Some VS Code reopen operations replace the tab object instead of
+          // its input. The replacement text tab is already in the same group.
+          for (const closed of event.closed) if (isReader(closed)) {
+            for (const tab of closed.group.tabs) if (tab.input instanceof vscode.TabInputText && sameUri(tab.input.uri, uriOf(closed)))
+              this.explicitSources.set(tab, tab.input.uri.toString());
+          }
+        }
+        for (const tab of [...event.opened, ...event.changed]) {
+          if (isReader(tab)) this.readerTabs.set(tab, uriOf(tab)!.toString());
+          else this.readerTabs.delete(tab);
+        }
+        const open = new Set(vscode.window.tabGroups.all.flatMap(group => group.tabs).map(tab => uriOf(tab)?.toString()));
+        for (const uri of this.readerResources) if (!open.has(uri)) this.readerResources.delete(uri);
+        schedule();
+      }),
+      vscode.window.tabGroups.onDidChangeTabGroups(event => {
+        for (const group of event.closed) {
+          this.histories.delete(group);
+          for (const pair of this.pairs) if (pair.source === group || pair.reader === group) this.pairs.delete(pair);
+        }
+      }));
     schedule();
   }
-  dispose() { clearTimeout(this.timer); this.subscriptions.forEach(item => item.dispose()); this.histories.clear(); }
+  dispose() { clearTimeout(this.timer); this.subscriptions.forEach(item => item.dispose()); this.histories.clear(); this.pairs.clear(); this.readerResources.clear(); }
   private report(error: unknown) { void vscode.window.showErrorMessage(`LiMR: ${error instanceof Error ? error.message : String(error)}`); }
   private serial<T>(task: () => Promise<T>): Promise<T> {
     const next = this.queue.then(task);
     this.queue = next.then(() => {}, () => {});
     return next;
   }
-  async explicit<T>(task: () => Promise<T>): Promise<T> {
+  async explicit<T>(task: () => Promise<T>, rememberSource = true): Promise<T> {
     this.suppressed++;
     try { return await task(); }
     finally {
       const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
       this.lastSource = tab?.input instanceof vscode.TabInputText ? { tab, uri: tab.input.uri.toString() } : undefined;
+      if (rememberSource && this.lastSource) this.explicitSources.set(this.lastSource.tab, this.lastSource.uri);
       this.suppressed--;
     }
   }
@@ -78,6 +110,33 @@ export class ReaderNavigation implements vscode.Disposable {
   private companion(uri: vscode.Uri, current: vscode.TabGroup) {
     return vscode.window.tabGroups.all.find(group => group !== current && group.activeTab?.input instanceof vscode.TabInputText
       && sameUri(group.activeTab.input.uri, uri));
+  }
+  private rememberPair(source: vscode.TabGroup, reader: vscode.TabGroup) {
+    if (source === reader) return;
+    for (const pair of this.pairs) if (pair.source === source || pair.reader === source || pair.source === reader || pair.reader === reader) this.pairs.delete(pair);
+    this.pairs.add({ source, reader });
+    for (const tab of source.tabs) if (tab.input instanceof vscode.TabInputText && sameUri(tab.input.uri, uriOf(reader.activeTab))) this.explicitSources.delete(tab);
+  }
+  private async showPair(document: vscode.TextDocument, current: vscode.TabGroup, transient?: vscode.Tab, preserveFocus = true) {
+    const uri = document.uri, groups = vscode.window.tabGroups.all;
+    const remembered = [...this.pairs].find(pair => (pair.source === current || pair.reader === current) && groups.includes(pair.source) && groups.includes(pair.reader));
+    const existingReader = groups.find(group => group.tabs.some(tab => isReader(tab) && sameUri(uriOf(tab), uri)));
+    const singleReader = navigationSettings(uri).single ? groups.find(group => group.tabs.some(isReader)) : undefined;
+    const reader = remembered?.reader ?? existingReader ?? singleReader;
+    // A file opened from the reader's group still belongs to the established
+    // source group. Focus and preview-tab reuse must never swap the two roles.
+    const source = remembered?.source
+      ?? groups.find(group => group !== reader && group.tabs.some(tab => tab.input instanceof vscode.TabInputText && sameUri(tab.input.uri, uri)))
+      ?? (current !== reader ? current : this.otherGroup(uri, current));
+    const editor = await vscode.window.showTextDocument(document, { viewColumn: source?.viewColumn ?? vscode.ViewColumn.Beside, preview: false });
+    const sourceGroup = this.group(editor.viewColumn);
+    const target = reader && reader !== sourceGroup ? reader : this.otherGroup(uri, sourceGroup, true);
+    const readerGroup = await this.showReader({ uri: uri.toString() }, target?.viewColumn ?? vscode.ViewColumn.Beside, undefined, preserveFocus);
+    this.rememberPair(sourceGroup, readerGroup);
+    // The pinned source now owns the same buffer in its original column. Only
+    // remove a redundant, clean tab created on the reader side by this open.
+    if (transient && current !== sourceGroup && current.tabs.includes(transient) && !transient.isDirty)
+      await vscode.window.tabGroups.close(transient, true);
   }
   private captureEditor(group?: vscode.TabGroup): EditorLocation | undefined {
     const tab = group?.activeTab, uri = uriOf(tab);
@@ -111,13 +170,17 @@ export class ReaderNavigation implements vscode.Disposable {
     return group;
   }
   readerOpened(uri: vscode.Uri, column?: vscode.ViewColumn) {
+    // Native Reopen With replaces the tab input while retaining the resource.
+    // Respect source access until its last tab closes. TextDocument lifetime is
+    // longer than tab lifetime, so it cannot delimit this choice.
+    this.readerResources.add(uri.toString());
     if (!navigationSettings(uri).single) return Promise.resolve();
     return this.serial(() => this.explicit(async () => {
       const current = this.group(column).activeTab;
       if (!current || !isReader(current) || !sameUri(uriOf(current), uri)) return;
       const others = vscode.window.tabGroups.all.flatMap(group => group.tabs).filter(tab => tab !== current && isReader(tab) && !tab.isDirty);
       if (others.length) await vscode.window.tabGroups.close(others, true);
-    }));
+    }, false));
   }
   open(uri: vscode.Uri, beside: boolean) {
     return this.serial(() => this.explicit(async () => {
@@ -125,10 +188,8 @@ export class ReaderNavigation implements vscode.Disposable {
       let column = current.viewColumn;
       if (beside) {
         const document = await vscode.workspace.openTextDocument(uri);
-        const source = vscode.window.visibleTextEditors.find(editor => sameUri(editor.document.uri, uri));
-        await vscode.window.showTextDocument(document, { viewColumn: source?.viewColumn ?? column, preview: false });
-        const sourceGroup = this.group(source?.viewColumn ?? column);
-        column = this.otherGroup(uri, sourceGroup, true)?.viewColumn ?? vscode.ViewColumn.Beside;
+        await this.showPair(document, current, undefined, false);
+        return;
       }
       if (navigationSettings(uri).single) {
         column = vscode.window.tabGroups.all.find(group => group.tabs.some(isReader))?.viewColumn ?? column;
@@ -143,9 +204,11 @@ export class ReaderNavigation implements vscode.Disposable {
     const key = editor.document.uri.toString();
     if (this.lastSource?.tab === tab && this.lastSource.uri === key) return;
     this.lastSource = { tab, uri: key };
+    if (this.explicitSources.get(tab) === key) return;
     if (!markdown(editor.document)) return;
     const settings = navigationSettings(editor.document.uri);
     if (settings.open === 'none') return;
+    if (settings.open === 'reader' && this.readerResources.has(key)) return;
     await this.explicit(async () => {
       if (settings.open === 'reader') {
         await this.showReader({ uri: key }, group.viewColumn);
@@ -153,11 +216,9 @@ export class ReaderNavigation implements vscode.Disposable {
         // the custom text editor. Dirty tabs remain available for explicit save.
         if (!tab.isDirty && group.tabs.includes(tab)) await vscode.window.tabGroups.close(tab, true);
       } else {
-        const target = settings.single ? vscode.window.tabGroups.all.find(group => group.tabs.some(isReader)) : this.otherGroup(editor.document.uri, group, true);
-        if (target?.activeTab && isReader(target.activeTab) && sameUri(uriOf(target.activeTab), editor.document.uri)) return;
-        await this.showReader({ uri: key }, target?.viewColumn ?? vscode.ViewColumn.Beside, target?.activeTab, true);
+        await this.showPair(editor.document, group, tab);
       }
-    });
+    }, false);
   }
   follow(from: ReaderLocation, to: ReaderLocation, column?: vscode.ViewColumn) {
     return this.serial(() => this.explicit(async () => {
@@ -179,6 +240,7 @@ export class ReaderNavigation implements vscode.Disposable {
       }
       const previous = current.activeTab;
       await this.showReader(to, current.viewColumn, previous);
+      if (step.companion) this.rememberPair(step.companion.group, current);
       const history = this.histories.get(current) ?? { back: [], forward: [] };
       history.back.push(step); if (history.back.length > 100) history.back.shift(); history.forward = [];
       this.histories.set(current, history);

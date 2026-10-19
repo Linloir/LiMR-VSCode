@@ -41,6 +41,7 @@ export function readerSettings(uri: vscode.Uri, fileOverrides: ReaderFileSetting
     codeFontFamily: config.get<string>('codeFontFamily', ''), codeFontSize: config.get<number>('codeFontSize', 14),
     lineHeight: config.get<number>('lineHeight', 1.8), maxWidth: config.get<number>('maxWidth', 860),
     sidebarMode, sidebarAutoCollapse: config.get<boolean>('sidebarAutoCollapse', true), showToc: tocMode !== 'hidden', tocMode,
+    contentAlignment: choice(config.get('contentAlignment'), ['window', 'remaining'] as const, 'window'),
     imagePathMode: choice(config.get('images.pathMode'), ['auto', 'file', 'workspace', 'folder'] as const, 'auto'),
     imageBaseFolder: config.get<string>('images.baseFolder', ''),
     imageSearchPaths: Array.isArray(imageSearchPaths) ? imageSearchPaths.filter((value): value is string => typeof value === 'string' && !!value.trim()) : [],

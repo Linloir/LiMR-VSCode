@@ -12,15 +12,15 @@ const files = await Promise.all((await readdir(directory)).filter(name => name.e
 
 it('guards the typography correction against unreviewed versions, source drift and ambiguous modules', () => {
   const target = files.find(file => file.source.includes('// src/react/knuth-plass-layout.ts'));
-  expect(() => typographyCompatibilityModules(files, '1.3.5')).toThrow(/Review the LiMR typography adapter/);
-  expect(() => typographyCompatibilityModules(files.map(file => file === target ? { ...file, source: file.source + '\n' } : file), '1.3.4')).toThrow(/reviewed npm artifact/);
-  expect(() => typographyCompatibilityModules([...files, target], '1.3.4')).toThrow(/exactly one/);
+  expect(() => typographyCompatibilityModules(files, '1.3.6')).toThrow(/Review the LiMR typography adapter/);
+  expect(() => typographyCompatibilityModules(files.map(file => file === target ? { ...file, source: file.source + '\n' } : file), '1.3.5')).toThrow(/reviewed npm artifact/);
+  expect(() => typographyCompatibilityModules([...files, target], '1.3.5')).toThrow(/exactly one/);
 });
 
 // Exercise the transformed module's actual registration and release code with
 // observable browser API doubles. Browser acceptance checks clipping/layout.
 function harness({ prepareMilliseconds = 0 } = {}) {
-  const source = [...typographyCompatibilityModules(files, '1.3.4').values()][0];
+  const source = [...typographyCompatibilityModules(files, '1.3.5').values()][0];
   const observers = [];
   class Observer {
     targets = new Set(); disconnect = vi.fn(() => this.targets.clear());

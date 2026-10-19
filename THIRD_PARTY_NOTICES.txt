@@ -1393,7 +1393,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-@linloir/limr 1.3.4
+@linloir/limr 1.3.5
 License: MIT
 
 LICENSE

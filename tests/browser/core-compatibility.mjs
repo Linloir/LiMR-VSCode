@@ -46,6 +46,16 @@ export async function runCoreCompatibilityAcceptance({ page, frame, host, artifa
     await expect(fallback(alt)).toHaveCSS('border-radius', await image(alt).evaluate(element => getComputedStyle(element).borderRadius));
   }
   await record({ check: 'Missing and corrupt local images use the core localized fallback in Markdown, figures, tables and links; borderless icon and matching corners are preserved' });
+  await expect(fallback('Missing figure')).toHaveAttribute('data-compact');
+  await expect(fallback('Missing figure').locator('.limr-image-fallback-message')).toBeHidden();
+  const compact = await fallback('Missing figure').evaluate(element => {
+    const box = element.getBoundingClientRect(), icon = element.querySelector('.limr-image-fallback-icon').getBoundingClientRect();
+    return { height: box.height, x: icon.left + icon.width / 2 - (box.left + box.width / 2), y: icon.top + icon.height / 2 - (box.top + box.height / 2), overflow: getComputedStyle(element).overflow };
+  });
+  expect(compact.height).toBeCloseTo(120, 2);
+  expect(Math.abs(compact.x)).toBeLessThan(1); expect(Math.abs(compact.y)).toBeLessThan(1);
+  expect(compact.overflow).toBe('clip');
+  await record({ check: 'LiMR 1.3.5 compact image fallback centers its icon within the reserved figure height without scrollbars', compact });
 
   const colors = {};
   for (const theme of themes) {
@@ -133,12 +143,15 @@ export async function runCoreCompatibilityAcceptance({ page, frame, host, artifa
     const beginning = frame.locator('.limr-toc').getByRole('link', { name: title, exact: true });
     await expect(beginning).toBeVisible({ timeout: 60000 });
     await expect(frame.locator('.lv-app')).toHaveAttribute('data-reader-ready', 'true', { timeout: 60000 });
+    // Leave the previous fixture's pinned note through the reader's own blank
+    // space. A click outside the webview cannot clear core interaction state.
+    await root.click({ position: { x: 8, y: 8 } });
     await beginning.click();
     await expect(frame.getByRole('heading', { name: title, exact: true })).toBeInViewport();
     await frame.evaluate(() => document.fonts.ready);
     if (windowed) await expect(frame.locator('[data-limr-windowed]').first()).toBeVisible();
     for (const index of windowed ? [0, 10, 19] : [0]) {
-      await page.mouse.click(2, 2);
+      await root.click({ position: { x: 8, y: 8 } });
       await frame.locator('.limr-toc').getByRole('link', { name: `Section ${index}`, exact: true }).click();
       const reference = frame.locator('.limr-reader-content strong').filter({ hasText: `Shared reference ${index}` });
       await expect(reference).toBeInViewport(); await wait(700);

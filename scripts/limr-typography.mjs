@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 
-// LiMR 1.3.4 observes typography against the page viewport. Its rootMargin
+// LiMR 1.3.5 observes typography against the page viewport. Its rootMargin
 // cannot extend through the VS Code reader's overflow:auto scroll container.
 // Keep the configured scroll root's preparation margin, while preserving core's
 // batched reads/writes and 6ms RAF budget. Mounting or scrolling must not run
 // synchronous per-paragraph typesetting ahead of that shared scheduler.
-const reviewedVersion = '1.3.4';
+const reviewedVersion = '1.3.5';
 const reviewedSHA256 = '8d8d1c1d08f15a646edf90ea996f613dcedbad330a570a574858f81487580b38';
 const replacements = [
   [
@@ -112,7 +112,7 @@ export function typographyCompatibilityModules(files, version) {
   if (targets.length !== 1) throw new Error('LiMR typography adapter expected exactly one typography module.');
   const { filename, source } = targets[0];
   if (createHash('sha256').update(source).digest('hex') !== reviewedSHA256) {
-    throw new Error('LiMR 1.3.4 typography differs from the reviewed npm artifact; review the typography adapter.');
+    throw new Error('LiMR 1.3.5 typography differs from the reviewed npm artifact; review the typography adapter.');
   }
   let result = source;
   for (const [before, after] of replacements) {

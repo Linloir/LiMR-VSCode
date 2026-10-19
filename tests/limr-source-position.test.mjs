@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import path from 'node:path';
 import { captureFallbackCorrection } from '../scripts/limr-source-position.mjs';
 
-const module = await readFile('node_modules/@linloir/limr/dist/chunk-A7XTWZD5.js', 'utf8');
+const directory = path.join(path.dirname(createRequire(import.meta.url).resolve('@linloir/limr/package.json')), 'dist');
+const modules = await Promise.all((await readdir(directory)).filter(name => name.endsWith('.js')).map(name => readFile(path.join(directory, name), 'utf8')));
+const targets = modules.filter(source => source.includes('function captureReadingPosition(runtime, measuredBlock) {'));
+assert.equal(targets.length, 1);
+const module = targets[0];
 const [before, after] = captureFallbackCorrection(module);
 const rect = (top, width = 10, height = 16) => ({ top, bottom: top + height, left: 0, right: width, width, height });
 const empty = () => rect(0, 0, 0);

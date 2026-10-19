@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { typographyCompatibilityModules } from './limr-typography.mjs';
 import { captureFallbackCorrection } from './limr-source-position.mjs';
 
-// Reviewed compatibility corrections for the published LiMR 1.3.4 reader.
+// Reviewed compatibility corrections for the published LiMR 1.3.5 reader.
 // Keep the rendering logic in core: adapt its module at build time, without
 // changing node_modules or copying a renderer into the VS Code webview.
 // Remove this adapter when a reviewed upstream release contains these fixes.
@@ -16,8 +16,8 @@ import { captureFallbackCorrection } from './limr-source-position.mjs';
 //    and wait for measurable restored viewports.
 // 5. Measure resized slots and publish their scroll correction before paint,
 //    instead of exposing the changed flow for a frame before the next RAF.
-const reviewedVersion = '1.3.4';
-const reviewedSHA256 = "5b83815a5ca79f0413b3fb896e13b4bcf5075c0feade20a0b4e70c829b416664";
+const reviewedVersion = '1.3.5';
+const reviewedSHA256 = "013d560be503157776e38a6cdb01c1d0076cdf8d8feb15f120313d1e99792563";
 const replacements = [
   [
 `  const source = Number(block.element.dataset.sourceStart);
@@ -316,7 +316,7 @@ export function scrollCompatibilityModules(files, version) {
   if (targets.length !== 1) throw new Error('LiMR scroll adapter expected exactly one windowed reader module.');
   const { filename, source } = targets[0];
   if (createHash('sha256').update(source).digest('hex') !== reviewedSHA256) {
-    throw new Error('LiMR 1.3.4 windowed reader differs from the reviewed npm artifact; review the scroll adapter.');
+    throw new Error('LiMR 1.3.5 windowed reader differs from the reviewed npm artifact; review the scroll adapter.');
   }
   let result = source;
   for (const [before, after] of [captureFallbackCorrection(source), ...replacements]) {

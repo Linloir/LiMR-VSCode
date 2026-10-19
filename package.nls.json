@@ -93,5 +93,8 @@
   "limr.markdownLinkMode.option.smart": "Smart: synchronize a source/reader pair for the same document; otherwise navigate only the current reader",
   "limr.singleReader.description": "Reuse one LiMR reader, closing other saved reader tabs after opening. Unsaved tabs are retained to protect edits.",
   "command.navigateBack": "Go Back in Reader",
-  "command.navigateForward": "Go Forward in Reader"
+  "command.navigateForward": "Go Forward in Reader",
+  "limr.contentAlignment.description": "When the annotation sidebar is absent and a side TOC is visible, center the article in the whole reader window or in the space to the right of the TOC.",
+  "limr.contentAlignment.option.window": "Center in the reader window",
+  "limr.contentAlignment.option.remaining": "Center in the space to the right of the TOC"
 }

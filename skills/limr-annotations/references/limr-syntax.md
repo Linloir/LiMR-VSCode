@@ -1,8 +1,8 @@
-# LiMR 1.3.4 offline syntax guide
+# LiMR 1.3.5 offline syntax guide
 
-Use this bundled reference when writing LiMR Markdown; no `limr-use` skill, package checkout, or network access is required. It describes the default LiMR 1.3.4 modules, with VS Code additions identified separately. For source annotation ranges, definitions, and safe edits, use [the annotation contract](source-annotations.md). For new syntax, use [the plugin contract](reader-plugins.md).
+Use this bundled reference when writing LiMR Markdown; no `limr-use` skill, package checkout, or network access is required. It describes the default LiMR 1.3.5 modules, with VS Code additions identified separately. For source annotation ranges, definitions, and safe edits, use [the annotation contract](source-annotations.md). For new syntax, use [the plugin contract](reader-plugins.md).
 
-Official documentation: [中文入口](https://linloir.github.io/LiMR/#/docs/zh-CN/README) · [English entry](https://linloir.github.io/LiMR/#/docs/en/README) · [中文语法](https://linloir.github.io/LiMR/#/docs/zh-CN/syntax) · [English syntax](https://linloir.github.io/LiMR/#/docs/en/syntax) · [documentation source](https://github.com/Linloir/LiMR/tree/main/docs). Online docs can describe a newer release; this reference targets 1.3.4.
+Official documentation: [中文入口](https://linloir.github.io/LiMR/#/docs/zh-CN/README) · [English entry](https://linloir.github.io/LiMR/#/docs/en/README) · [中文语法](https://linloir.github.io/LiMR/#/docs/zh-CN/syntax) · [English syntax](https://linloir.github.io/LiMR/#/docs/en/syntax) · [documentation source](https://github.com/Linloir/LiMR/tree/main/docs). Online docs can describe a newer release; this reference targets 1.3.5.
 
 ## Citations: wrap the supported text
 
@@ -78,7 +78,7 @@ Avoid generating adjacent blocks such as `<translations><origin>The cache</origi
 
 `default` accepts `origin`, `translation`, or `both`; omitted means `origin` under default module settings. `both` shows the translation above the original. These are **source syntax** values: the VS Code display settings use `original`, `translated`, `bilingual`, and `paragraph`. User/file display settings can override block defaults without rewriting the translation. LiMR displays the supplied translation; it does not generate it.
 
-LiMR 1.3.4 keeps interactive text selections within an original or translated region by default, and shows a hint when a drag crosses its boundary. This prevents the reversed visual/source order from capturing unexpected text. It does not invalidate existing source annotation ranges or restrict annotations written through the source API.
+LiMR 1.3.5 keeps interactive text selections within an original or translated region by default, and shows a hint when a drag crosses its boundary. This prevents the reversed visual/source order from capturing unexpected text. It does not invalidate existing source annotation ranges or restrict annotations written through the source API.
 
 ## Highlights, footnotes, and source annotations
 
@@ -189,8 +189,8 @@ Built-in names are `gfm`, `definition`, `title`, `content`, `question`, `questio
 
 Code examples do not authorize source annotation boundaries. However, a real annotation definition elsewhere can activate matching boundaries even inside code. Escape the first colon of both boundaries to display them literally, such as `\::%%limr%%{<#example}` and `\::%%limr%%{>#example}`. The source annotation contract explains other literal contexts.
 
-The VS Code reader additionally renders a leading YAML `---` frontmatter block as metadata. This is a bundled extension feature, not a claim that the core 1.3.4 component syntax supports arbitrary YAML props or MDX execution.
+The VS Code reader additionally renders a leading YAML `---` frontmatter block as metadata. This is a bundled extension feature, not a claim that the core 1.3.5 component syntax supports arbitrary YAML props or MDX execution.
 
 ## Native image preview in VS Code
 
-LiMR 1.3.4 provides the image preview for ordinary Markdown images and `figure` / `figures`. Click an image or use its keyboard action to open it. The toolbar cycles fit / actual size / fill, zooms, copies image pixels, and closes; Escape restores focus. The extension resolves local image URLs and adapts the controls to the selected reader theme and high contrast. A linked image retains its link behavior. Image preview changes neither the Markdown nor the source image.
+LiMR 1.3.5 provides the image preview for ordinary Markdown images and `figure` / `figures`. Click an image or use its keyboard action to open it. The toolbar cycles fit / actual size / fill, zooms, copies image pixels, and closes; Escape restores focus. The extension resolves local image URLs and adapts the controls to the selected reader theme and high contrast. A linked image retains its link behavior. Image preview changes neither the Markdown nor the source image.

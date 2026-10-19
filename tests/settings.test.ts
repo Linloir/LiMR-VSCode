@@ -70,6 +70,13 @@ describe('reader preferences', () => {
     values.config.sidebarMode = 'unsupported';
     expect(readerSettings(uri).sidebarMode).toBe('content');
   });
+  it('centers the article in the window by default and validates the remaining-space choice', () => {
+    expect(readerSettings(uri).contentAlignment).toBe('window');
+    values.config.contentAlignment = 'remaining';
+    expect(readerSettings(uri).contentAlignment).toBe('remaining');
+    values.config.contentAlignment = 'unsupported';
+    expect(readerSettings(uri).contentAlignment).toBe('window');
+  });
   it('exposes image strategy and preserves the configured fallback directory order', () => {
     expect(readerSettings(uri)).toMatchObject({ imagePathMode: 'auto', imageBaseFolder: '', imageSearchPaths: [] });
     values.config = { 'images.pathMode': 'folder', 'images.baseFolder': '~/Pictures/My Images', 'images.searchPaths': ['assets', '/shared/图片', 'file:///tmp/images', '', 7] };

@@ -3,6 +3,7 @@ export type ReaderTypography = 'standard' | 'justify' | 'knuth-plass';
 export type ReaderTranslationMode = 'bilingual' | 'original' | 'translated' | 'paragraph';
 export type ParagraphTranslationMode = 'origin' | 'translation' | 'both';
 export type ReaderTocMode = 'always' | 'wide' | 'hidden';
+export type ReaderContentAlignment = 'window' | 'remaining';
 export type ReaderSidebarMode = 'always' | 'content' | 'hidden';
 export type ReaderImagePathMode = 'auto' | 'file' | 'workspace' | 'folder';
 export type ReaderLanguage = 'auto' | 'zh-CN' | 'en';
@@ -32,6 +33,7 @@ export interface ReaderSettings {
   imageSearchPaths: string[];
   showToc: boolean;
   tocMode: ReaderTocMode;
+  contentAlignment: ReaderContentAlignment;
   typography: ReaderTypography;
   translationMode: ReaderTranslationMode;
   language: ReaderLanguage;

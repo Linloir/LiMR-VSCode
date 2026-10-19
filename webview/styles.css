@@ -131,6 +131,11 @@ body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button:focus
 .lv-reader.lv-centered-toc[data-toc]:not([data-sidebar]) > .limr-reader-toc { display: block; grid-column: 1; width: min(260px, 100%); justify-self: start; }
 .lv-reader.lv-centered-toc[data-toc]:not([data-sidebar]) > .limr-reader-content { grid-column: 2; }
 .lv-reader.lv-centered-toc[data-toc]:not([data-sidebar]) > .limr-reader-mobile-toc { display: none; }
+/* Reserve only the TOC rail, then center the reading measure in what remains. */
+.lv-reader.lv-remaining-toc[data-toc]:not([data-sidebar]) { grid-template-columns: var(--limr-toc-width) minmax(0, 1fr); grid-template-rows: auto; }
+.lv-reader.lv-remaining-toc[data-toc]:not([data-sidebar]) > .limr-reader-toc { display: block; grid-column: 1; }
+.lv-reader.lv-remaining-toc[data-toc]:not([data-sidebar]) > .limr-reader-content { grid-column: 2; }
+.lv-reader.lv-remaining-toc[data-toc]:not([data-sidebar]) > .limr-reader-mobile-toc { display: none; }
 .lv-reader .limr-prose > :first-child { margin-block-start: 0; }
 .lv-reader[data-limr-appearance="vscode"] .limr-prose h1 { margin-block-end: 1.2rem; }
 .lv-reader[data-limr-appearance="vscode"] .limr-prose h2 { padding-block-end: .35em; border-bottom: 1px solid var(--lv-border); }
@@ -168,12 +173,10 @@ body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button:focus
    animation. Keep the viewport invariant; wheel, touch and drag still pan. */
 .limr-image-preview-stage { scrollbar-width: none; }
 .limr-image-preview-stage::-webkit-scrollbar { width: 0; height: 0; }
-/* A failed figure keeps the same reserved media height as its pending image.
-   Core's 156px fallback would otherwise enlarge the default 120px placeholder
-   and move an already visible caption. Long hints remain readable by scrolling. */
+/* Retain the reserved figure height without overriding LiMR 1.3.5's compact
+   fallback, clipping or explicit image dimensions. Small boxes show its icon. */
 .limr-figure-media .limr-image-fallback {
-  height: var(--limr-figure-min-height); min-height: var(--limr-figure-min-height);
-  padding-block: 12px; overflow: auto; justify-content: safe center;
+  height: var(--limr-figure-min-height);
 }
 /* Unlayered host resets otherwise win over the new native toolbar skin. */
 .limr-image-preview-toolbar > button { color: var(--limr-secondary); background: transparent; }
