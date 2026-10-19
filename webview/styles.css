@@ -206,6 +206,10 @@ body[data-reader-contrast='high'] .limr-image-preview-toolbar > button:focus-vis
 .limr-annotation-overlay:has(.lv-note-content) .limr-overlay-content { padding: 0 .9rem .75rem; }
 .lv-note-content { font-size: 14px; line-height: 1.6; text-align: start; user-select: text; }
 .lv-note-content .limr-annotation-markdown { --limr-font-size: 14px; line-height: 1.6; }
+/* AnnotationMarkdown disables selection tracking but still mounts core's paint
+   layer. Its read-only content needs native selection in overlays and sidebars. */
+.limr-annotation-markdown { user-select: text; }
+.limr-annotation-markdown::selection, .limr-annotation-markdown ::selection { background: var(--limr-selection, var(--lv-selection)); }
 .lv-note-content .limr-annotation-markdown > :first-child { margin-block-start: 0; }
 .lv-note-content .limr-annotation-markdown > :last-child { margin-block-end: 0; }
 .lv-note-empty { color: var(--lv-muted); margin: 0; }

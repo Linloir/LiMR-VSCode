@@ -58,6 +58,8 @@ Run `npm run test:navigation` for skill-language toolbar and real link navigatio
 
 `npm run test:annotations` checks source annotation creation, highlight visibility, range deletion and Undo, bilingual question/answer anchors, and clicking collapsed sidebar previews.
 
+`node scripts/test-vscode.mjs --annotation-selection` uses real mouse drags and clipboard reads in narrow hover/expanded overlays and wide adaptive/fixed sidebars, with light and dark themes. The host restores native selection backgrounds for read-only `AnnotationMarkdown`: core still mounts its paint layer when selection tracking is disabled, so its transparent native selection rule otherwise hides the selected text. `LIMR_TEST_OBSERVE_ONLY=1` records the unfixed behavior without asserting selection colors.
+
 ## Loading and performance checks
 
 `node scripts/test-vscode.mjs --large-scroll` checks continuous scrolling in both panes, gutter takeover, source/DOM continuity and per-frame reading anchors in a large document. Set `LIMR_TEST_LARGE_DOCUMENT` to a local Markdown file to exercise a copy of it in the disposable workspace; the original is never edited. `LIMR_TEST_WIDTH` selects a narrower test window.

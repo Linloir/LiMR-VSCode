@@ -224,6 +224,7 @@ try {
     if (session) await session.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   }
   const runAcceptance = skillSuite ? runSkillAcceptance
+    : process.argv.includes('--annotation-selection') ? (await import('../tests/browser/annotation-selection.mjs')).runAnnotationSelectionAcceptance
     : process.argv.includes('--core-compatibility') ? (await import('../tests/browser/core-compatibility.mjs')).runCoreCompatibilityAcceptance
     : process.env.LIMR_TEST_SUITE === 'annotations' || process.argv.includes('--annotations') ? (await import('../tests/browser/annotations.mjs')).runAnnotationAcceptance
     : process.argv.includes('--navigation-modes') ? (await import('../tests/browser/navigation-modes.mjs')).runNavigationModesAcceptance
