@@ -78,7 +78,7 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 
 这会稍微放大正文、缩窄阅读宽度，并只在宽屏显示目录。切换颜色主题不会重置字体。图片的固定目录和额外目录支持绝对路径、`file:` URI、`~`，相对目录基于当前文件所属工作区；未打开工作区时基于文件目录。
 
-排版与翻译还支持“仅当前文件”的覆盖：执行 **LiMR: Choose Typography** 或 **LiMR: Choose Translation Display** 后，先选择具体配置，再选择应用于当前文件或默认配置。第一步会标明当前值和默认值；选择“当前文件恢复默认”直接清除该项覆盖，翻译设置也会清除各段落覆盖。默认配置遵循 VS Code 的用户、工作区及文件夹优先级，菜单会显示实际范围。覆盖在下次打开时保留，不改写 Markdown；**LiMR: Reset Current File Reading Settings** 可恢复默认。
+排版与翻译还支持“仅当前文件”的覆盖：执行 **LiMR: Choose Typography** 或 **LiMR: Choose Translation Display** 后，先选择具体配置，再选择应用于当前文件或默认配置。选择“默认配置”会保存默认值，并让当前文件的该项设置恢复跟随默认；翻译设置也会清除当前文件的段落覆盖，其他文件的独立设置保留。第一步会标明当前值和默认值；选择“当前文件恢复默认”直接清除该项覆盖，翻译设置也会清除各段落覆盖。默认配置遵循 VS Code 的用户、工作区及文件夹优先级，菜单会显示实际范围。覆盖在下次打开时保留，不改写 Markdown；**LiMR: Reset Current File Reading Settings** 可恢复默认。
 
 ## 用 AI 自定义外观与能力
 
@@ -218,7 +218,7 @@ For example, add this to User Settings JSON or your project's `.vscode/settings.
 
 This slightly enlarges body text, narrows the article, and shows contents only in wide readers. Switching color themes preserves font settings. Fixed and additional image directories accept absolute paths, `file:` URIs, and `~`; relative directories start at the file's workspace, or its directory when no workspace is open.
 
-Typography and translation support per-file overrides through **LiMR: Choose Typography** and **LiMR: Choose Translation Display**. Choose a value first, then apply it to this file or the default settings. The first menu shows the current and default values; “Reset this file to default” clears the override immediately, including paragraph overrides for translation. Defaults follow VS Code user/workspace/folder precedence, with the actual scope shown in the menu. Overrides persist across reopening without rewriting Markdown. **LiMR: Reset Current File Reading Settings** restores the defaults.
+Typography and translation support per-file overrides through **LiMR: Choose Typography** and **LiMR: Choose Translation Display**. Choose a value first, then apply it to this file or the default settings. Choosing default settings also clears this file’s override for that preference, including paragraph overrides for translation; other files keep their overrides. The first menu shows the current and default values; “Reset this file to default” clears the override immediately, including paragraph overrides for translation. Defaults follow VS Code user/workspace/folder precedence, with the actual scope shown in the menu. Overrides persist across reopening without rewriting Markdown. **LiMR: Reset Current File Reading Settings** restores the defaults.
 
 ## Customize appearance and capabilities with AI
 

@@ -53,7 +53,7 @@ import { activate } from '../src/extension';
 interface Provider {
   resolveCustomTextEditor(document:VSCode.TextDocument,panel:VSCode.WebviewPanel):void;
   setFileSettings(uri:VSCode.Uri,incoming:ReaderFileSettings,replace?:boolean,epoch?:number,version?:number):Promise<void>;
-  choosePreference(key:'translationMode',uri?:VSCode.Uri):Promise<void>;
+  choosePreference(key:'typography'|'translationMode',uri?:VSCode.Uri):Promise<void>;
   dispose():void;
 }
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(done=>{resolve=done;});return{promise,resolve};};
@@ -104,11 +104,56 @@ describe('native provisional translation write ordering (actual registered provi
       expect(state.posts.filter(item=>item.message.type==='translationIntent')).toEqual([]);
     }
   });
+  it.each([
+    { chosen: 'bilingual', override: 'original' },
+    { chosen: 'translated', override: 'original' },
+    { chosen: 'bilingual', override: undefined },
+  ] as const)('applies default $chosen to the current file and clears its $override and paragraph overrides', async ({ chosen, override }) => {
+    const document = attach('workspace/a.md'), other = attach('workspace/b.md');
+    const key = 'limr.fileSettings:' + document.uri.toString(), otherKey = 'limr.fileSettings:' + other.uri.toString();
+    values.set(key, { ...(override ? { translationMode: override } : {}), translationParagraphs: { first: 'origin' }, typography: 'justify' });
+    const independent: ReaderFileSettings = { translationMode: 'original', translationParagraphs: { other: 'translation' } };
+    values.set(otherKey, independent);
+    state.picks = [chosen, 'default'];
+    state.configBarrier = () => expect(state.posts.filter(item => item.message.type === 'translationIntent').map(item => item.uri)).toEqual([document.uri.toString()]);
+    await provider.choosePreference('translationMode', document.uri);
+    expect(state.updates).toEqual([{ key: 'translationMode', value: chosen, target: 1 }]);
+    expect(values.get(key)).toEqual({ typography: 'justify' });
+    expect(values.get(otherKey)).toEqual(independent);
+  });
+  it('returns typography to the selected default without clearing translation preferences', async () => {
+    const document = attach('workspace/a.md'), key = 'limr.fileSettings:' + document.uri.toString();
+    const translations: ReaderFileSettings = { translationMode: 'original', translationParagraphs: { first: 'both' } };
+    values.set(key, { ...translations, typography: 'knuth-plass' });
+    state.picks = ['standard', 'default'];
+    await provider.choosePreference('typography', document.uri);
+    expect(state.updates).toEqual([{ key: 'typography', value: 'standard', target: 1 }]);
+    expect(values.get(key)).toEqual(translations);
+  });
+  it('preserves the file override when saving the default fails', async () => {
+    const document = attach('workspace/a.md'), key = 'limr.fileSettings:' + document.uri.toString();
+    const original: ReaderFileSettings = { translationMode: 'original', translationParagraphs: { first: 'origin' } };
+    values.set(key, original); state.picks = ['translated', 'default'];
+    state.configBarrier = () => { throw new Error('Cannot save default'); };
+    await expect(provider.choosePreference('translationMode', document.uri)).rejects.toThrow('Cannot save default');
+    expect(values.get(key)).toEqual(original); expect(writes).toEqual([]);
+  });
+  it('clears overrides after queued writes while retaining their unrelated typography change', async () => {
+    const document = attach('workspace/a.md'), key = 'limr.fileSettings:' + document.uri.toString();
+    values.set(key, { translationMode: 'original', translationParagraphs: { first: 'origin' } });
+    const held = { entered: deferred(), released: deferred() }; blockNext = held;
+    const earlier = provider.setFileSettings(document.uri, { typography: 'knuth-plass' }); await held.entered.promise;
+    const stale = provider.setFileSettings(document.uri, { translationMode: 'paragraph', translationParagraphs: { old: 'origin' } }, false, 0, 3);
+    state.picks = ['bilingual', 'default']; state.configBarrier = () => held.released.resolve();
+    await provider.choosePreference('translationMode', document.uri); await Promise.all([earlier, stale]);
+    expect(values.get(key)).toEqual({ typography: 'knuth-plass' });
+    expect(writes).toHaveLength(2);
+  });
   it('rejects a queued old completion after a same-value native default choice, before config write',async()=>{
     const document=attach('workspace/a.md'),held={entered:deferred(),released:deferred()};blockNext=held;
     const earlier=provider.setFileSettings(document.uri,{typography:'justify'});await held.entered.promise;
     const stale=provider.setFileSettings(document.uri,{translationMode:'paragraph',translationParagraphs:{old:'origin'}},false,0,3);
-    state.picks=['bilingual','default'];state.configBarrier=()=>{expect(state.posts.some(item=>item.uri===document.uri.toString()&&item.message.type==='translationIntent'&&item.message.epoch===1)).toBe(true);};
+    state.picks=['bilingual','default'];state.configBarrier=()=>{expect(state.posts.some(item=>item.uri===document.uri.toString()&&item.message.type==='translationIntent'&&item.message.epoch===1)).toBe(true);held.released.resolve();};
     await provider.choosePreference('translationMode',document.uri);held.released.resolve();await Promise.all([earlier,stale]);
     expect(writes).toEqual([{key:'limr.fileSettings:'+document.uri.toString(),value:{typography:'justify'}}]);
     expect(values.get('limr.fileSettings:'+document.uri.toString())).toEqual({typography:'justify'});

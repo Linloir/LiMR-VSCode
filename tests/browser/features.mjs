@@ -155,11 +155,18 @@ export async function runFeatureAcceptance({ page, frame, host, artifacts }) {
   await reopen();
   await expect(article()).toHaveAttribute('data-limr-typography', 'knuth-plass');
   expect((await host('readConfiguration', { keys: ['typography'] })).typography).toBe('justify');
+  await pick('limr.chooseTypography', '默认配置', '两端对齐');
+  await expect(article()).toHaveAttribute('data-limr-typography', 'justify');
+  await host('configure', { values: { typography: 'standard' } });
+  await expect(article()).toHaveAttribute('data-limr-typography', 'standard');
+  await host('configure', { values: { typography: 'justify' } });
+  await expect(article()).toHaveAttribute('data-limr-typography', 'justify');
+  await pick('limr.chooseTypography', '当前文件', 'Knuth–Plass');
   await pick('limr.chooseTypography', '当前文件恢复默认');
   await expect(article()).toHaveAttribute('data-limr-typography', 'justify');
   await pick('limr.chooseTypography', '当前文件', '标准');
   await expect(article()).toHaveAttribute('data-limr-typography', 'standard');
-  await save({ check: 'Typography uses native settings dialogs: default justification, per-file Knuth–Plass survives closing and reopening, reset follows default, and standard remains selectable' });
+  await save({ check: 'Typography toolbar/status settings persist per-file Knuth–Plass, and choosing the same default clears this file override so later default changes apply immediately' });
 
   await expect.poll(modes).toEqual(['origin', 'translation']);
   await pick('limr.chooseTranslationMode', '默认配置', '对照');
@@ -182,10 +189,17 @@ export async function runFeatureAcceptance({ page, frame, host, artifacts }) {
   await expect.poll(modes).toEqual(['translation', 'both']);
   await pick('limr.chooseTranslationMode', '当前文件', '仅原文');
   await expect.poll(modes).toEqual(['origin', 'origin']);
+  await pick('limr.chooseTranslationMode', '默认配置', '按照段落配置');
+  await expect.poll(modes).toEqual(['origin', 'translation']);
+  await reopen();
+  await expect.poll(modes).toEqual(['origin', 'translation']);
+  await host('configure', { values: { translationMode: 'bilingual' } });
+  await expect.poll(modes).toEqual(['both', 'both']);
+  await pick('limr.chooseTranslationMode', '当前文件', '仅原文');
   await pick('limr.chooseTranslationMode', '当前文件恢复默认');
   await expect.poll(modes).toEqual(['both', 'both']);
   expect((await host('readConfiguration', { keys: ['translationMode'] })).translationMode).toBe('bilingual');
-  await save({ check: 'Translation defaults and per-file modes work in read-only documents; switching one paragraph snapshots the others, persists across reopen, preserves keyboard focus and never edits Markdown or defaults', defaults });
+  await save({ check: 'Translation toolbar/status defaults clear this file mode and paragraph overrides, persist across reopen, and follow subsequent defaults; paragraph switching preserves keyboard focus and Markdown', defaults });
 
   // Inspect the selected default while the current file has a different mode.
   await openPreference('limr.chooseTypography');

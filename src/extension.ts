@@ -464,6 +464,17 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   }
   async setFileSettings(uri: vscode.Uri, incoming: ReaderFileSettings, replace = false, translationEpoch?: number, documentVersion?: number) {
     const settings = validateFileSettings(incoming);
+    return this.writeFileSettings(uri, current => replace ? settings : { ...current, ...settings }, translationEpoch, documentVersion);
+  }
+  private resetFilePreference(uri: vscode.Uri, key: 'typography' | 'translationMode') {
+    return this.writeFileSettings(uri, current => {
+      if (current[key] === undefined && (key !== 'translationMode' || current.translationParagraphs === undefined)) return current;
+      const restored = { ...current }; delete restored[key];
+      if (key === 'translationMode') delete restored.translationParagraphs;
+      return restored;
+    });
+  }
+  private async writeFileSettings(uri: vscode.Uri, update: (current: ReaderFileSettings) => ReaderFileSettings, translationEpoch?: number, documentVersion?: number) {
     const key = `limr.fileSettings:${uri.toString()}`;
     const previous = this.fileWrites.get(key) ?? Promise.resolve();
     const next = previous.catch(() => {}).then(async () => {
@@ -471,7 +482,9 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       // a newer native preference can win while an older write is queued.
       const currentDocument = documentVersion === undefined ? undefined : vscode.workspace.textDocuments.find(document => document.uri.toString() === uri.toString());
       if (translationEpoch !== undefined && translationEpoch !== (this.translationEpochs.get(uri.toString()) ?? 0) || documentVersion !== undefined && currentDocument?.version !== documentVersion) { this.broadcast(); return; }
-      const merged = replace ? settings : { ...this.context.workspaceState.get<ReaderFileSettings>(key, {}), ...settings };
+      const current = this.context.workspaceState.get<ReaderFileSettings>(key, {});
+      const merged = update(current);
+      if (merged === current) return;
       await this.context.workspaceState.update(key, Object.keys(merged).length ? merged : undefined);
       this.broadcast();
     });
@@ -492,7 +505,9 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     const workspace = !folder && selected?.workspaceValue !== undefined;
     const selectedFolder = uri && vscode.workspace.getWorkspaceFolder(uri)?.uri.toString();
     for (const document of new Map([...this.panels.values()].map(document => [document.uri.toString(), document])).values()) {
-      if (this.settings(document.uri).fileOverrides.translationMode !== undefined) continue;
+      // Choosing a default also returns the initiating file to that default.
+      // Invalidate its pending paragraph writes even while it has an override.
+      if (this.settings(document.uri).fileOverrides.translationMode !== undefined && document.uri.toString() !== uri?.toString()) continue;
       const current = vscode.workspace.getConfiguration('limr', document.uri).inspect('translationMode');
       if (folder && vscode.workspace.getWorkspaceFolder(document.uri)?.uri.toString() !== selectedFolder) continue;
       if (workspace && current?.workspaceFolderValue !== undefined) continue;
@@ -536,9 +551,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     if (!pick) return;
     if (pick.value === 'reset' && uri) {
       if (key === 'translationMode') this.notifyTranslationIntent(uri);
-      const settings = { ...this.settings(uri).fileOverrides }; delete settings[key];
-      if (key === 'translationMode') delete settings.translationParagraphs;
-      await this.setFileSettings(uri, settings, true); return;
+      await this.resetFilePreference(uri, key); return;
     }
     const scope = uri ? await vscode.window.showQuickPick([
       {
@@ -547,7 +560,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       },
       {
         label: t('默认配置', 'Default settings'), value: 'default', description: `${defaultScope.label} · ${labels[pick.value]}`,
-        detail: `${defaultScope.detail} ${t('已有单独设置的文件保留原设置。', 'Keeps existing file overrides.')}`,
+        detail: `${defaultScope.detail} ${t('当前文件也恢复跟随默认；其他文件的单独设置保留。', 'This file also follows the default; other files keep their overrides.')}`,
       },
     ], { title: `${title} · ${labels[pick.value]}`, placeHolder: t('选择设置的生效范围', 'Choose where this setting applies'), matchOnDescription: true, matchOnDetail: true }) : { value: 'default' };
     if (!scope) return;
@@ -556,7 +569,10 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       else this.notifyDefaultTranslationIntent(uri);
     }
     if (scope.value === 'file' && uri) await this.setFileSettings(uri, { [key]: pick.value });
-    else await setReaderSetting(uri, key, pick.value);
+    else {
+      await setReaderSetting(uri, key, pick.value);
+      if (uri) await this.resetFilePreference(uri, key);
+    }
   }
   async chooseButtons(key: 'topBarButtons' | 'bottomBarButtons', uri?: vscode.Uri) {
     const t = (zh: string, en: string) => this.text(uri, zh, en);
