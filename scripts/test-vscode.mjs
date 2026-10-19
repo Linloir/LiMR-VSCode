@@ -23,6 +23,7 @@ const skillSuite = process.env.LIMR_TEST_SUITE === 'skills' || process.argv.incl
 const syntaxSuite = process.env.LIMR_TEST_SUITE === 'syntax-highlighting' || process.argv.includes('--syntax-highlighting');
 const entrypointsSuite = process.argv.includes('--entrypoints');
 const openModesSuite = process.argv.includes('--open-modes');
+const previewDefaultSuite = process.argv.includes('--preview-default');
 const navigationSuite = process.env.LIMR_TEST_SUITE === 'navigation' || process.argv.includes('--navigation') || process.argv.includes('--navigation-modes');
 const extensionPluginSuite = process.env.LIMR_TEST_SUITE === 'extension-plugins' || process.argv.includes('--extension-plugins');
 const largePluginSuite = process.env.LIMR_TEST_SUITE === 'large-plugins' || process.argv.includes('--large-plugins');
@@ -156,7 +157,7 @@ if (skillSuite) {
 const port = await new Promise(resolve => { const server = createServer(); server.listen(0, '127.0.0.1', () => { const port = server.address().port; server.close(() => resolve(port)); }); });
 const output = [];
 const environment = { ...process.env, LIMR_TEST_IPC: ipc, LIMR_TEST_DOCUMENT: fixture, LIMR_TEST_THEME: theme,
-  ...(syntaxSuite || navigationSuite || entrypointsSuite || openModesSuite ? { LIMR_TEST_SOURCE_ONLY: '1' } : {}) };
+  ...(syntaxSuite || navigationSuite || entrypointsSuite || openModesSuite || previewDefaultSuite ? { LIMR_TEST_SOURCE_ONLY: '1' } : {}) };
 const externalOpens = path.join(temporary, 'external-opens.jsonl');
 if (navigationSuite) {
   // Observe real openExternal requests without launching the user's browser.
@@ -219,7 +220,7 @@ try {
   console.log(`Extension host ready: ${JSON.stringify(ready)}`);
   const page = await until(async () => browser.contexts().flatMap(context => context.pages()).find(page => page.url().includes('workbench')));
   await page.setViewportSize({ width: 1920, height: 1080 });
-  const frame = syntaxSuite || navigationSuite || entrypointsSuite || openModesSuite ? undefined : await until(async () => { for (const frame of page.frames()) if (await frame.locator('.limr-reader').count().catch(() => 0)) return frame; }, 60_000);
+  const frame = syntaxSuite || navigationSuite || entrypointsSuite || openModesSuite || previewDefaultSuite ? undefined : await until(async () => { for (const frame of page.frames()) if (await frame.locator('.limr-reader').count().catch(() => 0)) return frame; }, 60_000);
   await page.bringToFront();
   for (const target of (process.env.LIMR_TEST_NO_FOCUS_EMULATION ? [] : [page, ...(frame ? [frame] : [])])) {
     const session = await page.context().newCDPSession(target).catch(() => undefined);
@@ -228,6 +229,7 @@ try {
   const runAcceptance = skillSuite ? runSkillAcceptance
     : entrypointsSuite ? (await import('../tests/browser/entrypoints.mjs')).runEntrypointsAcceptance
     : openModesSuite ? (await import('../tests/browser/open-modes.mjs')).runOpenModesAcceptance
+    : previewDefaultSuite ? (await import('../tests/browser/preview-default.mjs')).runPreviewDefaultAcceptance
     : process.argv.includes('--annotation-selection') ? (await import('../tests/browser/annotation-selection.mjs')).runAnnotationSelectionAcceptance
     : process.argv.includes('--core-compatibility') ? (await import('../tests/browser/core-compatibility.mjs')).runCoreCompatibilityAcceptance
     : process.env.LIMR_TEST_SUITE === 'annotations' || process.argv.includes('--annotations') ? (await import('../tests/browser/annotations.mjs')).runAnnotationAcceptance

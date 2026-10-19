@@ -89,3 +89,5 @@ See [the benchmark harness](../benchmarks/reading/README.md) for frozen builds, 
 The [1.0.2 measured results](performance-1.0.2.md) describe the tested hardware, host overhead, 75 MiB boundary, and remaining fast-scroll cost.
 
 `--open-modes` exercises native Quick Open under all three Markdown opening modes, changes the mode while the same source tab remains active, reuses existing split groups, and preserves explicit Reopen with Text Editor choices. Run it in both VS Code and Windows Cursor + WSL.
+
+`--preview-default` verifies the default LiMR preview button, Alt-click access to the built-in preview, and live separate/merged setting changes. On Cursor it also records the independent native breadcrumb Preview editor and verifies the return path to LiMR.

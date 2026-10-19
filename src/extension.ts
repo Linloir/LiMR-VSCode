@@ -409,7 +409,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       ? [...this.panels].find(([panel]) => panel.active)?.[1] : undefined;
     const uri = document?.uri ?? this.activeUri;
     const config = vscode.workspace.getConfiguration('limr', uri);
-    const merged = config.get<string>('previewButtonMode', 'separate') === 'merged';
+    const merged = config.get<string>('previewButtonMode', 'merged') === 'merged';
     if (this.mergedPreview !== merged) {
       // Built-in Markdown explicitly offers this integration context key.
       if (merged || this.mergedPreview) void vscode.commands.executeCommand('setContext', 'hasCustomMarkdownPreview', merged);

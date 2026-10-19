@@ -544,7 +544,7 @@
         },
         "limr.previewButtonMode": {
           "type": "string",
-          "default": "separate",
+          "default": "merged",
           "description": "%limr.previewButtonMode.description%",
           "enum": [
             "separate",

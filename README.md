@@ -25,6 +25,8 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 
 快捷键：`Ctrl+Shift+V` 在当前栏打开 LiMR，`Ctrl+Alt+V` 在侧栏打开（macOS 使用 `Cmd`）。VS Code 还支持 `Ctrl+K V`；Cursor 的 `Ctrl+K` 用于 AI 编辑。Cursor 首次激活时会将 LiMR 按钮补入 `cursor.general.pinnedTitleActions`，保留已有条目；之后从该列表删除的按钮不会自动加回。可在首次激活前关闭 `limr.cursor.pinTitleActions`。
 
+默认预览按钮和快捷键打开 LiMR；如已显式设置 `limr.previewButtonMode: "separate"`，会继续显示两个按钮。Cursor 面包屑中的 `Preview / Markdown` 属于 Cursor 内部编辑器，当前没有公开的替换预览提供者接口；这个切换仍使用 Cursor 自己的渲染器。如果 Cursor 已记住内置 Preview，先切回 Markdown，或配置默认编辑器。源码文件的打开方式可选择 `limr.markdownOpenMode: "reader"`，或在“重新打开方式 → 配置默认编辑器”中选择 LiMR Reader。
+
 网页链接交给浏览器打开。内部 Markdown 链接默认智能跳转：同文档的源码/阅读双栏一起更新，其余布局只更新当前阅读器。可切换五种跳转方式；需旁栏时优先复用已有分栏。鼠标侧键或 Alt+左右键支持阅读器历史，双栏模式同时恢复另一栏的原文件。同一文档内的标题链接在阅读器中滚动。
 
 达到 256 KiB（按 UTF-16 字符数计）的文档会合并连续输入：停顿 250 毫秒后刷新，持续输入时最长等待 1.2 秒。较小文档即时更新。异步刷新期间保留已显示的内容，完整结果就绪后在原阅读位置接替。
@@ -51,7 +53,7 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 | `limr.contentAlignment` | `"window"` | 没有批注侧栏时，`window` 将正文相对阅读窗口居中；`remaining` 相对侧目录右侧的剩余空间居中。 |
 | `limr.translationMode` | `"paragraph"` | `paragraph` 遵循各段配置；`bilingual` 原译对照；`original` 仅原文；`translated` 仅译文。用于已有翻译内容，不自动翻译。 |
 | `limr.syncScroll` | `true` | 源码与阅读器双向同步滚动。 |
-| `limr.previewButtonMode` | `"separate"` | `separate` 同时显示 LiMR 书本按钮与内置预览按钮；`merged` 只保留 LiMR 入口，Alt 点击打开内置预览，也可在“更多操作 → Markdown 预览”中选择。 |
+| `limr.previewButtonMode` | `"merged"` | `separate` 同时显示 LiMR 书本按钮与内置预览按钮；`merged` 只保留 LiMR 入口，Alt 点击打开内置预览，也可在“更多操作 → Markdown 预览”中选择。 |
 | `limr.language` | `"auto"` | 阅读器与对话框跟随 VS Code 语言，也可指定 `zh-CN` 或 `en`。原生命令和设置名称遵循 VS Code 界面语言。 |
 | `limr.topBarButtons` / `limr.bottomBarButtons` | 顶栏全部；底栏编辑、排版、翻译 | 选择显示的操作。可用 **LiMR: Choose Top Bar Buttons** / **Choose Status Bar Buttons** 多选调整。 |
 | `limr.images.pathMode` | `"auto"` | 图片先按 Markdown 所在目录解析，找不到再查所属工作区。`file` 仅文件目录；`workspace` 仅工作区；`folder` 使用 `limr.images.baseFolder` 指定的目录。 |
@@ -74,7 +76,7 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
   "limr.maxWidth": 800,
   "limr.tocMode": "wide",
   "limr.sidebarMode": "content",
-  "limr.previewButtonMode": "separate"
+  "limr.previewButtonMode": "merged"
 }
 ```
 
@@ -167,6 +169,8 @@ LiMR is also a Markdown rendering library for React projects. This extension use
 
 Shortcuts: `Ctrl+Shift+V` opens LiMR in the current group; `Ctrl+Alt+V` opens it beside the source (use `Cmd` on macOS). VS Code also supports `Ctrl+K V`; Cursor uses `Ctrl+K` for AI editing. On first activation in Cursor, LiMR adds its buttons to `cursor.general.pinnedTitleActions`, preserving existing entries. Later removals from that list are respected. Disable `limr.cursor.pinTitleActions` before first activation to retain Cursor’s hidden buttons.
 
+The default preview title button and shortcuts open LiMR; an explicit `limr.previewButtonMode: "separate"` still shows both buttons. Cursor’s breadcrumb `Preview / Markdown` toggle belongs to its internal editor and currently has no public preview-provider replacement API, so it continues to use Cursor’s renderer. If Cursor remembers its internal Preview, switch back to Markdown or configure the default editor. For source files, choose `limr.markdownOpenMode: "reader"` or **Reopen Editor With → Configure default editor → LiMR Reader**.
+
 Web links open in your browser. Markdown links default to smart navigation: a source/reader pair for the same document updates together; other layouts update only the current reader. Choose among five link modes; side targets reuse existing groups. Mouse back/forward or Alt+arrow keys restore reader history and the previous companion file. Same-document heading links scroll within the reader.
 
 Documents of at least 256 KiB of UTF-16 text coalesce edits for 250 ms, with a 1.2 s maximum wait during continuous typing. Smaller documents update immediately. Asynchronous refresh keeps the accepted content visible until a complete replacement is ready at the same reading position.
@@ -193,7 +197,7 @@ Documents of at least 256 KiB of UTF-16 text coalesce edits for 250 ms, with a 1
 | `limr.contentAlignment` | `"window"` | Without an annotation sidebar, `window` centers the article in the reader window; `remaining` centers it in the space to the right of the side TOC. |
 | `limr.translationMode` | `"paragraph"` | `paragraph` follows each block; `bilingual` shows both versions; `original` or `translated` shows one. Displays existing translations; does not generate them. |
 | `limr.syncScroll` | `true` | Synchronize scrolling between source and reader in both directions. |
-| `limr.previewButtonMode` | `"separate"` | `separate` shows the LiMR book and built-in preview buttons; `merged` keeps one LiMR entry. Alt-click opens the built-in preview; both choices are also in **More Actions → Markdown Preview**. |
+| `limr.previewButtonMode` | `"merged"` | `separate` shows the LiMR book and built-in preview buttons; `merged` keeps one LiMR entry. Alt-click opens the built-in preview; both choices are also in **More Actions → Markdown Preview**. |
 | `limr.language` | `"auto"` | Reader and dialogs follow VS Code language, or use `zh-CN` / `en`. Native command and setting names follow VS Code's display language. |
 | `limr.topBarButtons` / `limr.bottomBarButtons` | All title actions; editing, typography, translation in status bar | Select visible actions with **LiMR: Choose Top Bar Buttons** / **Choose Status Bar Buttons**. |
 | `limr.images.pathMode` | `"auto"` | Try the Markdown directory, then its workspace. `file` uses only the file directory; `workspace` uses its workspace; `folder` uses `limr.images.baseFolder`. |
@@ -216,7 +220,7 @@ For example, add this to User Settings JSON or your project's `.vscode/settings.
   "limr.maxWidth": 800,
   "limr.tocMode": "wide",
   "limr.sidebarMode": "content",
-  "limr.previewButtonMode": "separate"
+  "limr.previewButtonMode": "merged"
 }
 ```
 

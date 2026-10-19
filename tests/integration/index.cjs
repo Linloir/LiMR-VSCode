@@ -46,7 +46,7 @@ exports.run = async function run() {
     activeCustom: vscode.window.tabGroups.activeTabGroup.activeTab?.input instanceof vscode.TabInputCustom ? vscode.window.tabGroups.activeTabGroup.activeTab.input.viewType : undefined,
     visibleRanges: vscode.window.visibleTextEditors.filter(editor => editor.document.uri.toString() === uri.toString()).flatMap(editor => editor.visibleRanges.map(range => ({ start: range.start.line, end: range.end.line }))),
     activeEditor: vscode.window.activeTextEditor && { uri: vscode.window.activeTextEditor.document.uri.toString(), language: vscode.window.activeTextEditor.document.languageId, line: vscode.window.activeTextEditor.selection.active.line },
-    groups: vscode.window.tabGroups.all.map(group => ({ viewColumn: group.viewColumn, active: group.isActive, tabs: group.tabs.map(tab => ({ label: tab.label, active: tab.isActive, preview: tab.isPreview, dirty: tab.isDirty, uri: tab.input.uri?.toString(), custom: tab.input instanceof vscode.TabInputCustom ? tab.input.viewType : undefined, webview: tab.input instanceof vscode.TabInputWebview ? tab.input.viewType : undefined })) })),
+    groups: vscode.window.tabGroups.all.map(group => ({ viewColumn: group.viewColumn, active: group.isActive, tabs: group.tabs.map(tab => ({ label: tab.label, active: tab.isActive, preview: tab.isPreview, dirty: tab.isDirty, uri: tab.input?.uri?.toString(), custom: tab.input instanceof vscode.TabInputCustom ? tab.input.viewType : undefined, webview: tab.input instanceof vscode.TabInputWebview ? tab.input.viewType : undefined })) })),
   });
   let scrollSeries;
   const scrollEvents = [];
