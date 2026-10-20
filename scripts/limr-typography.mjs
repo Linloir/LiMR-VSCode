@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 // Keep the configured scroll root's preparation margin, while preserving core's
 // batched reads/writes and 6ms RAF budget. Mounting or scrolling must not run
 // synchronous per-paragraph typesetting ahead of that shared scheduler.
-const reviewedVersions = ['1.3.11', '1.3.12'];
+const reviewedVersions = ['1.3.11', '1.3.12', '1.3.13'];
 const reviewedSHA256 = '43d1c275d4c6e5c1860c71b97380427e65fa24132d1a88a10a33de80a0014e0e';
 const replacements = [
   [

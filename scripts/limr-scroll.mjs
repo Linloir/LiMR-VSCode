@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { typographyCompatibilityModules } from './limr-typography.mjs';
 import { captureFallbackCorrection } from './limr-source-position.mjs';
 
-// Reviewed compatibility corrections for published LiMR 1.3.11 and 1.3.12.
+// Reviewed compatibility corrections for published LiMR 1.3.11 through 1.3.13.
 // Keep the rendering logic in core: adapt its module at build time, without
 // changing node_modules or copying a renderer into the VS Code webview.
 // Remove this adapter when a reviewed upstream release contains these fixes.
@@ -19,6 +19,7 @@ import { captureFallbackCorrection } from './limr-source-position.mjs';
 const reviewedSHA256 = {
   '1.3.11': 'a80211ec7d3fa54e754a7b70edab61890ab381104a0cd885fa777451e7c54fab',
   '1.3.12': 'a80211ec7d3fa54e754a7b70edab61890ab381104a0cd885fa777451e7c54fab',
+  '1.3.13': 'a80211ec7d3fa54e754a7b70edab61890ab381104a0cd885fa777451e7c54fab',
 };
 const replacements = [
   [

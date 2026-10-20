@@ -84,11 +84,16 @@ export async function runReaderAcceptance({ page, frame, host, source, artifacts
   await expect(frame.locator('body')).toHaveCSS('background-color', 'rgb(27, 26, 24)');
   const fonts = await frame.evaluate(async () => {
     await document.fonts.load('16px "Noto Serif SC Variable"', '中文Latin');
-    await document.fonts.load('14px "LiMR Maple Mono NF CN"', 'const answer = 42;');
+    const styles = ['normal 400', 'normal 700', 'italic 400', 'italic 700'];
+    const maple = await Promise.all(styles.map(async style => {
+      const loaded = await document.fonts.load(`${style} 14px "LiMR Maple Mono NF CN"`, 'const 中文λ = 42;');
+      return { style, count: loaded.length, loaded: loaded.every(font => font.status === 'loaded') };
+    }));
     await document.fonts.ready;
-    return { noto: document.fonts.check('16px "Noto Serif SC Variable"', '中文Latin'), maple: document.fonts.check('14px "LiMR Maple Mono NF CN"', 'const answer = 42;'), loaded: [...document.fonts].filter(font => font.status === 'loaded').map(font => font.family) };
+    return { noto: document.fonts.check('16px "Noto Serif SC Variable"', '中文Latin'), maple, loaded: [...document.fonts].filter(font => font.status === 'loaded').map(font => font.family) };
   });
-  expect(fonts.noto).toBe(true); expect(fonts.maple).toBe(true);
+  expect(fonts.noto).toBe(true);
+  for (const style of fonts.maple) { expect(style.count).toBeGreaterThan(0); expect(style.loaded).toBe(true); }
   expect(fonts.loaded.some(family => family.includes('Noto Serif SC Variable'))).toBe(true);
   expect(fonts.loaded.some(family => family.includes('LiMR Maple Mono NF CN'))).toBe(true);
   evidence.push({ check: 'Header/footer are absent; bundled Noto Serif and Maple fonts load under default Playground dark appearance', fonts });
@@ -117,7 +122,7 @@ export async function runReaderAcceptance({ page, frame, host, source, artifacts
   expect(copied).toContain('reader.md');
   expect(copied).toContain(fixture);
   expect(copied).toContain('selected words');
-  const context = JSON.parse(copied.match(/```json\n([\s\S]*?)\n```/)?.[1] ?? 'null');
+  const context = JSON.parse(copied.match(/(`{3,})json\r?\n([\s\S]*?)\r?\n\1(?:\r?\n|$)/)?.[2] ?? 'null');
   expect(context).toMatchObject({ format: 'limr-context-v3', file: fixture, version: initial.version,
     allowSourceEdits: false, selectedText: 'selected words' });
   const selectedStart = source.indexOf('**selected words**');
@@ -245,10 +250,17 @@ export async function runReaderAcceptance({ page, frame, host, source, artifacts
   await expect(frame.getByAltText('Local sample', { exact: true })).toBeVisible();
   await expect.poll(() => frame.getByAltText('Local sample', { exact: true }).evaluate(element => element.naturalWidth)).toBe(120);
   await expect(frame.locator('.katex')).toBeVisible();
+  const mathFonts = await frame.evaluate(async () => {
+    const fonts = [...document.fonts].filter(font => font.family.startsWith('KaTeX_'));
+    await Promise.all(fonts.map(font => font.load()));
+    return fonts.map(font => ({ family: font.family, weight: font.weight, style: font.style, status: font.status }));
+  });
+  expect(mathFonts).toHaveLength(20);
+  expect(mathFonts.every(font => font.status === 'loaded')).toBe(true);
   await expect(frame.locator('.limr-mermaid-block')).toHaveAttribute('data-mermaid-state', 'ready', { timeout: 20_000 });
   await expect(frame.locator('.limr-mermaid-canvas svg')).toBeVisible();
   await snapshot('markdown-resources');
-  evidence.push({ check: 'Real webview CSP and resource URLs load local images, mathematical typesetting and lazy Mermaid rendering' });
+  evidence.push({ check: 'Real webview CSP and resource URLs load local images, all 20 WOFF2 math faces and lazy Mermaid rendering', mathFonts });
 
   await host('command', { command: 'limr.installSkill', wait: false });
   await page.locator('.quick-input-list').getByText('Codex · 当前工作区', { exact: true }).click();

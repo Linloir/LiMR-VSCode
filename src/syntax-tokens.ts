@@ -1,5 +1,5 @@
 import { createDocument, mapText, rangeOf, type MarkdownNode, type SourceRange, type SyntaxExtension } from '@linloir/limr/core';
-import { gfm, inlineHighlights, sourceAnnotations } from '@linloir/limr/extensions';
+import { standardWorkerRegistry } from '@linloir/limr/worker-api';
 import { math } from 'micromark-extension-math';
 import { mathFromMarkdown } from 'mdast-util-math';
 import { parseFrontmatter } from './shared/frontmatter';
@@ -15,14 +15,17 @@ export const syntaxTags = ['callout', 'definition', 'title', 'content', 'questio
   'figcaption', 'caption', 'img', 'citation', 'ref', 'translations', 'origin', 'translation', 'footnote', 'footnote-ref'] as const;
 const blockTags = new Set<string>(syntaxTags.filter(name => !['citation', 'ref', 'footnote', 'footnote-ref'].includes(name)));
 const literalDirectives = new Set(['math', 'code', 'code-highlight', 'mermaid']);
+// Use core's DOM-free grammar factories. The renderer entrypoint also pulls
+// React, KaTeX and reader components into this source-decoration worker.
+const standardSyntax = (name: 'gfm' | 'source-annotations' | 'inline-highlights') => standardWorkerRegistry['limr/standard']({ name });
 const parserExtensions = (): SyntaxExtension[] => [
-  gfm(),
+  standardSyntax('gfm'),
   { name: 'syntax-math', directives: ['math'], literal: true, micromark: [math()], mdast: [mathFromMarkdown()] },
   { name: 'syntax-code', directives: ['code', 'code-highlight', 'mermaid'], literal: true },
   { name: 'syntax-block-tags', tags: syntaxTags.filter(name => blockTags.has(name)), display: 'block' },
   { name: 'syntax-inline-tags', tags: syntaxTags.filter(name => !blockTags.has(name)) },
-  sourceAnnotations(),
-  inlineHighlights(),
+  standardSyntax('source-annotations'),
+  standardSyntax('inline-highlights'),
 ];
 
 /** Pure source classification. Only tokens recognized in LiMR's AST receive
