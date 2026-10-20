@@ -2,7 +2,7 @@
   "name": "limr-vscode",
   "displayName": "LiMR — Markdown Reader",
   "description": "Read and annotate Markdown beside your editor with LiMR. Inline notes, highlights, AI context, and VS Code themes.",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "publisher": "linloir",
   "license": "MIT",
   "engines": {
@@ -989,7 +989,7 @@
     "test": "vitest run",
     "test:browser": "npm run test:vscode",
     "test:vscode": "node scripts/test-vscode.mjs",
-    "package": "vsce package --no-dependencies --githubBranch main -o artifacts/limr-vscode-1.1.3.vsix",
+    "package": "vsce package --no-dependencies --githubBranch main -o artifacts/limr-vscode-1.1.4.vsix",
     "check:package": "node scripts/check-package.mjs",
     "vscode:prepublish": "npm run build && npm run check:package",
     "test:animations": "node scripts/test-vscode.mjs --animations",

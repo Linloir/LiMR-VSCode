@@ -1,6 +1,6 @@
 # Customize the LiMR VS Code reader
 
-Use reader plugins to change styles or add syntax without editing the installed LiMR extension bundle. LiMR for VS Code 1.1.3 exposes API v1 and uses LiMR 1.3.15. For changes scoped to one project, use its workspace manifest and preserve existing entries. For reusable functionality installed through VS Code, create an add-on extension and register its packaged files through the public API.
+Use reader plugins to change styles or add syntax without editing the installed LiMR extension bundle. LiMR for VS Code 1.1.4 exposes API v1 and uses LiMR 1.3.15. For changes scoped to one project, use its workspace manifest and preserve existing entries. For reusable functionality installed through VS Code, create an add-on extension and register its packaged files through the public API.
 
 ## Workspace files
 
@@ -127,7 +127,7 @@ Core React consumers can replace Reader.search or compose DocumentSearch/useDocu
 
 ## Selection action keybindings
 
-LiMR for VS Code 1.1.3 provides `limr.runSelectionAction` with `{ "actionId": "your.unique.action.id" }`. Both workspace modules and installed add-ons can contribute ordinary `RendererExtension.actions`. Use a unique action ID: actions are merged by ID, while only the extension's `name` receives the host namespace.
+LiMR for VS Code 1.1.4 provides `limr.runSelectionAction` with `{ "actionId": "your.unique.action.id" }`. Both workspace modules and installed add-ons can contribute ordinary `RendererExtension.actions`. Use a unique action ID: actions are merged by ID, while only the extension's `name` receives the host namespace.
 
 For a workspace module, add a binding in the user's **Keyboard Shortcuts (JSON)**:
 
