@@ -6,12 +6,13 @@ import { scrollCompatibilityModules } from '../scripts/limr-scroll.mjs';
 import { simulateSourceNavigation } from './fixtures/scroll-navigation-model.mjs';
 
 const require = createRequire(import.meta.url);
+const version = require('@linloir/limr/package.json').version;
 const directory = path.join(path.dirname(require.resolve('@linloir/limr/package.json')), 'dist');
 const files = await Promise.all((await readdir(directory)).filter(name => name.endsWith('.js')).map(async name => ({
   filename: path.join(directory, name), source: await readFile(path.join(directory, name), 'utf8'),
 })));
 const published = files.find(file => file.source.includes('function WindowedBlocks('));
-const adapted = scrollCompatibilityModules(files, '1.3.10').get(published.filename);
+const adapted = scrollCompatibilityModules(files, version).get(published.filename);
 
 // These cases execute real core navigation closures. Controlled DOM rectangles,
 // React commits, typography and RAF verify algorithm convergence, not paint or

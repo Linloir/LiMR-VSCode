@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 
-// The public core API has no imperative toolbar/search command yet. This
-// host adapter enters core's existing controllers and enables its complete
-// reading-text search for ordinary documents too. It does not recreate selection
-// contexts, permissions, search, serialization or rendering.
-const reviewedVersion = '1.3.10';
-const reviewedSHA256 = 'd7a417ca9f9403f07db345c9fb4e5a744d8ecd5f230b3058615b1ce12dec5d39';
+// 1.3.10 needs a bridge into both search and selection action controllers.
+// 1.3.11 exposes find() publicly, leaving only the selection-action bridge here.
+// Core owns contexts, permissions, searching, serialization and rendering.
+const reviewedSHA256 = {
+  '1.3.10': 'd7a417ca9f9403f07db345c9fb4e5a744d8ecd5f230b3058615b1ce12dec5d39',
+  '1.3.11': '916165bec4042a2c34df52c148c5c97d797874c48f7edf78fbeda97553d67691',
+};
 const replacements = [
   [
 `    windowed && /* @__PURE__ */ jsx12(DocumentSearch, {}),`,
@@ -62,14 +63,16 @@ const replacements = [
 ];
 
 export function commandCompatibilityModules(files, version) {
-  if (version !== reviewedVersion) throw new Error(`Review the LiMR command adapter before using version ${version}.`);
+  if (!reviewedSHA256[version]) throw new Error(`Review the LiMR command adapter before using version ${version}.`);
   const targets = files.filter(file => file.source.includes('function SelectionToolbar(') && file.source.includes('function DocumentSearch('));
   if (targets.length !== 1) throw new Error('LiMR command adapter expected exactly one toolbar/search module.');
   const { filename, source } = targets[0];
-  if (createHash('sha256').update(source).digest('hex') !== reviewedSHA256)
-    throw new Error('LiMR 1.3.10 commands differ from the reviewed npm artifact; review the command adapter.');
+  if (createHash('sha256').update(source).digest('hex') !== reviewedSHA256[version])
+    throw new Error(`LiMR ${version} commands differ from the reviewed npm artifact or local candidate; review the command adapter.`);
   let result = source;
-  for (const [before, after] of replacements) {
+  // 1.3.11 exposes find() publicly and makes search an explicit Reader option.
+  // Only the selection-action bridge still needs a source adapter.
+  for (const [before, after] of version === '1.3.10' ? replacements : [replacements[3]]) {
     if (result.split(before).length !== 2) throw new Error('LiMR command adapter expected exactly one copy of each reviewed source site.');
     result = result.replace(before, after);
   }

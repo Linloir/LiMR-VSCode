@@ -5,17 +5,18 @@ import path from 'node:path';
 import { commandCompatibilityModules } from '../scripts/limr-commands.mjs';
 
 const require = createRequire(import.meta.url);
+const version = require('@linloir/limr/package.json').version;
 const directory = path.join(path.dirname(require.resolve('@linloir/limr/package.json')), 'dist');
 const files = await Promise.all((await readdir(directory)).filter(name => name.endsWith('.js')).map(async name => ({
   filename: path.join(directory, name), source: await readFile(path.join(directory, name), 'utf8'),
 })));
 const target = files.find(file => file.source.includes('function DocumentSearch('));
-const adapted = commandCompatibilityModules(files, '1.3.10').get(target.filename);
+const adapted = commandCompatibilityModules(files, version).get(target.filename);
 
 it('fails closed on version, source and module-identity drift', () => {
-  expect(() => commandCompatibilityModules(files, '1.3.11')).toThrow(/Review/);
-  expect(() => commandCompatibilityModules(files.map(file => file === target ? { ...file, source: file.source + '\n' } : file), '1.3.10')).toThrow(/reviewed npm artifact/);
-  expect(() => commandCompatibilityModules([...files, target], '1.3.10')).toThrow(/exactly one/);
+  expect(() => commandCompatibilityModules(files, '1.3.12')).toThrow(/Review/);
+  expect(() => commandCompatibilityModules(files.map(file => file === target ? { ...file, source: file.source + '\n' } : file), version)).toThrow(/reviewed npm artifact/);
+  expect(() => commandCompatibilityModules([...files, target], version)).toThrow(/exactly one/);
 });
 
 // Run the actual injected listener. Core still builds the available-action list
@@ -54,7 +55,7 @@ it.each([{ open: false }, { disabled: true }, { busy: true }, { aborted: true },
   },
 );
 
-it.each([false, true])('routes native find commands into core search with virtualization=%j', windowed => {
+it.skipIf(version !== '1.3.10').each([false, true])('routes native find commands into core search with virtualization=%j', windowed => {
   const from = adapted.indexOf('  useEffect9(() => {\n    const command =');
   const to = adapted.indexOf('  if (!open) return null;', from);
   const document = new EventTarget(), focus = vi.fn(), select = vi.fn(), move = vi.fn(), setOpen = vi.fn(), cleanups = [];
@@ -68,4 +69,9 @@ it.each([false, true])('routes native find commands into core search with virtua
   expect(select).toHaveBeenCalledOnce();
   expect(focus).toHaveBeenCalledTimes(3);
   cleanups.forEach(cleanup => cleanup());
+});
+
+it.runIf(version === "1.3.11")("uses public find without rewriting the search component", () => {
+  expect(adapted).not.toContain("limr-vscode:find");
+  expect(adapted).toContain("limr-vscode:selection-action");
 });

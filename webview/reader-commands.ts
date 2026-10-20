@@ -6,6 +6,7 @@ export function dispatchReaderCommand(
   message: Extract<HostMessage, { type: 'readerCommand' }>,
   ready: boolean,
   notify: (message: string, error?: boolean) => void,
+  find?: (command?: 'open' | 'next' | 'previous' | 'close') => void,
 ) {
   const chinese = document.documentElement.lang.startsWith('zh');
   if (!ready) {
@@ -13,6 +14,10 @@ export function dispatchReaderCommand(
     return;
   }
   if (message.command !== 'selectionAction') {
+    if (find) {
+      find(message.command === 'find' ? 'open' : message.command === 'findNext' ? 'next' : 'previous');
+      return;
+    }
     document.dispatchEvent(new CustomEvent('limr-vscode:find', { detail: { command: message.command } }));
     return;
   }

@@ -113,7 +113,7 @@ export function App() {
   useEffect(() => {
     const receive = (message: HostMessage) => {
       if (message.type === 'readerCommand') {
-        dispatchReaderCommand(message, readerReadyRef.current, notify);
+        dispatchReaderCommand(message, readerReadyRef.current, notify, readerCommands.current?.find);
       }
       else if (message.type === 'state') {
         const incoming = message.sourceBytes instanceof ArrayBuffer

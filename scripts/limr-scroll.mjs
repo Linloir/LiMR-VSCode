@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { typographyCompatibilityModules } from './limr-typography.mjs';
 import { captureFallbackCorrection } from './limr-source-position.mjs';
 
-// Reviewed compatibility corrections for the published LiMR 1.3.10 reader.
+// Reviewed compatibility corrections for LiMR 1.3.10 and the 1.3.11 candidate.
 // Keep the rendering logic in core: adapt its module at build time, without
 // changing node_modules or copying a renderer into the VS Code webview.
 // Remove this adapter when a reviewed upstream release contains these fixes.
@@ -16,8 +16,10 @@ import { captureFallbackCorrection } from './limr-source-position.mjs';
 //    and wait for measurable restored viewports.
 // 5. Measure resized slots and publish their scroll correction before paint,
 //    instead of exposing the changed flow for a frame before the next RAF.
-const reviewedVersion = '1.3.10';
-const reviewedSHA256 = "8a6c4cfae656ac4aade2453da0189c2e26b6722fc0f228acf0208ac145703a56";
+const reviewedSHA256 = {
+  '1.3.10': '8a6c4cfae656ac4aade2453da0189c2e26b6722fc0f228acf0208ac145703a56',
+  '1.3.11': 'a80211ec7d3fa54e754a7b70edab61890ab381104a0cd885fa777451e7c54fab',
+};
 const replacements = [
   [
 `  const source = Number(block.element.dataset.sourceStart);
@@ -312,12 +314,12 @@ function restoreReadingPosition(runtime, position) {
 ];
 
 export function scrollCompatibilityModules(files, version) {
-  if (version !== reviewedVersion) throw new Error(`Review the LiMR scroll adapter before using version ${version}.`);
+  if (!reviewedSHA256[version]) throw new Error(`Review the LiMR scroll adapter before using version ${version}.`);
   const targets = files.filter(file => file.source.includes('function WindowedBlocks('));
   if (targets.length !== 1) throw new Error('LiMR scroll adapter expected exactly one windowed reader module.');
   const { filename, source } = targets[0];
-  if (createHash('sha256').update(source).digest('hex') !== reviewedSHA256) {
-    throw new Error('LiMR 1.3.10 windowed reader differs from the reviewed npm artifact; review the scroll adapter.');
+  if (createHash('sha256').update(source).digest('hex') !== reviewedSHA256[version]) {
+    throw new Error(`LiMR ${version} windowed reader differs from the reviewed npm artifact or local candidate; review the scroll adapter.`);
   }
   let result = source;
   for (const [before, after] of [captureFallbackCorrection(source), ...replacements]) {

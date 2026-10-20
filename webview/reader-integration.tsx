@@ -3,7 +3,7 @@ import { Reader, useAnnotations, useDocument, useLiMR, type DocumentSnapshot, ty
 import { RetainedReader } from './retained-reader';
 import { ReaderLoadingIndicator, useReaderLoading } from './reader-loading';
 
-export type ReaderCommands = ReturnType<typeof useLiMR>;
+export type ReaderCommands = ReturnType<typeof useLiMR> & { find?: (command?: 'open' | 'next' | 'previous' | 'close') => void };
 export interface ReaderIntegrationProps {
   onReader(commands: ReaderCommands, document: DocumentSnapshot, hasContent: boolean, hasTableContent: boolean): void;
   onDispose(commands: ReaderCommands): void;
@@ -20,13 +20,16 @@ export function ReaderIntegration({ onReader, onDispose }: ReaderIntegrationProp
 
 const MemoAsyncReader = memo(RetainedReader);
 export function HostedReader({ source = '', loadingMode = 'progressive', documentVersion = 0, ...props }: ReaderProps & { loadingMode?: 'blocking' | 'progressive'; documentVersion?: number }) {
+  // Prepared for 1.3.11's opt-in component. The pinned 1.3.10 ignores this
+  // extra prop and retains its reviewed command adapter until npm is updated.
+  const searchProps = { search: true };
   const asynchronous = source.length >= 64 * 1024;
   // An unregistered synchronous parser cannot be interrupted by a timer. Large
   // custom grammars must supply a matching worker instead of freezing this UI.
   const { progress, onLoadStateChange, retry } = useReaderLoading(props.documentId ?? '', documentVersion, source, asynchronous);
   return <>{asynchronous
-    ? <MemoAsyncReader {...props} source={source} loadingMode={loadingMode} onLoadStateChange={onLoadStateChange} />
-    : <Reader {...props} source={source} />}
+    ? <MemoAsyncReader {...props} {...searchProps} source={source} loadingMode={loadingMode} onLoadStateChange={onLoadStateChange} />
+    : <Reader {...props} {...searchProps} source={source} />}
     {asynchronous && <ReaderLoadingIndicator progress={progress} locale={props.locale?.language?.startsWith('zh') ? 'zh-CN' : 'en'} retry={retry} />}
   </>;
 }

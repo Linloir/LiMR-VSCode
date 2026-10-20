@@ -5,6 +5,7 @@ import path from 'node:path';
 import { typographyCompatibilityModules } from '../scripts/limr-typography.mjs';
 
 const require = createRequire(import.meta.url);
+const version = require('@linloir/limr/package.json').version;
 const directory = path.join(path.dirname(require.resolve('@linloir/limr/package.json')), 'dist');
 const files = await Promise.all((await readdir(directory)).filter(name => name.endsWith('.js')).map(async name => ({
   filename: path.join(directory, name), source: await readFile(path.join(directory, name), 'utf8'),
@@ -12,15 +13,15 @@ const files = await Promise.all((await readdir(directory)).filter(name => name.e
 
 it('guards the typography correction against unreviewed versions, source drift and ambiguous modules', () => {
   const target = files.find(file => file.source.includes('// src/react/knuth-plass-layout.ts'));
-  expect(() => typographyCompatibilityModules(files, '1.3.11')).toThrow(/Review the LiMR typography adapter/);
-  expect(() => typographyCompatibilityModules(files.map(file => file === target ? { ...file, source: file.source + '\n' } : file), '1.3.10')).toThrow(/reviewed npm artifact/);
-  expect(() => typographyCompatibilityModules([...files, target], '1.3.10')).toThrow(/exactly one/);
+  expect(() => typographyCompatibilityModules(files, '1.3.12')).toThrow(/Review the LiMR typography adapter/);
+  expect(() => typographyCompatibilityModules(files.map(file => file === target ? { ...file, source: file.source + '\n' } : file), version)).toThrow(/reviewed npm artifact/);
+  expect(() => typographyCompatibilityModules([...files, target], version)).toThrow(/exactly one/);
 });
 
 // Exercise the transformed module's actual registration and release code with
 // observable browser API doubles. Browser acceptance checks clipping/layout.
 function harness({ prepareMilliseconds = 0 } = {}) {
-  const source = [...typographyCompatibilityModules(files, '1.3.10').values()][0];
+  const source = [...typographyCompatibilityModules(files, version).values()][0];
   const observers = [];
   class Observer {
     targets = new Set(); disconnect = vi.fn(() => this.targets.clear());
