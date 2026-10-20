@@ -26,4 +26,18 @@ describe('workbench shortcuts in the embedded reader', () => {
     expect(event.stopPropagation).not.toHaveBeenCalled();
     expect(event.stopImmediatePropagation).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { ctrlKey: true, key: 'z' }, { ctrlKey: true, key: 'y' },
+    { metaKey: true, key: 'z' }, { metaKey: true, shiftKey: true, key: 'Z' },
+  ])('keeps search input history in the webview: %j', modifiers => {
+    const target = { closest: vi.fn(selector => selector === '.limr-document-search input' ? {} : null) };
+    const event = keyEvent({ ...modifiers, target: target as unknown as Element });
+    preserveWorkbenchShortcuts(event as unknown as KeyboardEvent);
+    expect(event.stopPropagation).toHaveBeenCalledOnce();
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    const outside = keyEvent({ ...modifiers, target: { closest: () => null } as unknown as Element });
+    preserveWorkbenchShortcuts(outside as unknown as KeyboardEvent);
+    expect(outside.stopPropagation).not.toHaveBeenCalled();
+  });
 });
