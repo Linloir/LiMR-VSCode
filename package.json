@@ -504,6 +504,12 @@
           "description": "%limr.syncScroll.description%",
           "scope": "resource"
         },
+        "limr.search.rememberQuery": {
+          "type": "boolean",
+          "default": false,
+          "description": "%limr.search.rememberQuery.description%",
+          "scope": "resource"
+        },
         "limr.tocMode": {
           "type": "string",
           "default": "always",

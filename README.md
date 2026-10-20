@@ -74,6 +74,7 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 | `limr.contentAlignment` | `"window"` | 没有批注侧栏时，`window` 将正文相对阅读窗口居中；`remaining` 相对侧目录右侧的剩余空间居中。 |
 | `limr.translationMode` | `"paragraph"` | `paragraph` 遵循各段配置；`bilingual` 原译对照；`original` 仅原文；`translated` 仅译文。用于已有翻译内容，不自动翻译。 |
 | `limr.syncScroll` | `true` | 源码与阅读器双向同步滚动。 |
+| `limr.search.rememberQuery` | `false` | 重新打开搜索框时默认清空搜索内容；开启后保留同一阅读器中上次关闭时的搜索内容。 |
 | `limr.previewButtonMode` | `"merged"` | `separate` 同时显示 LiMR 书本按钮与内置预览按钮；`merged` 只保留 LiMR 入口，Alt 点击打开内置预览，也可在“更多操作 → Markdown 预览”中选择。 |
 | `limr.language` | `"auto"` | 阅读器与对话框跟随 VS Code 语言，也可指定 `zh-CN` 或 `en`。原生命令和设置名称遵循 VS Code 界面语言。 |
 | `limr.topBarButtons` / `limr.bottomBarButtons` | 顶栏全部；底栏编辑、排版、翻译 | 选择显示的操作。可用 **LiMR: Choose Top Bar Buttons** / **Choose Status Bar Buttons** 多选调整。 |
@@ -239,6 +240,7 @@ Documents of at least 256 KiB of UTF-16 text coalesce edits for 250 ms, with a 1
 | `limr.contentAlignment` | `"window"` | Without an annotation sidebar, `window` centers the article in the reader window; `remaining` centers it in the space to the right of the side TOC. |
 | `limr.translationMode` | `"paragraph"` | `paragraph` follows each block; `bilingual` shows both versions; `original` or `translated` shows one. Displays existing translations; does not generate them. |
 | `limr.syncScroll` | `true` | Synchronize scrolling between source and reader in both directions. |
+| `limr.search.rememberQuery` | `false` | Clear the search text when reopening the search box; enable to restore the last query in the same reader. |
 | `limr.previewButtonMode` | `"merged"` | `separate` shows the LiMR book and built-in preview buttons; `merged` keeps one LiMR entry. Alt-click opens the built-in preview; both choices are also in **More Actions → Markdown Preview**. |
 | `limr.language` | `"auto"` | Reader and dialogs follow VS Code language, or use `zh-CN` / `en`. Native command and setting names follow VS Code's display language. |
 | `limr.topBarButtons` / `limr.bottomBarButtons` | All title actions; editing, typography, translation in status bar | Select visible actions with **LiMR: Choose Top Bar Buttons** / **Choose Status Bar Buttons**. |

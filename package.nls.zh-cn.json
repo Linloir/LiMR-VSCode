@@ -54,6 +54,7 @@
   "limr.sidebarMode.option.hidden": "关闭：不保留侧栏空间，通过浮层阅读标注。",
   "limr.sidebarAutoCollapse.description": "自动折叠侧栏中密集的标注条目；关闭后逐项排布，不再合并折叠。此设置控制卡片组的折叠，不会收起整个侧栏，也不改变单条卡片正文的展开状态。",
   "limr.syncScroll.description": "同步源代码编辑器与阅读器的滚动位置。",
+  "limr.search.rememberQuery.description": "在同一阅读器中重新打开搜索框时，恢复上次关闭时的搜索内容。默认关闭，重新打开时搜索框为空。",
   "limr.tocMode.option.always": "始终",
   "limr.tocMode.option.wide": "仅宽度允许",
   "limr.tocMode.option.hidden": "隐藏",

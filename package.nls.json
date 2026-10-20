@@ -37,6 +37,7 @@
   "limr.sidebarMode.option.hidden": "Disabled: never reserve sidebar space; read annotations in overlays.",
   "limr.sidebarAutoCollapse.description": "Automatically fold crowded annotation items in the sidebar. Turn off to lay out each item separately. This controls groups of cards, not the sidebar itself or the expansion of each card's body.",
   "limr.syncScroll.description": "Synchronize the source editor's visible range with the reader.",
+  "limr.search.rememberQuery.description": "Restore the previous search text when reopening the search box in the same reader. Disabled by default, so reopening starts with an empty search box.",
   "limr.tocMode.description": "Table of contents: always includes a compact TOC on narrow screens; wide only shows the side rail; hidden omits it.",
   "limr.typography.description": "Default paragraph layout. Use Choose Typography for a persistent override on the current file.",
   "limr.translationMode.description": "Default translation display. Changing a paragraph creates a per-file preference and switches that file to paragraph mode.",

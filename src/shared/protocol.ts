@@ -45,6 +45,7 @@ export interface ReaderSettings {
   bottomBarButtons: ReaderButton[];
   fileOverrides: ReaderFileSettings;
   syncScroll: boolean;
+  searchRememberQuery: boolean;
   tableLayoutEnabled: boolean;
   /** Preview first by default; blocking waits for the complete document. */
   loadingMode?: 'blocking' | 'progressive';

@@ -54,6 +54,7 @@ export function readerSettings(uri: vscode.Uri, fileOverrides: ReaderFileSetting
     topBarButtons: buttons(config.get('topBarButtons'), topBarButtons, topBarButtons),
     bottomBarButtons: buttons(config.get('bottomBarButtons'), bottomBarButtons, defaultBottomBarButtons),
     syncScroll: config.get<boolean>('syncScroll', true),
+    searchRememberQuery: config.get<boolean>('search.rememberQuery', false),
     tableLayoutEnabled: config.get<boolean>('tableLayout.enabled', true),
     loadingMode: choice(config.get('loadingMode'), ['blocking', 'progressive'] as const, 'progressive'),
   };

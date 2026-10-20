@@ -326,6 +326,7 @@ export function App() {
           theme={isDark ? 'dark' : 'light'} appearance={playground ? 'classic' : 'vscode'} locale={locale === 'zh-CN' ? chinese : english} extensions={extensions} plugins={plugins}
           actions={actions} annotations={noExternalAnnotations} readOnly={!editingEnabled} onSourceChange={editingEnabled ? editSource : undefined}
           typography={state.settings.typography} parameters={readerParameters} loadingMode={state.settings.loadingMode} documentVersion={state.document.version}
+          searchRememberQuery={state.settings.searchRememberQuery}
           sidebar={sidebarEnabled} sidebarBreakpoint={tocVisible ? 1120 : 900} sidebarCollapse={state.settings.sidebarAutoCollapse} toc={tocVisible}
           scrollRoot={scrollRoot} scrollOffset={18}><ReaderIntegration onReader={readerAvailable} onDispose={readerDisposed} /></MemoReader>}</PluginBoundary>
       </EditorContext.Provider>}
