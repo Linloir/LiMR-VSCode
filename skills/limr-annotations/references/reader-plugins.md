@@ -1,6 +1,6 @@
 # Customize the LiMR VS Code reader
 
-Use reader plugins to change styles or add syntax without editing the installed LiMR extension bundle. LiMR for VS Code 1.1.2 exposes API v1 and uses LiMR 1.3.13. For changes scoped to one project, use its workspace manifest and preserve existing entries. For reusable functionality installed through VS Code, create an add-on extension and register its packaged files through the public API.
+Use reader plugins to change styles or add syntax without editing the installed LiMR extension bundle. LiMR for VS Code 1.1.2 exposes API v1 and uses LiMR 1.3.14. For changes scoped to one project, use its workspace manifest and preserve existing entries. For reusable functionality installed through VS Code, create an add-on extension and register its packaged files through the public API.
 
 ## Workspace files
 
@@ -115,7 +115,7 @@ Core worker registrations and internal standard-renderer identity checks belong 
 
 For a custom renderer that can safely be unmounted, `RendererExtension.virtualization[componentName]` or an override's `virtualization` must supply `copyText(node, context)`. It may also supply `searchText` and `keepAlive`. `context.children` is projected visible child text, and `context.value` is the selected, decoded literal value; use these rather than copying hidden Markdown syntax. A pure wrapper can return `context.children`. Stateful widgets must preserve their state outside transient DOM, or declare the appropriate `keepAlive` behavior. Keep-alive widgets consume DOM while retained, so it is not a general performance shortcut. Verify ordinary and cross-window copy, search, navigation, and widget state before claiming windowed compatibility. Existing `defineBlock` examples deliberately require no such declarations and retain compatibility behavior.
 
-For lower-level syntax, annotations, or actions, inspect the public LiMR 1.3.13 declarations and matching package documentation first. `RendererExtension` can contribute `components`, `annotationTypes`, `actions`, and `parameters` as well as syntax. Follow the existing source annotation serializer for source-backed notes; a presentation plugin must not write files itself. Read [the source annotation contract](source-annotations.md) when adding annotation UI or serialization. Custom reader syntax does not automatically extend Markdown source-editor highlighting.
+For lower-level syntax, annotations, or actions, inspect the public LiMR 1.3.14 declarations and matching package documentation first. `RendererExtension` can contribute `components`, `annotationTypes`, `actions`, and `parameters` as well as syntax. Follow the existing source annotation serializer for source-backed notes; a presentation plugin must not write files itself. Read [the source annotation contract](source-annotations.md) when adding annotation UI or serialization. Custom reader syntax does not automatically extend Markdown source-editor highlighting.
 
 ## Search styling and host boundaries
 

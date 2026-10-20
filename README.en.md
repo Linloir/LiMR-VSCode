@@ -15,7 +15,7 @@ LiMR is a Markdown reader designed for comfortable reading. This extension bring
 - **Reading preferences**: configure fonts, spacing, article width, contents, translation display, and paragraph layout. Source and reader can scroll together.
 - **Simple extensibility**: use workspace CSS to change appearance and JavaScript modules to add components, syntax, annotations, or actions. Reusable modules can also ship as VS Code add-ons.
 
-LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.13`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
+LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.14`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
 
 ## Get started and configure
 

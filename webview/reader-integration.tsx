@@ -1,5 +1,5 @@
 import { memo, useLayoutEffect, useMemo } from 'react';
-import { DocumentSearch, Reader, useAnnotations, useDocument, useDocumentSearch, useLiMR, type DocumentSnapshot, type ReaderProps } from '@linloir/limr';
+import { DocumentSearch, Reader, useAnnotations, useDocument, useLiMR, type DocumentSnapshot, type ReaderProps } from '@linloir/limr';
 import { RetainedReader } from './retained-reader';
 import { ReaderLoadingIndicator, useReaderLoading } from './reader-loading';
 
@@ -22,14 +22,7 @@ const MemoAsyncReader = memo(RetainedReader);
 function HostedSearch({ rememberQuery }: { rememberQuery: boolean }) {
   // The workbench forwards keys even when the webview prevents their default.
   // Keep one shortcut owner so F3/Shift+F3 do not navigate twice.
-  const controller = useDocumentSearch({ shortcuts: false });
-  const { open, query, setQuery } = controller;
-  useLayoutEffect(() => {
-    // Apply the host preference while closed, for every core close path, so
-    // reopening never starts a search for the discarded query.
-    if (!open && !rememberQuery && query) setQuery('');
-  }, [open, query, rememberQuery, setQuery]);
-  return <DocumentSearch controller={controller} />;
+  return <DocumentSearch shortcuts={false} rememberQuery={rememberQuery} />;
 }
 export function HostedReader({ source = '', loadingMode = 'progressive', documentVersion = 0, searchRememberQuery = false, ...props }: ReaderProps & { loadingMode?: 'blocking' | 'progressive'; documentVersion?: number; searchRememberQuery?: boolean }) {
   // Core search is opt-in; enable it for both ordinary and worker-loaded files.

@@ -6,7 +6,7 @@ export function preserveWorkbenchShortcuts(event: KeyboardEvent) {
   const key = event.key.toLowerCase();
   if (['p', 'f'].includes(key)) event.preventDefault();
   // Keep native input undo/redo, but do not forward it to the workbench's
-  // document undo stack. This also supports the currently published core.
+  // document undo stack.
   if (['z', 'y'].includes(key) && (event.target as Element | null)?.closest?.('.limr-document-search input'))
     event.stopPropagation();
 }

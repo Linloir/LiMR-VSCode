@@ -5,8 +5,12 @@ import { createHash } from 'node:crypto';
 // Keep the configured scroll root's preparation margin, while preserving core's
 // batched reads/writes and 6ms RAF budget. Mounting or scrolling must not run
 // synchronous per-paragraph typesetting ahead of that shared scheduler.
-const reviewedVersions = ['1.3.11', '1.3.12', '1.3.13'];
-const reviewedSHA256 = '43d1c275d4c6e5c1860c71b97380427e65fa24132d1a88a10a33de80a0014e0e';
+const reviewedSHA256 = {
+  '1.3.11': '43d1c275d4c6e5c1860c71b97380427e65fa24132d1a88a10a33de80a0014e0e',
+  '1.3.12': '43d1c275d4c6e5c1860c71b97380427e65fa24132d1a88a10a33de80a0014e0e',
+  '1.3.13': '43d1c275d4c6e5c1860c71b97380427e65fa24132d1a88a10a33de80a0014e0e',
+  '1.3.14': '9cda9fc219e7277abc96a65b76c1c18c673d3675de376eb99737920aa57c648c',
+};
 const replacements = [
   [
 `var intersection;
@@ -107,11 +111,11 @@ function intersectionChanged(entries, observer) {
 ];
 
 export function typographyCompatibilityModules(files, version) {
-  if (!reviewedVersions.includes(version)) throw new Error(`Review the LiMR typography adapter before using version ${version}.`);
+  if (!reviewedSHA256[version]) throw new Error(`Review the LiMR typography adapter before using version ${version}.`);
   const targets = files.filter(file => file.source.includes('// src/react/knuth-plass-layout.ts'));
   if (targets.length !== 1) throw new Error('LiMR typography adapter expected exactly one typography module.');
   const { filename, source } = targets[0];
-  if (createHash('sha256').update(source).digest('hex') !== reviewedSHA256) {
+  if (createHash('sha256').update(source).digest('hex') !== reviewedSHA256[version]) {
     throw new Error(`LiMR ${version} typography differs from the reviewed npm artifact; review the typography adapter.`);
   }
   let result = source;

@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
 
+const reviewedSHA256 = new Set([
+  'c95e6d58085e89ba9807922d3dab9413c34fba8a1bb832c0d8730ed513fa858c', // 1.3.11–1.3.13
+  '1f7d4c63e286a97a7372811eb2f5563ac0a7ade6bdb2d2fd97af88c6791b989f', // 1.3.14: visibleReadingBlocks iterator
+]);
+
 // Apply before the source-position seek correction in limr-scroll.mjs.
 // It changes source capture, never scrollTop or virtual-window scheduling.
 export function captureFallbackCorrection(module) {
@@ -7,7 +12,7 @@ export function captureFallbackCorrection(module) {
   const end = module.indexOf('\nfunction restoreReadingPosition(', start);
   if (start < 0 || end < 0) throw new Error('Expected the published captureReadingPosition helper.');
   const before = module.slice(start, end);
-  if (createHash('sha256').update(before).digest('hex') !== 'c95e6d58085e89ba9807922d3dab9413c34fba8a1bb832c0d8730ed513fa858c')
+  if (!reviewedSHA256.has(createHash('sha256').update(before).digest('hex')))
     throw new Error('Review the captureReadingPosition source before applying this correction.');
   const replacements = [
     ['  if (!block) return null;\n  for (const leaf', '  if (!block) return null;\n  let preceding;\n  for (const leaf'],
