@@ -41,7 +41,7 @@ The real Electron/Playwright test uses isolated profiles, extension directories,
 
 `test:plugins` loads a real companion extension in a disposable profile and checks registration, disposal, settings and load failure isolation. `test:scroll` checks synchronized scrolling across complex blocks; `test:translations` covers reversed source order and all three translation display modes; `test:syntax` checks source highlighting and theme colors. After `npm run package`, run `npm run test:installed-icon` to install the VSIX in a disposable profile and verify the icon loaded in the extension list and details page.
 
-Output: `artifacts/limr-vscode-1.1.2.vsix`. Runtime assets are bundled, with no development server or CDN requirement. Remote media referenced by Markdown may still access the network.
+Output: `artifacts/limr-vscode-1.1.3.vsix`. Runtime assets are bundled, with no development server or CDN requirement. Remote media referenced by Markdown may still access the network.
 
 Release builds minify the extension host and both workers; only watch mode emits the host source map. The source-decoration worker uses core's public `standardWorkerRegistry` to load its grammar without browser renderers. The 1.3.14 adapter review covers the new search, table controls and shared visible-reading-block iterator. The selection toolbar and window scheduling sites are unchanged; capture now takes the first item from `visibleReadingBlocks`. The typography module only changes generated imports/source-map names. Exact published-module and capture-helper hashes were updated after this comparison, preserving fail-closed guards.
 
@@ -68,7 +68,7 @@ Install from a window already connected to **WSL: Ubuntu**. LiMR is a workspace 
 From that window's WSL terminal:
 
 ```bash
-code --install-extension ./artifacts/limr-vscode-1.1.2.vsix
+code --install-extension ./artifacts/limr-vscode-1.1.3.vsix
 ```
 
 Check that `code --list-extensions` identifies the intended WSL environment. Reload if VS Code requests it. **Developer: Show Running Extensions** shows the host location. To debug, open this repository in the WSL window, run `npm ci && npm run build`, and press F5.
