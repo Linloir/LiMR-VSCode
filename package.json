@@ -2,7 +2,7 @@
   "name": "limr-vscode",
   "displayName": "LiMR — Markdown Reader",
   "description": "Read and annotate Markdown beside your editor with LiMR. Inline notes, highlights, AI context, and VS Code themes.",
-  "version": "1.0.6",
+  "version": "1.1.0",
   "publisher": "linloir",
   "license": "MIT",
   "engines": {
@@ -166,6 +166,60 @@
         "command": "limr.navigateForward",
         "title": "%command.navigateForward%",
         "category": "LiMR"
+      },
+      {
+        "command": "limr.find",
+        "title": "%limr.find%",
+        "category": "LiMR",
+        "enablement": "activeCustomEditorId == limr.reader"
+      },
+      {
+        "command": "limr.findNext",
+        "title": "%limr.findNext%",
+        "category": "LiMR",
+        "enablement": "activeCustomEditorId == limr.reader"
+      },
+      {
+        "command": "limr.findPrevious",
+        "title": "%limr.findPrevious%",
+        "category": "LiMR",
+        "enablement": "activeCustomEditorId == limr.reader"
+      },
+      {
+        "command": "limr.highlight",
+        "title": "%limr.highlight%",
+        "category": "LiMR",
+        "enablement": "activeCustomEditorId == limr.reader && limr.readerEditing"
+      },
+      {
+        "command": "limr.addMarginNote",
+        "title": "%limr.addMarginNote%",
+        "category": "LiMR",
+        "enablement": "activeCustomEditorId == limr.reader && limr.readerEditing"
+      },
+      {
+        "command": "limr.addQuestion",
+        "title": "%limr.addQuestion%",
+        "category": "LiMR",
+        "enablement": "activeCustomEditorId == limr.reader && limr.readerEditing"
+      },
+      {
+        "command": "limr.copyQuestionContext",
+        "title": "%limr.copyQuestionContext%",
+        "category": "LiMR",
+        "enablement": "activeCustomEditorId == limr.reader"
+      },
+      {
+        "command": "limr.deleteAnnotations",
+        "title": "%limr.deleteAnnotations%",
+        "category": "LiMR",
+        "enablement": "activeCustomEditorId == limr.reader && limr.readerEditing"
+      },
+      {
+        "command": "limr.runSelectionAction",
+        "title": "%limr.runSelectionAction%",
+        "category": "LiMR",
+        "enablement": "activeCustomEditorId == limr.reader"
       }
     ],
     "menus": {
@@ -268,6 +322,42 @@
       "commandPalette": [
         {
           "command": "limr.toggleEditingLocked",
+          "when": "false"
+        },
+        {
+          "command": "limr.find",
+          "when": "activeCustomEditorId == limr.reader"
+        },
+        {
+          "command": "limr.findNext",
+          "when": "activeCustomEditorId == limr.reader"
+        },
+        {
+          "command": "limr.findPrevious",
+          "when": "activeCustomEditorId == limr.reader"
+        },
+        {
+          "command": "limr.highlight",
+          "when": "activeCustomEditorId == limr.reader"
+        },
+        {
+          "command": "limr.addMarginNote",
+          "when": "activeCustomEditorId == limr.reader"
+        },
+        {
+          "command": "limr.addQuestion",
+          "when": "activeCustomEditorId == limr.reader"
+        },
+        {
+          "command": "limr.copyQuestionContext",
+          "when": "activeCustomEditorId == limr.reader"
+        },
+        {
+          "command": "limr.deleteAnnotations",
+          "when": "activeCustomEditorId == limr.reader"
+        },
+        {
+          "command": "limr.runSelectionAction",
           "when": "false"
         }
       ]
@@ -680,6 +770,24 @@
           "default": false,
           "description": "%limr.singleReader.description%",
           "scope": "window"
+        },
+        "limr.codeBlock.lineNumbers": {
+          "type": "boolean",
+          "default": false,
+          "description": "%limr.codeBlock.lineNumbers.description%",
+          "scope": "resource"
+        },
+        "limr.codeBlock.autoCollapse": {
+          "type": "boolean",
+          "default": true,
+          "description": "%limr.codeBlock.autoCollapse.description%",
+          "scope": "resource"
+        },
+        "limr.codeBlock.wrap": {
+          "type": "boolean",
+          "default": false,
+          "description": "%limr.codeBlock.wrap.description%",
+          "scope": "resource"
         }
       }
     },
@@ -795,6 +903,76 @@
         "command": "limr.navigateForward",
         "key": "alt+right",
         "when": "activeCustomEditorId == limr.reader"
+      },
+      {
+        "command": "limr.find",
+        "key": "ctrl+f",
+        "when": "activeCustomEditorId == limr.reader",
+        "mac": "cmd+f"
+      },
+      {
+        "command": "limr.findNext",
+        "key": "f3",
+        "when": "activeCustomEditorId == limr.reader"
+      },
+      {
+        "command": "limr.findPrevious",
+        "key": "shift+f3",
+        "when": "activeCustomEditorId == limr.reader"
+      },
+      {
+        "command": "limr.findNext",
+        "key": "ctrl+g",
+        "when": "activeCustomEditorId == limr.reader && isMac",
+        "mac": "cmd+g"
+      },
+      {
+        "command": "limr.findPrevious",
+        "key": "ctrl+shift+g",
+        "when": "activeCustomEditorId == limr.reader && isMac",
+        "mac": "cmd+shift+g"
+      },
+      {
+        "command": "limr.openSource",
+        "key": "ctrl+shift+v",
+        "when": "activeCustomEditorId == limr.reader && !inputFocus",
+        "mac": "cmd+shift+v"
+      },
+      {
+        "command": "limr.toggleEditing",
+        "key": "ctrl+alt+e",
+        "when": "activeCustomEditorId == limr.reader && !inputFocus",
+        "mac": "cmd+alt+e"
+      },
+      {
+        "command": "limr.highlight",
+        "key": "ctrl+alt+h",
+        "when": "activeCustomEditorId == limr.reader && !inputFocus && limr.readerEditing",
+        "mac": "cmd+alt+h"
+      },
+      {
+        "command": "limr.addMarginNote",
+        "key": "ctrl+alt+m",
+        "when": "activeCustomEditorId == limr.reader && !inputFocus && limr.readerEditing",
+        "mac": "cmd+alt+m"
+      },
+      {
+        "command": "limr.addQuestion",
+        "key": "ctrl+alt+q",
+        "when": "activeCustomEditorId == limr.reader && !inputFocus && limr.readerEditing",
+        "mac": "cmd+alt+q"
+      },
+      {
+        "command": "limr.copyQuestionContext",
+        "key": "ctrl+alt+c",
+        "when": "activeCustomEditorId == limr.reader && !inputFocus",
+        "mac": "cmd+alt+c"
+      },
+      {
+        "command": "limr.deleteAnnotations",
+        "key": "ctrl+alt+backspace",
+        "when": "activeCustomEditorId == limr.reader && !inputFocus && limr.readerEditing",
+        "mac": "cmd+alt+backspace"
       }
     ]
   },
@@ -805,7 +983,7 @@
     "test": "vitest run",
     "test:browser": "npm run test:vscode",
     "test:vscode": "node scripts/test-vscode.mjs",
-    "package": "vsce package --no-dependencies --githubBranch main -o artifacts/limr-vscode-1.0.6.vsix",
+    "package": "vsce package --no-dependencies --githubBranch main -o artifacts/limr-vscode-1.1.0.vsix",
     "vscode:prepublish": "npm run build",
     "test:animations": "node scripts/test-vscode.mjs --animations",
     "test:regressions": "node scripts/test-vscode.mjs --regressions",
@@ -819,11 +997,12 @@
     "test:frontmatter": "node scripts/test-vscode.mjs --frontmatter",
     "test:skills": "node scripts/test-vscode.mjs --skills",
     "test:plugins": "node scripts/test-vscode.mjs --extension-plugins",
-    "test:translations": "node scripts/test-vscode.mjs --translation-scroll"
+    "test:translations": "node scripts/test-vscode.mjs --translation-scroll",
+    "test:reader-tools": "node scripts/test-vscode.mjs --reader-tools"
   },
   "dependencies": {
     "@fontsource-variable/noto-serif-sc": "5.3.1",
-    "@linloir/limr": "1.3.7",
+    "@linloir/limr": "1.3.10",
     "js-yaml": "4.3.2",
     "mdast-util-math": "3.0.0",
     "micromark-extension-math": "3.1.0",

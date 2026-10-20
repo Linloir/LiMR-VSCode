@@ -97,5 +97,17 @@
   "command.navigateForward": "阅读器前进",
   "limr.contentAlignment.description": "没有批注侧栏且显示侧边目录时，将正文相对整个阅读窗口居中，或相对目录右侧的剩余空间居中。",
   "limr.contentAlignment.option.window": "相对阅读窗口居中",
-  "limr.contentAlignment.option.remaining": "相对目录右侧剩余空间居中"
+  "limr.contentAlignment.option.remaining": "相对目录右侧剩余空间居中",
+  "limr.find": "在阅读器中查找",
+  "limr.findNext": "查找下一个",
+  "limr.findPrevious": "查找上一个",
+  "limr.highlight": "切换选段高亮",
+  "limr.addMarginNote": "为选段添加旁注",
+  "limr.addQuestion": "为选段添加提问",
+  "limr.copyQuestionContext": "复制选段提问上下文",
+  "limr.deleteAnnotations": "删除选段批注",
+  "limr.runSelectionAction": "运行选段操作",
+  "limr.codeBlock.lineNumbers.description": "显示代码块行号；行号不进入选段和复制内容。",
+  "limr.codeBlock.autoCollapse.description": "自动折叠长代码块；仍可通过每个代码块的按钮展开或收起。",
+  "limr.codeBlock.wrap.description": "默认将代码长行自动换行；仍可通过每个代码块的按钮切换。"
 }

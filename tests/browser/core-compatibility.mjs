@@ -52,7 +52,7 @@ export async function runCoreCompatibilityAcceptance({ page, frame, host, artifa
   await host('configure', { values: { typography: 'standard' } });
   await expect(frame.locator('[data-limr-kp]')).toHaveCount(0);
   expect((await host('snapshot')).source).toBe(inlineSource);
-  await record({ check: 'LiMR 1.3.7 inline code and math wrap in narrow and wide readers with the typography adapter, and switching back preserves source' });
+  await record({ check: 'LiMR 1.3.10 inline code and math wrap in narrow and wide readers with the typography adapter, and switching back preserves source' });
   await host('writeFiles', { files: { 'corrupt.svg': 'This file is not a valid image.', 'repaired/missing.svg': svg } });
   await host('replaceSource', { source: media });
   await expect(frame.getByRole('heading', { name: 'Core compatibility', exact: true })).toBeVisible();
@@ -76,7 +76,7 @@ export async function runCoreCompatibilityAcceptance({ page, frame, host, artifa
   expect(compact.height).toBeCloseTo(120, 2);
   expect(Math.abs(compact.x)).toBeLessThan(1); expect(Math.abs(compact.y)).toBeLessThan(1);
   expect(compact.overflow).toBe('clip');
-  await record({ check: 'LiMR 1.3.7 compact image fallback centers its icon within the reserved figure height without scrollbars', compact });
+  await record({ check: 'LiMR 1.3.10 compact image fallback centers its icon within the reserved figure height without scrollbars', compact });
 
   const colors = {};
   for (const theme of themes) {

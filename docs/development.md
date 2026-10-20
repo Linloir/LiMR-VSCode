@@ -2,11 +2,11 @@
 
 Node.js 22.12+ is recommended.
 
-The dependency is pinned to npm's `@linloir/limr@1.3.7`. Run `npm ci` with the lockfile; no neighboring repository or local tarball is required.
+The dependency is pinned to npm's `@linloir/limr@1.3.10`. Run `npm ci` with the lockfile; no neighboring repository or local tarball is required.
 
-The webview build applies a reviewed scroll compatibility patch to LiMR 1.3.7 via `scripts/limr-scroll.mjs`, alongside the short annotation ID adapter. It corrects estimated source seeks, invisible closing markup, and wheel takeover in reader gutters. Resized slots are measured in the existing ResizeObserver delivery so core's height correction runs before paint; deferring it to another animation frame exposed a changed paragraph height for one frame before restoring the visible text. This retains core's measured height index and scroll compensation, without adding a visual translation or another reading anchor. Source refinement uses the measured block index and permits up to 16 synchronous commit measurements per animation frame; further work waits for the next frame. Hidden viewports retain their measurements and latest navigation request until the scroll root has a size again. The host also keeps the empty plugin list stable, so unrelated host renders do not recreate the reader's extension configuration and lose that request. The adapter verifies the published module's SHA-256 and fails on version or source drift; `node_modules` remains unchanged. Remove it after reviewing an upstream release with equivalent fixes.
+The webview build applies a reviewed scroll compatibility patch to LiMR 1.3.10 via `scripts/limr-scroll.mjs`, alongside the short annotation ID adapter. It corrects estimated source seeks, invisible closing markup, and wheel takeover in reader gutters. Resized slots are measured in the existing ResizeObserver delivery so core's height correction runs before paint; deferring it to another animation frame exposed a changed paragraph height for one frame before restoring the visible text. This retains core's measured height index and scroll compensation, without adding a visual translation or another reading anchor. Source refinement uses the measured block index and permits up to 16 synchronous commit measurements per animation frame; further work waits for the next frame. Hidden viewports retain their measurements and latest navigation request until the scroll root has a size again. The host also keeps the empty plugin list stable, so unrelated host renders do not recreate the reader's extension configuration and lose that request. The adapter verifies the published module's SHA-256 and fails on version or source drift; `node_modules` remains unchanged. Remove it after reviewing an upstream release with equivalent fixes.
 
-LiMR 1.3.7 keeps all public TypeScript declarations unchanged. Its parser fixes punctuation-adjacent strong text, bold automatic links, unknown directive names, and decoded-link source positions. The reviewed reader module differs only in imported chunk names; the typography module is byte-identical to 1.3.6. Both artifact hashes and all source-position/short-ID replacement sites were reviewed. These adapters retain the core parsing changes without introducing a second Markdown grammar in the host. Worker parity and real webview checks cover strong text, source ranges, annotation edits and both typography modes.
+LiMR 1.3.10 adds public code-block options and source-reveal support for folded code. The host forwards `parameters.codeBlock` and retains upstream reveal preparation and out-of-flow scroll correction. Typography implementation remains unchanged apart from generated imports. Exact artifact hashes and source-position/short-ID replacement sites were reviewed. These adapters retain core's parser and source mapping without introducing a second Markdown grammar in the host. Worker parity and real webview checks cover source ranges, annotation edits and both typography modes.
 
 Host note editors wait for their input to become visible before requesting core autofocus during sidebar/overlay transitions. Sidebar space retention applies only to derived table overflow notes; disabling an annotation plugin releases its sidebar space.
 
@@ -14,7 +14,7 @@ Release builds contain no scroll diagnostic commands, message handlers or global
 
 Typography can also move a word between lines without changing its block height. The separate typography adapter uses the reader scroll container for advance layout, as described below; the removed DOM-mutation/translation compensation must not be restored.
 
-The host reserves Ctrl/Cmd+P and Ctrl/Cmd+Shift+P for VS Code. It prevents the embedded reader's print handler while preserving event propagation to the workbench, including custom keybindings. Otherwise LiMR 1.3.7 treats both shortcuts as print preparation and can create a second full-document render. Initial source delivery and worker loading both use the top progress bar.
+The host reserves Ctrl/Cmd+P and Ctrl/Cmd+Shift+P for VS Code. It prevents the embedded reader's print handler while preserving event propagation to the workbench, including custom keybindings. Otherwise LiMR treats both shortcuts as print preparation and can create a second full-document render. Initial source delivery and worker loading both use the top progress bar.
 
 ```bash
 npm ci
@@ -39,7 +39,13 @@ The real Electron/Playwright test uses isolated profiles, extension directories,
 
 `test:plugins` loads a real companion extension in a disposable profile and checks registration, disposal, settings and load failure isolation. `test:scroll` checks synchronized scrolling across complex blocks; `test:translations` covers reversed source order and all three translation display modes; `test:syntax` checks source highlighting and theme colors. After `npm run package`, run `npm run test:installed-icon` to install the VSIX in a disposable profile and verify the icon loaded in the extension list and details page.
 
-Output: `artifacts/limr-vscode-1.0.6.vsix`. Runtime assets are bundled, with no development server or CDN requirement. Remote media referenced by Markdown may still access the network.
+Output: `artifacts/limr-vscode-1.1.0.vsix`. Runtime assets are bundled, with no development server or CDN requirement. Remote media referenced by Markdown may still access the network.
+
+`npm run test:reader-tools` checks actual focused-webview Ctrl+F, virtual search across unmounted text and folded code, F3/Shift+F3, highlight/note shortcuts, native Undo, a companion add-on's custom footnote keybinding, code defaults/live overrides, exact code copying, and long-document edit acknowledgements. Run the same suite through the Windows WSL launcher for actual VS Code/Cursor acceptance.
+
+`scripts/limr-commands.mjs` is a version/hash-guarded host input adapter for LiMR 1.3.10. Core owns the search and selection action controllers; the adapter delivers native command events and enables the existing search controller for ordinary documents too. Workbench keybindings remain remappable. Both rendering modes search core's complete reading-text projection. This also avoids Cursor 3.24.18's native Webview find widget, which opened but returned no results in real Windows + WSL acceptance. Custom renderers can provide core's `virtualization.searchText` / `copyText` adapters for generated display text; ordinary module children use core's default projection.
+
+Reader-authored transactions mark only the `workspace.applyEdit` interval as immediate, so their text-document events cancel any pending typing timer and broadcast without the 250ms quiet period. The marker is cleared after success or failure. Core already updates the local document synchronously; this change does not eliminate its parsing/layout cost. Unit tests exercise the actual provider, failure cleanup and later typing, separately from real-client latency observations.
 
 ## Remote-WSL
 
@@ -48,7 +54,7 @@ Install from a window already connected to **WSL: Ubuntu**. LiMR is a workspace 
 From that window's WSL terminal:
 
 ```bash
-code --install-extension ./artifacts/limr-vscode-1.0.6.vsix
+code --install-extension ./artifacts/limr-vscode-1.1.0.vsix
 ```
 
 Check that `code --list-extensions` identifies the intended WSL environment. Reload if VS Code requests it. **Developer: Show Running Extensions** shows the host location. To debug, open this repository in the WSL window, run `npm ci && npm run build`, and press F5.
@@ -76,7 +82,7 @@ With the same document environment variable, `--scroll-reload` checks source nav
 
 The previous host-added glyph translation/MutationObserver compensation has been removed after reported autonomous scrolling. Core height measurement remains responsible for scrolling. The synthetic `--scroll-layout-anchor` stress probe is retained for upstream media/typography reflow investigation; its earlier passing reports describe the superseded compensation build, not a guarantee for this rollback.
 
-For LiMR 1.3.7, the guarded typography adapter observes the configured reader scroll container with the existing 600 px margin. A page-level observer's margin cannot extend an inner overflow clip, which previously delayed Knuth–Plass preparation until a paragraph became visible. The adapter preserves core's batched reads/writes and 6 ms asynchronous budget. Notifications from obsolete observers are ignored, scroll-root changes move jobs to the appropriate observer, and unused observers are released. The adapter does not write scroll positions.
+For LiMR 1.3.10, the guarded typography adapter observes the configured reader scroll container with the existing 600 px margin. A page-level observer's margin cannot extend an inner overflow clip, which previously delayed Knuth–Plass preparation until a paragraph became visible. The adapter preserves core's batched reads/writes and 6 ms asynchronous budget. Notifications from obsolete observers are ignored, scroll-root changes move jobs to the appropriate observer, and unused observers are released. The adapter does not write scroll positions.
 
 Failed figures keep the pending media height instead of growing from the 120 px placeholder to a 156 px error box. The host override only affects the figure fallback; long hints can scroll inside it, and ordinary inline/successful images keep their sizing.
 

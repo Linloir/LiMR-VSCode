@@ -24,6 +24,9 @@ export interface ReaderSettings {
   otherFontSize: number;
   codeFontFamily: string;
   codeFontSize: number;
+  codeBlockLineNumbers: boolean;
+  codeBlockAutoCollapse: boolean;
+  codeBlockWrap: boolean;
   lineHeight: number;
   maxWidth: number;
   sidebarMode: ReaderSidebarMode;
@@ -78,9 +81,12 @@ export interface ReaderState {
   plugins?: { id: string; stylesheet?: string; module?: string }[];
 }
 export interface SourceEdit { range: { start: number; end: number }; text: string }
+export type ReaderFindCommand = 'find' | 'findNext' | 'findPrevious';
+export type ReaderCommand = ReaderFindCommand | 'selectionAction';
 /** View preferences never carry another copy of the Markdown buffer. */
 export type ReaderConfiguration = Omit<ReaderState, 'document'>;
 export type HostMessage =
+  | { type: 'readerCommand'; command: ReaderCommand; actionId?: string }
   | { type: 'questionContext'; requestId: string; context?: import('./ai-context').AIContext; error?: string }
   | { type: 'requestHistory'; direction: 'back' | 'forward' }
   | { type: 'navigateTo'; location: import('../navigation').ReaderLocation }

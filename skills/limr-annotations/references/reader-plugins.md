@@ -1,6 +1,6 @@
 # Customize the LiMR VS Code reader
 
-Use reader plugins to change styles or add syntax without editing the installed LiMR extension bundle. LiMR for VS Code 1.0.2 exposes API v1 and uses LiMR 1.3.0. For changes scoped to one project, use its workspace manifest and preserve existing entries. For reusable functionality installed through VS Code, create an add-on extension and register its packaged files through the public API.
+Use reader plugins to change styles or add syntax without editing the installed LiMR extension bundle. LiMR for VS Code 1.1.0 exposes API v1 and uses LiMR 1.3.10. For changes scoped to one project, use its workspace manifest and preserve existing entries. For reusable functionality installed through VS Code, create an add-on extension and register its packaged files through the public API.
 
 ## Workspace files
 
@@ -115,7 +115,32 @@ Core worker registrations and internal standard-renderer identity checks belong 
 
 For a custom renderer that can safely be unmounted, `RendererExtension.virtualization[componentName]` or an override's `virtualization` must supply `copyText(node, context)`. It may also supply `searchText` and `keepAlive`. `context.children` is projected visible child text, and `context.value` is the selected, decoded literal value; use these rather than copying hidden Markdown syntax. A pure wrapper can return `context.children`. Stateful widgets must preserve their state outside transient DOM, or declare the appropriate `keepAlive` behavior. Keep-alive widgets consume DOM while retained, so it is not a general performance shortcut. Verify ordinary and cross-window copy, search, navigation, and widget state before claiming windowed compatibility. Existing `defineBlock` examples deliberately require no such declarations and retain compatibility behavior.
 
-For lower-level syntax, annotations, or actions, inspect the public LiMR 1.3.0 declarations and matching package documentation first. `RendererExtension` can contribute `components`, `annotationTypes`, `actions`, and `parameters` as well as syntax. Follow the existing source annotation serializer for source-backed notes; a presentation plugin must not write files itself. Read [the source annotation contract](source-annotations.md) when adding annotation UI or serialization. Custom reader syntax does not automatically extend Markdown source-editor highlighting.
+For lower-level syntax, annotations, or actions, inspect the public LiMR 1.3.10 declarations and matching package documentation first. `RendererExtension` can contribute `components`, `annotationTypes`, `actions`, and `parameters` as well as syntax. Follow the existing source annotation serializer for source-backed notes; a presentation plugin must not write files itself. Read [the source annotation contract](source-annotations.md) when adding annotation UI or serialization. Custom reader syntax does not automatically extend Markdown source-editor highlighting.
+
+## Selection action keybindings
+
+LiMR for VS Code 1.1.0 provides `limr.runSelectionAction` with `{ "actionId": "your.unique.action.id" }`. Both workspace modules and installed add-ons can contribute ordinary `RendererExtension.actions`. Use a unique action ID: actions are merged by ID, while only the extension's `name` receives the host namespace.
+
+For a workspace module, add a binding in the user's **Keyboard Shortcuts (JSON)**:
+
+```json
+{
+  "key": "ctrl+alt+n",
+  "command": "limr.runSelectionAction",
+  "when": "activeCustomEditorId == limr.reader && limr.readerEditing && !inputFocus",
+  "args": { "actionId": "limrExample.addFootnote" }
+}
+```
+
+On macOS use `cmd+alt+n`. An installed add-on can supply the same object in `contributes.keybindings` with `"mac": "cmd+alt+n"`; user keybindings can override it. A workspace browser module cannot register a native VS Code keybinding by itself. Do not install a global `keydown` listener or synthesize a selection to work around this.
+
+The runnable [add-on browser module](https://github.com/Linloir/LiMR-VSCode/blob/main/examples/vscode-reader-addon/reader.mjs) defines a `research-footnote` annotation type and an `actions` entry named `limrExample.addFootnote`. Its [package manifest](https://github.com/Linloir/LiMR-VSCode/blob/main/examples/vscode-reader-addon/package.json) binds `Ctrl+Alt+N` / `Cmd+Alt+N` to the command. The example creates a note with an initial body that can be edited in the Markdown source; it does not implement a custom note editor.
+
+The shortcut invokes core's existing toolbar action, including its `visible`, `disabled`, busy, read-only, error and source-write handling. It receives the same `ToolbarActionContext` as a toolbar click: use `context.selection.syntax.ranges`, `context.document`, `context.canEditSource()`, and `context.addAnnotation(..., { target: 'source' })`. No action runs while the reader is loading or when focus is inside an annotation/search input. Plugin unloading removes its actions from the active reader. Set `readOnly: true` only for actions safe without write access.
+
+Add-ons can also call `vscode.commands.executeCommand('limr.runSelectionAction', { actionId })`. This dispatches to the active reader; completion of the VS Code command is not a source-save acknowledgement. Source edits retain normal VS Code Undo and Save semantics.
+
+Code-block defaults are host settings: `limr.codeBlock.lineNumbers` (false), `limr.codeBlock.autoCollapse` (true), and `limr.codeBlock.wrap` (false). They map to LiMR's public `parameters.codeBlock`. Per-block wrap/fold choices take precedence for that reader; changing a default does not reset a user's explicit per-block choice.
 
 ## Verify the requested outcome
 

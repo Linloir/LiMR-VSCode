@@ -11,6 +11,7 @@ import { readerCodeHighlight } from './reader-extensions';
 import { HostedReader, ReaderIntegration, type ReaderCommands } from './reader-integration';
 import { ReaderProgressBar } from './reader-loading';
 import { preserveWorkbenchShortcuts } from './workbench-shortcuts';
+import { dispatchReaderCommand } from './reader-commands';
 import { PluginBoundary, useWorkspacePlugins } from './plugins';
 import { ReaderScrollSync } from './scroll-sync';
 import { ReaderImages } from './images';
@@ -79,7 +80,10 @@ export function App() {
   const translationRequest = useMemo(() => state ? { uri: state.document.uri, version: state.document.version, source } : undefined,
     [state?.document.uri, state?.document.version, source]);
   const { parameters, onDocument: translationDocument, cancel: cancelPendingTranslation } = useTranslationParameters(state?.settings, updateFileSettings, translationRequest, state?.translationEpoch ?? 0);
-  const readerParameters = useMemo(() => ({ ...parameters, tableLayout: state?.settings.tableLayoutEnabled === false ? false as const : undefined }), [parameters, state?.settings.tableLayoutEnabled]);
+  const readerParameters = useMemo(() => ({ ...parameters,
+    tableLayout: state?.settings.tableLayoutEnabled === false ? false as const : undefined,
+    codeBlock: { lineNumbers: state?.settings.codeBlockLineNumbers ?? false, autoCollapse: state?.settings.codeBlockAutoCollapse ?? true, wrap: state?.settings.codeBlockWrap ?? false },
+  }), [parameters, state?.settings.tableLayoutEnabled, state?.settings.codeBlockLineNumbers, state?.settings.codeBlockAutoCollapse, state?.settings.codeBlockWrap]);
   const readerAvailable = useCallback((commands: ReaderCommands, document: DocumentSnapshot, hasContent: boolean, hasTableContent: boolean) => {
     readerCommands.current = commands;
     const complete = commands.isDocumentComplete();
@@ -108,7 +112,10 @@ export function App() {
   }, []);
   useEffect(() => {
     const receive = (message: HostMessage) => {
-      if (message.type === 'state') {
+      if (message.type === 'readerCommand') {
+        dispatchReaderCommand(message, readerReadyRef.current, notify);
+      }
+      else if (message.type === 'state') {
         const incoming = message.sourceBytes instanceof ArrayBuffer
           ? { ...message.state, document: { ...message.state.document,
             source: new TextDecoder('utf-8', { ignoreBOM: true }).decode(message.sourceBytes) } } : message.state;
@@ -317,7 +324,7 @@ export function App() {
       </div> : <EditorContext.Provider value={editorSession}>
         <PluginBoundary plugins={workspacePlugins} notify={notify}>{plugins => <MemoReader key={state.document.uri} className={`lv-reader${centeredToc ? ' lv-centered-toc' : remainingToc ? ' lv-remaining-toc' : ''}`} source={source} documentId={state.document.uri}
           theme={isDark ? 'dark' : 'light'} appearance={playground ? 'classic' : 'vscode'} locale={locale === 'zh-CN' ? chinese : english} extensions={extensions} plugins={plugins}
-          actions={actions} annotations={noExternalAnnotations} onSourceChange={editingEnabled ? editSource : undefined}
+          actions={actions} annotations={noExternalAnnotations} readOnly={!editingEnabled} onSourceChange={editingEnabled ? editSource : undefined}
           typography={state.settings.typography} parameters={readerParameters} loadingMode={state.settings.loadingMode} documentVersion={state.document.version}
           sidebar={sidebarEnabled} sidebarBreakpoint={tocVisible ? 1120 : 900} sidebarCollapse={state.settings.sidebarAutoCollapse} toc={tocVisible}
           scrollRoot={scrollRoot} scrollOffset={18}><ReaderIntegration onReader={readerAvailable} onDispose={readerDisposed} /></MemoReader>}</PluginBoundary>

@@ -12,10 +12,13 @@ const state=vi.hoisted(()=>{
     static joinPath(base:Uri,...pieces:string[]){return new Uri(new URL(pieces.join('/'),base.value.replace(/\/?$/,'/')).href);}
   }
   const dispose=()=>({dispose(){}}),event=()=>dispose();
-  return {receivers:new Map<string,(message:any)=>void>(),panels:new Map<string,any>(),viewChanges:new Map<string,()=>void>(),Uri,dispose,event,provider:undefined as unknown,documents:[] as any[],picks:[] as string[],pickers:[] as any[],editors:[] as any[],syncScroll:true,posts:[] as any[],updates:[] as any[],folderValues:new Map<string,unknown>(),workspaceValue:undefined as unknown,globalValue:'bilingual' as unknown,configBarrier:undefined as undefined|(()=>void),context:undefined as any};
+  return {changeDocument:undefined as undefined|((event:any)=>void),editingEnabled:false,applyEdit:async()=>false,
+    receivers:new Map<string,(message:any)=>void>(),panels:new Map<string,any>(),viewChanges:new Map<string,()=>void>(),Uri,dispose,event,provider:undefined as unknown,documents:[] as any[],picks:[] as string[],pickers:[] as any[],editors:[] as any[],syncScroll:true,posts:[] as any[],updates:[] as any[],folderValues:new Map<string,unknown>(),workspaceValue:undefined as unknown,globalValue:'bilingual' as unknown,configBarrier:undefined as undefined|(()=>void),context:undefined as any};
 });
 vi.mock('vscode',()=>({
   Position:class { constructor(public line:number,public character:number){} },
+  Range:class { constructor(public start:unknown,public end:unknown){} },
+  WorkspaceEdit:class { replace(){} },
   Uri:state.Uri,StatusBarAlignment:{Right:2},ConfigurationTarget:{Global:1,Workspace:2,WorkspaceFolder:3},
   TabInputCustom:class{},ColorThemeKind:{Light:1,HighContrast:3,HighContrastLight:4},
   env:{language:'en'},
@@ -34,13 +37,14 @@ vi.mock('vscode',()=>({
     getWorkspaceFolder:(uri:InstanceType<typeof state.Uri>)=>({uri:state.Uri.parse('file:///'+uri.path.split('/')[1])}),
     getConfiguration:(_section:string,uri?:InstanceType<typeof state.Uri>)=>{
       const folder=uri?.path.split('/')[1],folderValue=folder&&state.folderValues.get(folder);
-      return {get:(key:string,fallback:unknown)=>key==='translationMode'?(folderValue??state.workspaceValue??state.globalValue):key==='syncScroll'?state.syncScroll:fallback,
+      return {get:(key:string,fallback:unknown)=>key==='translationMode'?(folderValue??state.workspaceValue??state.globalValue):key==='syncScroll'?state.syncScroll:key==='editingEnabled'?state.editingEnabled:fallback,
         inspect:(key:string)=>key==='translationMode'?{globalValue:state.globalValue,workspaceValue:state.workspaceValue,workspaceFolderValue:folderValue}:undefined,
         update:async(key:string,value:unknown,target:number)=>{state.configBarrier?.();state.updates.push({key,value,target});if(target===3&&folder)state.folderValues.set(folder,value);else if(target===2)state.workspaceValue=value;else state.globalValue=value;},};
     },
     asRelativePath:(uri:InstanceType<typeof state.Uri>)=>uri.path,
     createFileSystemWatcher:()=>({dispose(){},onDidChange:state.event,onDidCreate:state.event,onDidDelete:state.event}),
-    onDidChangeTextDocument:state.event,onDidSaveTextDocument:state.event,onDidChangeConfiguration:state.event,onDidGrantWorkspaceTrust:state.event,
+    applyEdit:()=>state.applyEdit(),
+    onDidChangeTextDocument:(callback:(event:any)=>void)=>{state.changeDocument=callback;return state.dispose();},onDidSaveTextDocument:state.event,onDidChangeConfiguration:state.event,onDidGrantWorkspaceTrust:state.event,
   },
 }));
 vi.mock('../src/skills',()=>({installSkill:async()=>{},installGlobalSkill:async()=>{},copySkillInstallPrompt:async()=>{},maybePromptSkillInstall:async()=>{},showSkillGuide:async()=>{}}));
@@ -54,6 +58,7 @@ interface Provider {
   resolveCustomTextEditor(document:VSCode.TextDocument,panel:VSCode.WebviewPanel):void;
   setFileSettings(uri:VSCode.Uri,incoming:ReaderFileSettings,replace?:boolean,epoch?:number,version?:number):Promise<void>;
   choosePreference(key:'typography'|'translationMode',uri?:VSCode.Uri):Promise<void>;
+  applySourceEdit(document:VSCode.TextDocument,panel:VSCode.WebviewPanel,message:import('../src/shared/protocol').WebviewMessage):Promise<void>;
   dispose():void;
 }
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(done=>{resolve=done;});return{promise,resolve};};
@@ -67,6 +72,7 @@ function attach(path:string,visible=true){
   state.panels.set(uri.toString(),panel);provider.resolveCustomTextEditor(document,panel);return document;
 }
 beforeEach(()=>{
+  state.editingEnabled=false;state.applyEdit=async()=>false;state.changeDocument=undefined;
   state.receivers.clear();state.panels.clear();state.viewChanges.clear();state.documents=[];state.picks=[];state.pickers=[];state.editors=[];state.syncScroll=true;state.posts=[];state.updates=[];state.folderValues.clear();state.workspaceValue=undefined;state.globalValue='bilingual';state.configBarrier=undefined;
   values=new Map();writes=[];blockNext=undefined;
   const context={subscriptions:[],extensionUri:state.Uri.parse('file:///extension'),asAbsolutePath:(path:string)=>'/extension/'+path,
@@ -74,6 +80,51 @@ beforeEach(()=>{
   state.context=context;activate(context as unknown as VSCode.ExtensionContext);provider=state.provider as Provider;
 });
 afterEach(()=>{provider?.dispose();state.context?.subscriptions.forEach((item:{dispose():void})=>item.dispose());vi.useRealTimers();});
+
+describe('reader-authored source edits in long documents', () => {
+  function book() {
+    const document = attach('workspace/book.md'), key = document.uri.toString();
+    let source = 'A paragraph.\n\n'.repeat(24_000);
+    Object.assign(document, { getText: () => source, offsetAt: () => source.length, positionAt: (offset: number) => ({ line: 0, character: offset }) });
+    state.editingEnabled = true;
+    const change = (next: string) => {
+      source = next; (document as { version: number }).version++;
+      state.changeDocument!({ document, contentChanges: [{}] });
+    };
+    return { document, panel: state.panels.get(key), change };
+  }
+  it('broadcasts an annotation transaction without advancing timers and cancels an older typing broadcast', async () => {
+    vi.useFakeTimers();
+    const { document, panel, change } = book();
+    change(document.getText() + 'Typed text.');
+    expect(state.posts).toHaveLength(0);
+    const before = document.getText(), version = document.version, next = before + '\n\n:::limr-annotation{#note type="margin-note"}\nNote.\n:::\n';
+    state.applyEdit = async () => { change(next); return true; };
+    await provider.applySourceEdit(document, panel, { type: 'edit', requestId: 'reader-edit', baseVersion: version, baseSource: before, source: next,
+      edits: [{ range: { start: before.length, end: before.length }, text: next.slice(before.length) }] });
+    expect(state.posts.map(item => item.message.type)).toEqual(['state', 'editResult']);
+    expect(state.posts.at(-1).message.success).toBe(true);
+    vi.advanceTimersByTime(1500);
+    expect(state.posts).toHaveLength(2);
+    change(next + 'More typing.');
+    expect(state.posts).toHaveLength(2);
+    vi.advanceTimersByTime(250);
+    expect(state.posts.at(-1).message.type).toBe('state');
+  });
+  it('restores ordinary typing scheduling after a rejected reader transaction', async () => {
+    vi.useFakeTimers();
+    const { document, panel, change } = book();
+    const before = document.getText();
+    await provider.applySourceEdit(document, panel, { type: 'edit', requestId: 'rejected', baseVersion: document.version, baseSource: before, source: before + 'note',
+      edits: [{ range: { start: before.length, end: before.length }, text: 'note' }] });
+    expect(state.posts.at(-1).message).toMatchObject({ type: 'editResult', success: false });
+    state.posts = [];
+    change(before + 'Typed text.');
+    expect(state.posts).toHaveLength(0);
+    vi.advanceTimersByTime(250);
+    expect(state.posts.map(item => item.message.type)).toEqual(['state']);
+  });
+});
 
 describe('native provisional translation write ordering (actual registered provider)',()=>{
   it('shows values, current mode and reset target first, then applies the chosen value to a file',async()=>{

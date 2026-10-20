@@ -50,6 +50,8 @@ export function simulateSourceNavigation(module) {
     getComputedStyle: () => ({ fontSize: '16', lineHeight: '28' }),
     requestAnimationFrame: fn => { const id = nextFrame++; queues.set(id, fn); return id; }, cancelAnimationFrame: id => queues.delete(id),
     typographyLayoutVersion: () => typographyVersion, windowedKeepAliveBlocks: () => new Set(),
+    // Plain-paragraph fixture: no collapsed code needs preparation before reveal.
+    prepareSourceReveal: () => false,
     sourceTypographyPending: (_runtime, node) => pendingTypography.has(node.index),
     sourceRangeStartRect: (_runtime, range) => {
       const node = runtime.blocks.get(String(Math.floor(range.start / 100)));

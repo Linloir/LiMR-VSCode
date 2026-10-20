@@ -18,6 +18,15 @@
     }
   },
   "contributes": {
+    "keybindings": [
+      {
+        "command": "limr.runSelectionAction",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n",
+        "when": "activeCustomEditorId == limr.reader && limr.readerEditing && !inputFocus",
+        "args": { "actionId": "limrExample.addFootnote" }
+      }
+    ],
     "commands": [
       {
         "command": "limrExample.enable",

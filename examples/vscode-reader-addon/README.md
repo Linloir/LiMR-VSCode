@@ -1,10 +1,10 @@
 # LiMR reader add-on example
 
-A minimal VS Code extension that contributes a styled Markdown block to LiMR. It has no build step or npm dependencies. The extension host runs `extension.cjs`; the reader loads `reader.mjs` as browser ESM and supplies its existing React and LiMR instances.
+A minimal VS Code extension that contributes a styled Markdown block and a custom research footnote action to LiMR. It has no build step or npm dependencies. The extension host runs `extension.cjs`; the reader loads `reader.mjs` as browser ESM and supplies its existing React and LiMR instances.
 
 ## Run
 
-1. Install **LiMR for VS Code 1.0.1 or later** (`linloir.limr-vscode`) in the extension host you use. For Remote-WSL, install LiMR and the add-on on the WSL side.
+1. Install **LiMR for VS Code 1.1.0 or later** (`linloir.limr-vscode`) in the extension host you use. For Remote-WSL, install LiMR and the add-on on the WSL side.
 2. From this directory, launch an Extension Development Host:
 
    ```bash
@@ -13,6 +13,7 @@ A minimal VS Code extension that contributes a styled Markdown block to LiMR. It
 
 3. Trust this example folder, open `example.md`, and run **LiMR: Open Reader to the Side**. The research card appears with a colored border.
 4. Run **LiMR Example: Disable Research Card** and **LiMR Example: Enable Research Card**. Existing readers refresh immediately; repeated enabling keeps one registration. Disabling removes the component and CSS without changing the Markdown.
+5. Enable LiMR editing, select text, and press **Ctrl+Alt+N** (**Cmd+Alt+N** on macOS) to add a `research-footnote`. Its action is also in the selection toolbar. Edit the example's initial note body in the Markdown source; native Undo removes the insertion. `contributes.keybindings` targets `limr.runSelectionAction` with `actionId: "limrExample.addFootnote"`, so the same core action handles mouse and keyboard.
 
 Registration happens during activation. `extensionDependencies` ensures LiMR is present; the host checks `apiVersion` before using the API. The registration is disposed through `context.subscriptions`. `limr.plugins.enabled` controls loading alongside workspace plugins. The example does not execute in an untrusted workspace.
 
@@ -22,6 +23,8 @@ The [public TypeScript contract](../../api/index.d.ts) and [reader plugin guide]
 
 ## 中文说明
 
-此目录是可直接运行的附加 VS Code 扩展，无需安装 npm 依赖或构建。先在同一扩展宿主安装 LiMR 1.0.1 或更新版本，再从本目录执行上面的 `code` 命令。在新窗口信任示例目录，打开 `example.md` 并运行 **LiMR: Open Reader to the Side**。
+此目录是可直接运行的附加 VS Code 扩展，无需安装 npm 依赖或构建。先在同一扩展宿主安装 LiMR 1.1.0 或更新版本，再从本目录执行上面的 `code` 命令。在新窗口信任示例目录，打开 `example.md` 并运行 **LiMR: Open Reader to the Side**。
+
+开启 LiMR 编辑、选中正文后，按 **Ctrl+Alt+N**（macOS 为 **Cmd+Alt+N**）可添加自定义 `research-footnote`。初始正文可在 Markdown 源码中编辑，也可用原生 Undo 撤销。该快捷键通过 `limr.runSelectionAction` 调用模块已有选段动作，与工具栏按钮共用权限和写回逻辑。
 
 示例激活时调用 `registerPlugin`，关闭扩展时通过 `context.subscriptions` 释放注册。命令 **LiMR Example: Disable Research Card** 和 **LiMR Example: Enable Research Card** 可即时移除、重新加载组件与 CSS；重复启用不会重复注册，也不会修改 Markdown。`extension.cjs` 在扩展宿主中运行，`reader.mjs` 在浏览器中复用 LiMR 提供的 React 和 LiMR，不重复打包它们。Remote-WSL 下，两项扩展均应安装在 WSL 一侧。

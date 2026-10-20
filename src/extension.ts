@@ -16,7 +16,7 @@ import { EditCoalescer } from './edit-coalescer';
 import { resolveReaderImage } from './images';
 import { SourceSyntaxHighlighting } from './syntax-highlighting';
 import { ScrollThrottle } from './shared/scroll-sync';
-import type { HostMessage, ReaderState, WebviewMessage, ReaderFileSettings, ReaderButton, ReaderLoadProgress } from './shared/protocol';
+import type { HostMessage, ReaderState, WebviewMessage, ReaderFileSettings, ReaderButton, ReaderLoadProgress, ReaderCommand } from './shared/protocol';
 import { isReaderLoadProgress, loadProgressLabel } from './shared/loading';
 import { LoadWatchdog, MAX_DOCUMENT_BYTES, loadErrorMessage } from './shared/load-limits';
 import { previewBuffer, readerStateMessage } from './reader-buffer';
@@ -76,6 +76,17 @@ export function activate(context: vscode.ExtensionContext): LiMRExtensionApi {
   command('limr.openPreviewToSide', (uri?: vscode.Uri) => open(uri, true));
   command('limr.navigateBack', () => provider.requestHistory('back'));
   command('limr.navigateForward', () => provider.requestHistory('forward'));
+  for (const name of ['find', 'findNext', 'findPrevious'] as const)
+    command(`limr.${name}`, () => provider.requestReaderCommand(name));
+  const selectionActions = { highlight: 'highlight', addMarginNote: 'lv-margin-note', addQuestion: 'lv-question', copyQuestionContext: 'lv-question-context', deleteAnnotations: 'delete-annotations' };
+  for (const [name, actionId] of Object.entries(selectionActions))
+    command(`limr.${name}`, () => provider.requestReaderCommand('selectionAction', actionId));
+  command('limr.runSelectionAction', (args?: { actionId?: unknown }) => {
+    if (!args || typeof args.actionId !== 'string' || !args.actionId.trim()) {
+      throw new Error(localized(resource(), '请在快捷键参数中提供 actionId。', 'Provide actionId in the keybinding arguments.'));
+    }
+    provider.requestReaderCommand('selectionAction', args.actionId);
+  });
   command('limr.openSource', async (uri?: vscode.Uri) => { const target = resource(uri); if (target) await provider.openSource(target); });
   command('limr.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:linloir.limr-vscode'));
   command('limr.loadingAction', () => provider.loadingAction());
@@ -132,6 +143,8 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   private readonly sentDocuments = new Map<vscode.WebviewPanel, { uri: string; version: number; aligned?: boolean }>();
   private readonly subscriptions: vscode.Disposable[] = [];
   private readonly pending = new Map<string, Promise<void>>();
+  /** Reader transactions are explicit user actions, not a burst of editor typing. */
+  private readonly immediateSourceEdits = new Set<string>();
   private readonly plugins = new Map<vscode.WebviewPanel, NonNullable<ReaderState['plugins']>>();
   private readonly pluginRevisions = new Map<vscode.WebviewPanel, number>();
   private readonly pluginRoots = new Map<vscode.WebviewPanel, readonly vscode.Uri[]>();
@@ -194,7 +207,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       pluginRegistry.onDidChange(() => { void this.reloadPlugins(); }),
       vscode.workspace.onDidChangeTextDocument(event => {
         if (event.contentChanges.length) this.editedDocuments.schedule(event.document.uri.toString(), event.document,
-          event.document.offsetAt(new vscode.Position(event.document.lineCount, 0)) >= 256 * 1024);
+          !this.immediateSourceEdits.has(event.document.uri.toString()) && event.document.offsetAt(new vscode.Position(event.document.lineCount, 0)) >= 256 * 1024);
       }),
       vscode.workspace.onDidSaveTextDocument(document => { this.editedDocuments.cancel(document.uri.toString()); this.broadcast(document); }),
       vscode.workspace.onDidChangeConfiguration(event => {
@@ -354,6 +367,10 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
   requestHistory(direction: 'back' | 'forward') {
     const panel = [...this.panels.keys()].find(panel => panel.active);
     if (panel) this.post(panel, { type: 'requestHistory', direction });
+  }
+  requestReaderCommand(command: ReaderCommand, actionId?: string) {
+    const panel = [...this.panels.keys()].find(panel => panel.active);
+    if (panel && this.readyPanels.has(panel)) this.post(panel, { type: 'readerCommand', command, actionId });
   }
   private flushNavigation(panel: vscode.WebviewPanel, document: vscode.TextDocument) {
     const key = `${panel.viewColumn}:${document.uri.toString()}`, location = this.navigationTargets.get(key);
@@ -804,6 +821,7 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
     }
   }
   private async applySourceEdit(document: vscode.TextDocument, panel: vscode.WebviewPanel, message: Extract<WebviewMessage, { type: 'edit' }>): Promise<void> {
+    const key = document.uri.toString();
     try {
       if (!readerSettings(document.uri).editingEnabled) throw new Error(this.text(document.uri, '当前处于只读模式，未修改 Markdown。', 'The reader is read-only. Markdown was not changed.'));
       if (document.isClosed || message.baseVersion !== document.version || message.baseSource !== document.getText()) throw new Error(this.text(document.uri, 'Markdown 已被其他编辑更新。已刷新阅读器，请重新提交修改。', 'Markdown changed in another editor. The reader has refreshed; please submit again.'));
@@ -813,13 +831,14 @@ class ReaderProvider implements vscode.CustomTextEditorProvider, vscode.Disposab
       const edits = validateTransaction(document.getText(), message.edits, message.source);
       const transaction = new vscode.WorkspaceEdit();
       for (const edit of edits) transaction.replace(document.uri, new vscode.Range(document.positionAt(edit.range.start), document.positionAt(edit.range.end)), edit.text);
+      this.immediateSourceEdits.add(key);
       const accepted = await vscode.workspace.applyEdit(transaction);
       if (!accepted) throw new Error(this.text(document.uri, 'VS Code 未能应用修改，请重试。', 'VS Code could not apply the changes. Please retry.'));
       if (document.getText() !== message.source) throw new Error(this.text(document.uri, '文档在提交期间发生了变化，请检查最新内容。', 'The document changed during submission. Check the latest content.'));
       this.post(panel, { type: 'editResult', requestId: message.requestId, success: true, state: this.state(document, panel.webview) });
     } catch (error) {
       this.post(panel, { type: 'editResult', requestId: message.requestId, success: false, error: error instanceof Error ? error.message : String(error), state: this.state(document, panel.webview) });
-    }
+    } finally { this.immediateSourceEdits.delete(key); }
   }
   private async openLink(documentUri: vscode.Uri, href: string, readerColumn?: vscode.ViewColumn, position?: ReaderLocation['position']): Promise<void> {
     const link = resolveReaderLink({ documentUri: documentUri.toString(), workspaceUri: vscode.workspace.getWorkspaceFolder(documentUri)?.uri.toString(), href });

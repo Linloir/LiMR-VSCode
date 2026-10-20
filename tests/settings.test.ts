@@ -17,6 +17,11 @@ import { readerLocale, readerSettings } from '../src/settings';
 describe('reader preferences', () => {
   beforeEach(() => { values.config = {}; values.language = 'en'; });
   const uri = { scheme: 'file' } as Parameters<typeof readerSettings>[0];
+  it('uses the requested code defaults and reads all three resource overrides', () => {
+    expect(readerSettings(uri)).toMatchObject({ codeBlockLineNumbers: false, codeBlockAutoCollapse: true, codeBlockWrap: false });
+    values.config = { 'codeBlock.lineNumbers': true, 'codeBlock.autoCollapse': false, 'codeBlock.wrap': true };
+    expect(readerSettings(uri)).toMatchObject({ codeBlockLineNumbers: true, codeBlockAutoCollapse: false, codeBlockWrap: true });
+  });
   it('enables optimized tables by default and honors the native layout opt-out', () => {
     expect(readerSettings(uri).tableLayoutEnabled).toBe(true);
     values.config['tableLayout.enabled'] = false;

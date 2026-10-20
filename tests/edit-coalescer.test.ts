@@ -16,4 +16,17 @@ describe('large-document edit scheduling', () => {
     scheduler.schedule('large', 12, true); scheduler.dispose(); vi.advanceTimersByTime(2000);
     expect(send).toHaveBeenCalledTimes(1);
   });
+  it('publishes an explicit reader edit immediately and cancels an older typing timer', () => {
+    vi.useFakeTimers(); const send = vi.fn(), scheduler = new EditCoalescer(send);
+    scheduler.schedule('book', 1, true);
+    scheduler.schedule('book', 2, false);
+    expect(send.mock.calls).toEqual([[2]]);
+    vi.advanceTimersByTime(1500);
+    expect(send.mock.calls).toEqual([[2]]);
+    scheduler.schedule('book', 3, true);
+    expect(send).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(250);
+    expect(send.mock.calls).toEqual([[2], [3]]);
+    scheduler.dispose();
+  });
 });

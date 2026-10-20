@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scrollCompatibilityModules } from './limr-scroll.mjs';
+import { commandCompatibilityModules } from './limr-commands.mjs';
 
 const require = createRequire(import.meta.url);
 const allocator = fileURLToPath(new URL('../src/shared/annotation-ids.ts', import.meta.url));
@@ -26,14 +27,14 @@ export function shortAnnotationIdsPlugin() {
         patched.clear(); loaded.clear();
         const manifest = require.resolve('@linloir/limr/package.json');
         const version = JSON.parse(await readFile(manifest, 'utf8')).version;
-        if (!['1.2.3', '1.3.0', '1.3.1', '1.3.3', '1.3.4', '1.3.5', '1.3.6', '1.3.7'].includes(version)) {
-          throw new Error('The LiMR short-ID adapter requires reviewed @linloir/limr version 1.2.3, 1.3.0, 1.3.1, 1.3.3, 1.3.4, 1.3.5, 1.3.6 or 1.3.7.');
+        if (version !== '1.3.10') {
+          throw new Error('The LiMR host adapters require reviewed @linloir/limr version 1.3.10.');
         }
         const directory = path.join(path.dirname(manifest), 'dist');
         const files = await Promise.all((await readdir(directory)).filter(file => file.endsWith('.js')).map(async file => {
           const filename = path.join(directory, file); return { filename, source: await readFile(filename, 'utf8') };
         }));
-        const scrollModules = scrollCompatibilityModules(files, version);
+        const hostModules = new Map([...scrollCompatibilityModules(files, version), ...commandCompatibilityModules(files, version)]);
         for (const [before] of replacements) {
           const count = files.reduce((sum, file) => sum + file.source.split(before).length - 1, 0);
           if (count !== 1) throw new Error(`LiMR short-ID adapter expected exactly one creation site: ${before} (found ${count}).`);
@@ -44,7 +45,7 @@ export function shortAnnotationIdsPlugin() {
           throw new Error('LiMR source annotation serializer binding changed; review the short-ID adapter.');
         }
         for (const { filename, source } of files) {
-          let transformed = scrollModules.get(filename) ?? source;
+          let transformed = hostModules.get(filename) ?? source;
           for (const [before, after] of replacements) transformed = transformed.replace(before, after);
           if (transformed !== source) patched.set(filename, `import { shortAnnotationId as ${symbol} } from ${JSON.stringify(allocator)};\n${transformed}`);
         }

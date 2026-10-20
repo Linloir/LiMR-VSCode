@@ -11,7 +11,7 @@ const files = await Promise.all((await readdir(directory)).filter(name => name.e
   filename: path.join(directory, name), source: await readFile(path.join(directory, name), 'utf8'),
 })));
 const published = files.find(file => file.source.includes('function WindowedBlocks('));
-const adapted = scrollCompatibilityModules(files, '1.3.7').get(published.filename);
+const adapted = scrollCompatibilityModules(files, '1.3.10').get(published.filename);
 
 // These cases execute real core navigation closures. Controlled DOM rectangles,
 // React commits, typography and RAF verify algorithm convergence, not paint or

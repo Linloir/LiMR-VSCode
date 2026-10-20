@@ -25,6 +25,7 @@ const entrypointsSuite = process.argv.includes('--entrypoints');
 const openModesSuite = process.argv.includes('--open-modes');
 const previewDefaultSuite = process.argv.includes('--preview-default');
 const navigationSuite = process.env.LIMR_TEST_SUITE === 'navigation' || process.argv.includes('--navigation') || process.argv.includes('--navigation-modes');
+const readerToolsSuite = process.argv.includes('--reader-tools');
 const extensionPluginSuite = process.env.LIMR_TEST_SUITE === 'extension-plugins' || process.argv.includes('--extension-plugins');
 const largePluginSuite = process.env.LIMR_TEST_SUITE === 'large-plugins' || process.argv.includes('--large-plugins');
 // Fixtures and the integration host stay in this repository. Only the actual
@@ -51,7 +52,7 @@ if (themeDirectory) {
   await cp(themeDirectory, path.join(extensionDirectory, 'zhuangtongfa.material-theme'), { recursive: true });
   theme = 'One Dark Pro';
 }
-if (extensionPluginSuite || largePluginSuite) {
+if (extensionPluginSuite || largePluginSuite || readerToolsSuite) {
   // Install a real companion extension into this disposable VS Code profile.
   // The example itself activates through extensionDependencies and exports API v1.
   const addon = path.join(extensionDirectory, 'limr-examples.limr-reader-addon');
@@ -181,6 +182,10 @@ const child = spawn(executable, [
   '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
   `--remote-debugging-port=${port}`, `--user-data-dir=${userData}`, `--extensions-dir=${extensionDirectory}`,
   `--extensionDevelopmentPath=${developmentPath}`, `--extensionTestsPath=${path.join(root, 'tests', 'integration', 'index.cjs')}`, workspace,
+  // --extensions-dir belongs to the Windows UI profile. A workspace add-on
+  // must also be loaded into the disposable run's WSL extension host.
+  ...(process.env.LIMR_TEST_WINDOWS_CODE && (extensionPluginSuite || largePluginSuite || readerToolsSuite)
+    ? [`--extensionDevelopmentPath=${path.join(extensionDirectory, 'limr-examples.limr-reader-addon')}`] : []),
 ], { cwd: root, env: environment, stdio: ['ignore', 'pipe', 'pipe'] });
 child.stdout.on('data', data => { output.push(data.toString()); });
 child.stderr.on('data', data => { output.push(data.toString()); });
@@ -227,6 +232,7 @@ try {
     if (session) await session.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   }
   const runAcceptance = skillSuite ? runSkillAcceptance
+    : readerToolsSuite ? (await import('../tests/browser/reader-tools.mjs')).runReaderToolsAcceptance
     : entrypointsSuite ? (await import('../tests/browser/entrypoints.mjs')).runEntrypointsAcceptance
     : openModesSuite ? (await import('../tests/browser/open-modes.mjs')).runOpenModesAcceptance
     : previewDefaultSuite ? (await import('../tests/browser/preview-default.mjs')).runPreviewDefaultAcceptance

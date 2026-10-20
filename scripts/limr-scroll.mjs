@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { typographyCompatibilityModules } from './limr-typography.mjs';
 import { captureFallbackCorrection } from './limr-source-position.mjs';
 
-// Reviewed compatibility corrections for the published LiMR 1.3.7 reader.
+// Reviewed compatibility corrections for the published LiMR 1.3.10 reader.
 // Keep the rendering logic in core: adapt its module at build time, without
 // changing node_modules or copying a renderer into the VS Code webview.
 // Remove this adapter when a reviewed upstream release contains these fixes.
@@ -16,8 +16,8 @@ import { captureFallbackCorrection } from './limr-source-position.mjs';
 //    and wait for measurable restored viewports.
 // 5. Measure resized slots and publish their scroll correction before paint,
 //    instead of exposing the changed flow for a frame before the next RAF.
-const reviewedVersion = '1.3.7';
-const reviewedSHA256 = "bca7f4676b30df0ecba4bec6310e96ecb1a8b846977b3187f69fe21a6b9cdb88";
+const reviewedVersion = '1.3.10';
+const reviewedSHA256 = "8a6c4cfae656ac4aade2453da0189c2e26b6722fc0f228acf0208ac145703a56";
 const replacements = [
   [
 `  const source = Number(block.element.dataset.sourceStart);
@@ -123,7 +123,8 @@ function restoreReadingPosition(runtime, position) {
           const target = (sourceRangeStartRect(runtime, requested.range)?.top ?? node.getBoundingClientRect().top) - viewportTop() - requested.offset;
           const pendingTypography = sourceTypographyPending(runtime, node, requested.range, content);
           if (Math.abs(target) > 1) {
-            if (!move(logical + target, true) && !pendingTypography) {
+            const outside = current - Math.max(origin, Math.min(origin + geometry.physicalMax, current));
+            if (!move(logical + outside + target, true) && !pendingTypography) {
 `,
 `            queue2();
             return;
@@ -138,7 +139,7 @@ function restoreReadingPosition(runtime, position) {
             const slot = node.closest("[data-window-slot]");
             const next = slot
               ? heights.offset(index) + runtime.getContentOffset() + target + viewportTop() - slot.getBoundingClientRect().top
-              : logical + target;
+              : logical + current - Math.max(origin, Math.min(origin + geometry.physicalMax, current)) + target;
             if (!move(next, true) && !pendingTypography) {
 `
   ],
@@ -316,7 +317,7 @@ export function scrollCompatibilityModules(files, version) {
   if (targets.length !== 1) throw new Error('LiMR scroll adapter expected exactly one windowed reader module.');
   const { filename, source } = targets[0];
   if (createHash('sha256').update(source).digest('hex') !== reviewedSHA256) {
-    throw new Error('LiMR 1.3.7 windowed reader differs from the reviewed npm artifact; review the scroll adapter.');
+    throw new Error('LiMR 1.3.10 windowed reader differs from the reviewed npm artifact; review the scroll adapter.');
   }
   let result = source;
   for (const [before, after] of [captureFallbackCorrection(source), ...replacements]) {

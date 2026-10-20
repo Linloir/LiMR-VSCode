@@ -1,5 +1,16 @@
 import type { Disposable } from 'vscode';
 
+/**
+ * Arguments for vscode.commands.executeCommand('limr.runSelectionAction', args)
+ * or a contributes.keybindings entry targeting that command (LiMR 1.1.0+).
+ * The active reader runs the named visible, enabled SelectionAction using its
+ * current selection. Use globally unique action IDs in browser modules.
+ * VS Code command completion acknowledges dispatch, not source persistence.
+ */
+export interface LiMRSelectionActionArguments {
+  readonly actionId: string;
+}
+
 /** Browser assets packaged inside the registering VS Code extension. */
 export interface LiMRPluginContribution {
   /** Unique within the extension; start with a lowercase letter, followed by lowercase letters, digits or hyphens. */

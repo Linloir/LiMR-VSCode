@@ -97,5 +97,17 @@
   "command.navigateForward": "Go Forward in Reader",
   "limr.contentAlignment.description": "When the annotation sidebar is absent and a side TOC is visible, center the article in the whole reader window or in the space to the right of the TOC.",
   "limr.contentAlignment.option.window": "Center in the reader window",
-  "limr.contentAlignment.option.remaining": "Center in the space to the right of the TOC"
+  "limr.contentAlignment.option.remaining": "Center in the space to the right of the TOC",
+  "limr.find": "Find in Reader",
+  "limr.findNext": "Find Next in Reader",
+  "limr.findPrevious": "Find Previous in Reader",
+  "limr.highlight": "Toggle Selection Highlight",
+  "limr.addMarginNote": "Add Margin Note to Selection",
+  "limr.addQuestion": "Add Question to Selection",
+  "limr.copyQuestionContext": "Copy Selection Question Context",
+  "limr.deleteAnnotations": "Delete Annotations at Selection",
+  "limr.runSelectionAction": "Run Selection Action",
+  "limr.codeBlock.lineNumbers.description": "Show source line numbers in code blocks. Numbers are excluded from selection and copying.",
+  "limr.codeBlock.autoCollapse.description": "Initially fold long code blocks. Per-block expand/collapse controls remain available.",
+  "limr.codeBlock.wrap.description": "Initially wrap long code lines. Per-block wrap controls remain available."
 }

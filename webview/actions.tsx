@@ -40,7 +40,7 @@ export function readerActions(options: ActionOptions): SelectionAction[] {
     { id: 'lv-copy', readOnly: true, label: zh ? '复制' : 'Copy', icon: <ToolIcon name="copy" />, successLabel: zh ? '已复制' : 'Copied', successIcon: <ToolIcon name="check" />,
       run: async context => { await copyClipboard(context.selection.text); },
     },
-    { id: 'lv-question-context', label: zh ? '提问上下文' : 'Question context', icon: <ToolIcon name="sparkles" />,
+    { id: 'lv-question-context', readOnly: true, label: zh ? '提问上下文' : 'Question context', icon: <ToolIcon name="sparkles" />,
       successLabel: zh ? '已复制上下文' : 'Context copied', successIcon: <ToolIcon name="check" />,
       disabled: context => options.isBusy() || context.document.source !== options.getDocument().source,
       renderExpanded: () => <div className="lv-context-hint"><strong>{zh ? '复制后，粘贴给 AI 助手提问' : 'Copy, then paste your question into your AI assistant'}</strong><p>{zh ? '包含文件引用、选区和快速回写入口。AI 先回答，再将问题和答案写入文档。' : 'Includes the file, selection and quick writeback entry. The assistant answers first, then records the question and answer.'}</p></div>,

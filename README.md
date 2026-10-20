@@ -15,7 +15,7 @@ LiMR 是一个注重阅读体验的 Markdown 阅读器。这个扩展将 [LiMR](
 - **可调整的阅读方式**：字体、行距、正文宽度、目录、翻译显示和排版均可配置；源码与阅读器支持滚动同步。
 - **简易的扩展能力**：用工作区 CSS 调整外观，用 JavaScript 模块添加组件、语法、标注或操作；也可以做成独立的 VS Code 附加扩展。
 
-LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 `@linloir/limr 1.3.7`。你可以在 [Playground](https://linloir.github.io/LiMR/) 体验阅读与编辑，在 [语法文档](https://linloir.github.io/LiMR/#/docs/zh-CN/syntax) 查看更多内容模块。
+LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 `@linloir/limr 1.3.10`。你可以在 [Playground](https://linloir.github.io/LiMR/) 体验阅读与编辑，在 [语法文档](https://linloir.github.io/LiMR/#/docs/zh-CN/syntax) 查看更多内容模块。
 
 ## 开始使用与配置
 
@@ -26,6 +26,24 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 快捷键：`Ctrl+Shift+V` 在当前栏打开 LiMR，`Ctrl+Alt+V` 在侧栏打开（macOS 使用 `Cmd`）。VS Code 还支持 `Ctrl+K V`；Cursor 的 `Ctrl+K` 用于 AI 编辑。Cursor 首次激活时会将 LiMR 按钮补入 `cursor.general.pinnedTitleActions`，保留已有条目；之后从该列表删除的按钮不会自动加回。可在首次激活前关闭 `limr.cursor.pinTitleActions`。
 
 默认预览按钮和快捷键打开 LiMR；如已显式设置 `limr.previewButtonMode: "separate"`，会继续显示两个按钮。Cursor 面包屑中的 `Preview / Markdown` 属于 Cursor 内部编辑器，当前没有公开的替换预览提供者接口；这个切换仍使用 Cursor 自己的渲染器。如果 Cursor 已记住内置 Preview，先切回 Markdown，或配置默认编辑器。源码文件的打开方式可选择 `limr.markdownOpenMode: "reader"`，或在“重新打开方式 → 配置默认编辑器”中选择 LiMR Reader。
+
+在阅读器内可使用以下快捷键（macOS 将 `Ctrl` 换成 `Cmd`）：
+
+| 操作 | 快捷键 |
+| --- | --- |
+| 搜索 | `Ctrl+F` |
+| 下一个 / 上一个结果 | `F3` / `Shift+F3`；搜索框内 `Enter` / `Shift+Enter` |
+| 返回源码 | `Ctrl+Shift+V` |
+| 切换编辑权限 | `Ctrl+Alt+E` |
+| 切换选段高亮 | `Ctrl+Alt+H` |
+| 添加旁注 / 提问 | `Ctrl+Alt+M` / `Ctrl+Alt+Q` |
+| 复制提问上下文 | `Ctrl+Alt+C` |
+| 删除选段批注 | `Ctrl+Alt+Backspace` |
+
+普通文档和虚拟化长文档统一使用 LiMR 全文搜索，支持不区分大小写的字面文本匹配，可定位尚未挂载的段落和折叠代码。macOS 还支持 `Cmd+G` / `Cmd+Shift+G`。快捷键可在 VS Code“键盘快捷方式”中修改；写入操作需要启用编辑并选择正文，不会处理旁注编辑框中的文本。模块的选段动作可通过 `limr.runSelectionAction` 绑定快捷键，见[插件指引](skills/limr-annotations/references/reader-plugins.md#selection-action-keybindings)。
+
+阅读器内的高亮、旁注和任务框等源码修改立即广播，不经过源码连续输入的 250ms 合并等待；长文档的解析与布局仍需计算时间。
+
 
 网页链接交给浏览器打开。内部 Markdown 链接默认智能跳转：同文档的源码/阅读双栏一起更新，其余布局只更新当前阅读器。可切换五种跳转方式；需旁栏时优先复用已有分栏。鼠标侧键或 Alt+左右键支持阅读器历史，双栏模式同时恢复另一栏的原文件。同一文档内的标题链接在阅读器中滚动。
 
@@ -40,6 +58,9 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 | `limr.bodyFontFamily` / `limr.bodyFontSize` | `""` / `16` | 正文字体和字号（px）。空字体使用内置 Noto Serif SC Variable。 |
 | `limr.chineseFontFamily` / `limr.chineseFontSize` | `""` / `0` | 单独设置中文字体和字号；空字体、字号 0 跟随正文。`limr.otherFontFamily` / `limr.otherFontSize` 同样控制其他文字。 |
 | `limr.codeFontFamily` / `limr.codeFontSize` | `""` / `14` | 代码字体和字号（px）；空字体使用内置 Maple Mono NF CN。 |
+| `limr.codeBlock.lineNumbers` | `false` | 显示代码块行号，不影响复制。 |
+| `limr.codeBlock.autoCollapse` | `true` | 自动折叠长代码块；可手动展开全文。 |
+| `limr.codeBlock.wrap` | `false` | 代码长行自动换行；也可逐块切换。 |
 | `limr.lineHeight` / `limr.maxWidth` | `1.8` / `860` | 正文行高倍数与最大宽度（px）；偏好紧凑阅读可适当调小。 |
 | `limr.typography` | `"standard"` | `standard` 标准排版；`justify` 两端对齐；`knuth-plass` 使用段落级断行优化。 |
 | `limr.tableLayout.enabled` | `true` | 启用表格优化布局；关闭后使用原生表格，减少长表格的测量开销。 |
@@ -159,7 +180,7 @@ LiMR is a Markdown reader designed for comfortable reading. This extension bring
 - **Reading preferences**: configure fonts, spacing, article width, contents, translation display, and paragraph layout. Source and reader can scroll together.
 - **Simple extensibility**: use workspace CSS to change appearance and JavaScript modules to add components, syntax, annotations, or actions. Reusable modules can also ship as VS Code add-ons.
 
-LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.7`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
+LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.10`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
 
 ## Get started and configure
 
@@ -168,6 +189,24 @@ LiMR is also a Markdown rendering library for React projects. This extension use
 3. Click settings or run **LiMR: Reader Settings**. Search VS Code Settings for `@ext:linloir.limr-vscode`. Choose **User** for personal defaults or **Workspace** for project settings.
 
 Shortcuts: `Ctrl+Shift+V` opens LiMR in the current group; `Ctrl+Alt+V` opens it beside the source (use `Cmd` on macOS). VS Code also supports `Ctrl+K V`; Cursor uses `Ctrl+K` for AI editing. On first activation in Cursor, LiMR adds its buttons to `cursor.general.pinnedTitleActions`, preserving existing entries. Later removals from that list are respected. Disable `limr.cursor.pinTitleActions` before first activation to retain Cursor’s hidden buttons.
+
+Reader shortcuts (replace `Ctrl` with `Cmd` on macOS):
+
+| Action | Shortcut |
+| --- | --- |
+| Find | `Ctrl+F` |
+| Next / previous match | `F3` / `Shift+F3`; `Enter` / `Shift+Enter` in the find input |
+| Return to source | `Ctrl+Shift+V` |
+| Toggle editing | `Ctrl+Alt+E` |
+| Toggle selection highlight | `Ctrl+Alt+H` |
+| Add margin note / question | `Ctrl+Alt+M` / `Ctrl+Alt+Q` |
+| Copy question context | `Ctrl+Alt+C` |
+| Delete annotations at selection | `Ctrl+Alt+Backspace` |
+
+Ordinary and virtualized documents use LiMR's complete reading-text search with case-insensitive literal matching, including unmounted paragraphs and folded code. macOS also supports `Cmd+G` / `Cmd+Shift+G`. Customize bindings in VS Code Keyboard Shortcuts. Writing actions require editing permission and a body selection; they do not consume text inside annotation inputs. Modules can bind selection actions through `limr.runSelectionAction`; see the [plugin guide](skills/limr-annotations/references/reader-plugins.md#selection-action-keybindings).
+
+Reader-authored highlights, notes and checkbox edits broadcast immediately, bypassing the 250ms quiet period for source-editor typing. Large-document parsing and layout still take computation time.
+
 
 The default preview title button and shortcuts open LiMR; an explicit `limr.previewButtonMode: "separate"` still shows both buttons. Cursor’s breadcrumb `Preview / Markdown` toggle belongs to its internal editor and currently has no public preview-provider replacement API, so it continues to use Cursor’s renderer. If Cursor remembers its internal Preview, switch back to Markdown or configure the default editor. For source files, choose `limr.markdownOpenMode: "reader"` or **Reopen Editor With → Configure default editor → LiMR Reader**.
 
@@ -184,6 +223,9 @@ Documents of at least 256 KiB of UTF-16 text coalesce edits for 250 ms, with a 1
 | `limr.bodyFontFamily` / `limr.bodyFontSize` | `""` / `16` | Body font and size in px. An empty family uses bundled Noto Serif SC Variable. |
 | `limr.chineseFontFamily` / `limr.chineseFontSize` | `""` / `0` | Separate Chinese font and size; an empty family and size 0 inherit the body settings. `limr.otherFontFamily` / `limr.otherFontSize` do the same for other scripts. |
 | `limr.codeFontFamily` / `limr.codeFontSize` | `""` / `14` | Code font and size in px; an empty family uses bundled Maple Mono NF CN. |
+| `limr.codeBlock.lineNumbers` | `false` | Show code line numbers without changing copied text. |
+| `limr.codeBlock.autoCollapse` | `true` | Initially fold long code blocks; manually expand their full height. |
+| `limr.codeBlock.wrap` | `false` | Initially wrap long lines; also switch wrapping per block. |
 | `limr.lineHeight` / `limr.maxWidth` | `1.8` / `860` | Body line-height multiplier and maximum width in px. Reduce them for a more compact layout. |
 | `limr.typography` | `"standard"` | `standard` normal layout; `justify` justified text; `knuth-plass` paragraph-wide line-breaking optimization. |
 | `limr.tableLayout.enabled` | `true` | Optimize table layout; disable for native tables with less measurement work on long tables. |
