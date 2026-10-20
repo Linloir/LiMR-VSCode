@@ -13,7 +13,7 @@ const files = await Promise.all((await readdir(directory)).filter(name => name.e
 })));
 
 it('refuses to silently carry the compatibility correction onto an unreviewed release', () => {
-  expect(() => scrollCompatibilityModules(files, '1.3.12')).toThrow(/Review the LiMR scroll adapter/);
+  expect(() => scrollCompatibilityModules(files, '0.0.0')).toThrow(/Review the LiMR scroll adapter/);
 });
 
 it('rejects source drift or an ambiguous module before bundling any compatibility correction', () => {

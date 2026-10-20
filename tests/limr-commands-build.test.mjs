@@ -10,11 +10,11 @@ const directory = path.join(path.dirname(require.resolve('@linloir/limr/package.
 const files = await Promise.all((await readdir(directory)).filter(name => name.endsWith('.js')).map(async name => ({
   filename: path.join(directory, name), source: await readFile(path.join(directory, name), 'utf8'),
 })));
-const target = files.find(file => file.source.includes('function DocumentSearch('));
+const target = files.find(file => file.source.includes('function SelectionToolbar('));
 const adapted = commandCompatibilityModules(files, version).get(target.filename);
 
 it('fails closed on version, source and module-identity drift', () => {
-  expect(() => commandCompatibilityModules(files, '1.3.12')).toThrow(/Review/);
+  expect(() => commandCompatibilityModules(files, '0.0.0')).toThrow(/Review/);
   expect(() => commandCompatibilityModules(files.map(file => file === target ? { ...file, source: file.source + '\n' } : file), version)).toThrow(/reviewed npm artifact/);
   expect(() => commandCompatibilityModules([...files, target], version)).toThrow(/exactly one/);
 });
@@ -55,23 +55,7 @@ it.each([{ open: false }, { disabled: true }, { busy: true }, { aborted: true },
   },
 );
 
-it.skipIf(version !== '1.3.10').each([false, true])('routes native find commands into core search with virtualization=%j', windowed => {
-  const from = adapted.indexOf('  useEffect9(() => {\n    const command =');
-  const to = adapted.indexOf('  if (!open) return null;', from);
-  const document = new EventTarget(), focus = vi.fn(), select = vi.fn(), move = vi.fn(), setOpen = vi.fn(), cleanups = [];
-  new Function('document', 'useEffect9', 'runtime', 'open', 'previousFocus', 'setOpen', 'move', 'requestAnimationFrame', 'input', adapted.slice(from, to))(
-    document, effect => cleanups.push(effect()), { documentViewport: windowed ? {} : null, configuration: { get: () => ({ provisional: false }) }, signal: { aborted: false } }, true, { current: null },
-    setOpen, move, fn => fn(), { current: { focus, select } },
-  );
-  for (const command of ['find', 'findNext', 'findPrevious'])
-    document.dispatchEvent(Object.assign(new Event('limr-vscode:find'), { detail: { command } }));
-  expect(move.mock.calls).toEqual([[1], [-1]]);
-  expect(select).toHaveBeenCalledOnce();
-  expect(focus).toHaveBeenCalledTimes(3);
-  cleanups.forEach(cleanup => cleanup());
-});
-
-it.runIf(version === "1.3.11")("uses public find without rewriting the search component", () => {
+it("uses public find without rewriting the search component", () => {
   expect(adapted).not.toContain("limr-vscode:find");
   expect(adapted).toContain("limr-vscode:selection-action");
 });

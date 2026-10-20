@@ -13,7 +13,7 @@ const files = await Promise.all((await readdir(directory)).filter(name => name.e
 
 it('guards the typography correction against unreviewed versions, source drift and ambiguous modules', () => {
   const target = files.find(file => file.source.includes('// src/react/knuth-plass-layout.ts'));
-  expect(() => typographyCompatibilityModules(files, '1.3.12')).toThrow(/Review the LiMR typography adapter/);
+  expect(() => typographyCompatibilityModules(files, '0.0.0')).toThrow(/Review the LiMR typography adapter/);
   expect(() => typographyCompatibilityModules(files.map(file => file === target ? { ...file, source: file.source + '\n' } : file), version)).toThrow(/reviewed npm artifact/);
   expect(() => typographyCompatibilityModules([...files, target], version)).toThrow(/exactly one/);
 });

@@ -12,11 +12,11 @@ it('routes native commands through the public controller without dispatching a s
   expect(find.mock.calls).toEqual([['open'], ['next'], ['previous']]);
   expect(legacy).not.toHaveBeenCalled();
 });
-it('retains the guarded legacy bridge while the published dependency remains pinned', () => {
-  const legacy = vi.fn(); document.addEventListener('limr-vscode:find', legacy);
-  dispatchReaderCommand({ type: 'readerCommand', command: 'findNext' }, true, vi.fn());
-  expect(legacy).toHaveBeenCalledOnce();
-  expect(legacy.mock.calls[0][0].detail.command).toBe('findNext');
+it('reports an unavailable core controller without dispatching a private find event', () => {
+  const legacy = vi.fn(), notify = vi.fn(); document.addEventListener('limr-vscode:find', legacy);
+  dispatchReaderCommand({ type: 'readerCommand', command: 'findNext' }, true, notify);
+  expect(notify).toHaveBeenCalledOnce();
+  expect(legacy).not.toHaveBeenCalled();
 });
 it('does not search a provisional reader', () => {
   const find = vi.fn(), notify = vi.fn();

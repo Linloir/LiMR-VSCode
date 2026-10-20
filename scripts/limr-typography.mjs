@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 
-// LiMR 1.3.10 observes typography against the page viewport. Its rootMargin
+// The reviewed LiMR releases observe typography against the page viewport. Their rootMargin
 // cannot extend through the VS Code reader's overflow:auto scroll container.
 // Keep the configured scroll root's preparation margin, while preserving core's
 // batched reads/writes and 6ms RAF budget. Mounting or scrolling must not run
 // synchronous per-paragraph typesetting ahead of that shared scheduler.
-const reviewedVersions = ['1.3.10', '1.3.11'];
+const reviewedVersions = ['1.3.11', '1.3.12'];
 const reviewedSHA256 = '43d1c275d4c6e5c1860c71b97380427e65fa24132d1a88a10a33de80a0014e0e';
 const replacements = [
   [

@@ -9,16 +9,12 @@ export function dispatchReaderCommand(
   find?: (command?: 'open' | 'next' | 'previous' | 'close') => void,
 ) {
   const chinese = document.documentElement.lang.startsWith('zh');
-  if (!ready) {
+  if (!ready || (message.command !== 'selectionAction' && !find)) {
     notify(chinese ? '文档正在更新，请稍后重试。' : 'The document is updating. Please retry when it is ready.');
     return;
   }
   if (message.command !== 'selectionAction') {
-    if (find) {
-      find(message.command === 'find' ? 'open' : message.command === 'findNext' ? 'next' : 'previous');
-      return;
-    }
-    document.dispatchEvent(new CustomEvent('limr-vscode:find', { detail: { command: message.command } }));
+    find?.(message.command === 'find' ? 'open' : message.command === 'findNext' ? 'next' : 'previous');
     return;
   }
   // A source action must never consume text from a note editor or find input.

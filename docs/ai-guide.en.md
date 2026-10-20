@@ -2,7 +2,7 @@
 
 [简体中文](ai-guide.md) · [Skill instructions](../skills/limr-annotations/SKILL.md)
 
-LiMR copies question context to your clipboard for your chosen AI assistant. It needs no API key or message hook. Annotations live in Markdown and can be committed with the document. The bundled skill covers LiMR 1.3.11 annotations and VS Code reader style/syntax plugins.
+LiMR copies question context to your clipboard for your chosen AI assistant. It needs no API key or message hook. Annotations live in Markdown and can be committed with the document. The bundled skill covers LiMR 1.3.12 annotations and VS Code reader style/syntax plugins.
 
 ## Install the skill
 
@@ -53,7 +53,7 @@ Replace the body of n-cache with the following explanation, keeping its ID, link
 
 Annotations use paired `::%%limr%%{<#r1}` / `::%%limr%%{>#r1}` boundaries and `:::limr-annotation` definitions. Ranges may cross paragraphs, nest, or overlap. Prefer meaningful, nonempty text of appropriate length; multiple annotations on the same exact text reuse its named range and add only definitions. Prefer a paired `<ref>` around a source mention or the full sentence it supports, and pair translations by complete paragraph. Marker-only citations and finer translation units remain available when intended. See the [source annotation reference](../skills/limr-annotations/references/source-annotations.md) for the complete contract.
 
-Installation also includes an [offline LiMR 1.3.11 syntax guide](../skills/limr-annotations/references/limr-syntax.md) with citation, paragraph translation, footnote, and component examples plus official documentation links. No additional skill or LiMR source checkout is required.
+Installation also includes an [offline LiMR 1.3.12 syntax guide](../skills/limr-annotations/references/limr-syntax.md) with citation, paragraph translation, footnote, and component examples plus official documentation links. No additional skill or LiMR source checkout is required.
 
 When generating LiMR Markdown for papers or research notes, the skill recommends `figure` for a single captioned image and `figures` for related panels. Preserve real image paths, figure numbers, panel labels, and captions; use `figcaption` for rich Markdown captions.
 
