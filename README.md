@@ -40,6 +40,8 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 | 复制提问上下文 | `Ctrl+Alt+C` |
 | 删除选段批注 | `Ctrl+Alt+Backspace` |
 
+选中正文后按 `Ctrl+F` 会自动填入所选的纯文本。输入时优先选中当前视口内的结果；结果都在视口外时显示 `?/总数`，按上一个/下一个才会定位，输入错误或暂无结果不会把阅读位置移回顶部。搜索框支持 `Ctrl/Cmd+Z` 撤销，以及 `Ctrl+Y` 或 `Ctrl/Cmd+Shift+Z` 重做。关闭后默认清空搜索内容，可通过 `limr.search.rememberQuery` 保留。
+
 普通文档和虚拟化长文档统一使用 LiMR 阅读搜索，可定位尚未挂载的段落和折叠代码。默认使用不区分大小写的字面匹配，点击 **Aa** 开启大小写敏感，点击 `.*` 开启正则。输入框聚焦时，当前与其他命中仍保持高亮。大文档先搜索阅读位置附近，上一个/下一个按需继续扫描，计数末尾的 **+** 表示结果尚不完整。持续搜索显示圆环 loading；非法或超时的正则会在搜索框内提示。macOS 还支持 `Cmd+G` / `Cmd+Shift+G`。快捷键可在 VS Code“键盘快捷方式”中修改；写入操作需要启用编辑并选择正文，不会处理旁注编辑框中的文本。模块的选段动作可通过 `limr.runSelectionAction` 绑定快捷键，见[插件指引](skills/limr-annotations/references/reader-plugins.md#selection-action-keybindings)。
 
 阅读器内的高亮、旁注和任务框等源码修改立即广播，不经过源码连续输入的 250ms 合并等待；长文档的解析与布局仍需计算时间。
@@ -203,6 +205,8 @@ Reader shortcuts (replace `Ctrl` with `Cmd` on macOS):
 | Add margin note / question | `Ctrl+Alt+M` / `Ctrl+Alt+Q` |
 | Copy question context | `Ctrl+Alt+C` |
 | Delete annotations at selection | `Ctrl+Alt+Backspace` |
+
+Press `Ctrl+F` with a body selection to search its plain text. Typing selects a result already in view; when all matches are offscreen, `?/total` waits for Previous/Next without moving your reading position. A typo or no-match query keeps that position too. The input supports `Ctrl/Cmd+Z` to undo and `Ctrl+Y` or `Ctrl/Cmd+Shift+Z` to redo. Closing clears the query by default; enable `limr.search.rememberQuery` to retain it.
 
 Ordinary and virtualized documents use LiMR's reading-text search, including unmounted paragraphs and folded code. Matching is literal and case-insensitive by default; use **Aa** for case sensitivity and `.*` for regular expressions. Current and other matches stay highlighted while the input is focused. Large documents search nearby first and extend the scan when you choose Previous/Next; a count ending in **+** is incomplete. Sustained searches show an animated loading ring, and invalid or timed-out expressions report an error in the search box. macOS also supports `Cmd+G` / `Cmd+Shift+G`. Customize bindings in VS Code Keyboard Shortcuts. Writing actions require editing permission and a body selection; they do not consume text inside annotation inputs. Modules can bind selection actions through `limr.runSelectionAction`; see the [plugin guide](skills/limr-annotations/references/reader-plugins.md#selection-action-keybindings).
 

@@ -232,6 +232,7 @@ try {
     if (session) await session.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   }
   const runAcceptance = skillSuite ? runSkillAcceptance
+    : process.argv.includes('--search-interactions') ? (await import('../tests/browser/search-interactions.mjs')).runSearchInteractionsAcceptance
     : readerToolsSuite ? (await import('../tests/browser/reader-tools.mjs')).runReaderToolsAcceptance
     : entrypointsSuite ? (await import('../tests/browser/entrypoints.mjs')).runEntrypointsAcceptance
     : openModesSuite ? (await import('../tests/browser/open-modes.mjs')).runOpenModesAcceptance

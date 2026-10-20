@@ -38,6 +38,8 @@ Reader shortcuts (replace `Ctrl` with `Cmd` on macOS):
 | Copy question context | `Ctrl+Alt+C` |
 | Delete annotations at selection | `Ctrl+Alt+Backspace` |
 
+Press `Ctrl+F` with a body selection to search its plain text. Typing selects a result already in view; when all matches are offscreen, `?/total` waits for Previous/Next without moving your reading position. A typo or no-match query keeps that position too. The input supports `Ctrl/Cmd+Z` to undo and `Ctrl+Y` or `Ctrl/Cmd+Shift+Z` to redo. Closing clears the query by default; enable `limr.search.rememberQuery` to retain it.
+
 Ordinary and virtualized documents use LiMR's reading-text search, including unmounted paragraphs and folded code. Matching is literal and case-insensitive by default; use **Aa** for case sensitivity and `.*` for regular expressions. Current and other matches stay highlighted while the input is focused. Large documents search nearby first and extend the scan when you choose Previous/Next; a count ending in **+** is incomplete. Sustained searches show an animated loading ring, and invalid or timed-out expressions report an error in the search box. macOS also supports `Cmd+G` / `Cmd+Shift+G`. Customize bindings in VS Code Keyboard Shortcuts. Writing actions require editing permission and a body selection; they do not consume text inside annotation inputs. Modules can bind selection actions through `limr.runSelectionAction`; see the [plugin guide](skills/limr-annotations/references/reader-plugins.md#selection-action-keybindings).
 
 Reader-authored highlights, notes and checkbox edits broadcast immediately, bypassing the 250ms quiet period for source-editor typing. Large-document parsing and layout still take computation time.
