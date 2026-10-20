@@ -1,7 +1,7 @@
 import type { HostMessage } from '../src/shared/protocol';
 
-/** Native keybindings remain customizable in VS Code. The guarded core adapter
- * routes their messages through the existing search and toolbar controllers. */
+/** Native keybindings remain customizable in VS Code. Find uses the public
+ * core controller; selection actions retain the guarded toolbar bridge. */
 export function dispatchReaderCommand(
   message: Extract<HostMessage, { type: 'readerCommand' }>,
   ready: boolean,

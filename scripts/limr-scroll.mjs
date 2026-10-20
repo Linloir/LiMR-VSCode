@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { typographyCompatibilityModules } from './limr-typography.mjs';
 import { captureFallbackCorrection } from './limr-source-position.mjs';
 
-// Reviewed compatibility corrections for LiMR 1.3.10 and the 1.3.11 candidate.
+// Reviewed compatibility corrections for published LiMR 1.3.10 and 1.3.11.
 // Keep the rendering logic in core: adapt its module at build time, without
 // changing node_modules or copying a renderer into the VS Code webview.
 // Remove this adapter when a reviewed upstream release contains these fixes.
@@ -319,7 +319,7 @@ export function scrollCompatibilityModules(files, version) {
   if (targets.length !== 1) throw new Error('LiMR scroll adapter expected exactly one windowed reader module.');
   const { filename, source } = targets[0];
   if (createHash('sha256').update(source).digest('hex') !== reviewedSHA256[version]) {
-    throw new Error(`LiMR ${version} windowed reader differs from the reviewed npm artifact or local candidate; review the scroll adapter.`);
+    throw new Error(`LiMR ${version} windowed reader differs from the reviewed npm artifact; review the scroll adapter.`);
   }
   let result = source;
   for (const [before, after] of [captureFallbackCorrection(source), ...replacements]) {

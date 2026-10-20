@@ -15,7 +15,7 @@ LiMR 是一个注重阅读体验的 Markdown 阅读器。这个扩展将 [LiMR](
 - **可调整的阅读方式**：字体、行距、正文宽度、目录、翻译显示和排版均可配置；源码与阅读器支持滚动同步。
 - **简易的扩展能力**：用工作区 CSS 调整外观，用 JavaScript 模块添加组件、语法、标注或操作；也可以做成独立的 VS Code 附加扩展。
 
-LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 `@linloir/limr 1.3.10`。你可以在 [Playground](https://linloir.github.io/LiMR/) 体验阅读与编辑，在 [语法文档](https://linloir.github.io/LiMR/#/docs/zh-CN/syntax) 查看更多内容模块。
+LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 `@linloir/limr 1.3.11`。你可以在 [Playground](https://linloir.github.io/LiMR/) 体验阅读与编辑，在 [语法文档](https://linloir.github.io/LiMR/#/docs/zh-CN/syntax) 查看更多内容模块。
 
 ## 开始使用与配置
 
@@ -40,7 +40,7 @@ LiMR 本身也是可用于 React 项目的 Markdown 渲染库。本扩展使用 
 | 复制提问上下文 | `Ctrl+Alt+C` |
 | 删除选段批注 | `Ctrl+Alt+Backspace` |
 
-普通文档和虚拟化长文档统一使用 LiMR 全文搜索，支持不区分大小写的字面文本匹配，可定位尚未挂载的段落和折叠代码。macOS 还支持 `Cmd+G` / `Cmd+Shift+G`。快捷键可在 VS Code“键盘快捷方式”中修改；写入操作需要启用编辑并选择正文，不会处理旁注编辑框中的文本。模块的选段动作可通过 `limr.runSelectionAction` 绑定快捷键，见[插件指引](skills/limr-annotations/references/reader-plugins.md#selection-action-keybindings)。
+普通文档和虚拟化长文档统一使用 LiMR 阅读搜索，可定位尚未挂载的段落和折叠代码。默认使用不区分大小写的字面匹配，点击 **Aa** 开启大小写敏感，点击 `.*` 开启正则。输入框聚焦时，当前与其他命中仍保持高亮。大文档先搜索阅读位置附近，上一个/下一个按需继续扫描，计数末尾的 **+** 表示结果尚不完整。持续搜索显示圆环 loading；非法或超时的正则会在搜索框内提示。macOS 还支持 `Cmd+G` / `Cmd+Shift+G`。快捷键可在 VS Code“键盘快捷方式”中修改；写入操作需要启用编辑并选择正文，不会处理旁注编辑框中的文本。模块的选段动作可通过 `limr.runSelectionAction` 绑定快捷键，见[插件指引](skills/limr-annotations/references/reader-plugins.md#selection-action-keybindings)。
 
 阅读器内的高亮、旁注和任务框等源码修改立即广播，不经过源码连续输入的 250ms 合并等待；长文档的解析与布局仍需计算时间。
 
@@ -180,7 +180,7 @@ LiMR is a Markdown reader designed for comfortable reading. This extension bring
 - **Reading preferences**: configure fonts, spacing, article width, contents, translation display, and paragraph layout. Source and reader can scroll together.
 - **Simple extensibility**: use workspace CSS to change appearance and JavaScript modules to add components, syntax, annotations, or actions. Reusable modules can also ship as VS Code add-ons.
 
-LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.10`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
+LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.11`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
 
 ## Get started and configure
 
@@ -203,7 +203,7 @@ Reader shortcuts (replace `Ctrl` with `Cmd` on macOS):
 | Copy question context | `Ctrl+Alt+C` |
 | Delete annotations at selection | `Ctrl+Alt+Backspace` |
 
-Ordinary and virtualized documents use LiMR's complete reading-text search with case-insensitive literal matching, including unmounted paragraphs and folded code. macOS also supports `Cmd+G` / `Cmd+Shift+G`. Customize bindings in VS Code Keyboard Shortcuts. Writing actions require editing permission and a body selection; they do not consume text inside annotation inputs. Modules can bind selection actions through `limr.runSelectionAction`; see the [plugin guide](skills/limr-annotations/references/reader-plugins.md#selection-action-keybindings).
+Ordinary and virtualized documents use LiMR's reading-text search, including unmounted paragraphs and folded code. Matching is literal and case-insensitive by default; use **Aa** for case sensitivity and `.*` for regular expressions. Current and other matches stay highlighted while the input is focused. Large documents search nearby first and extend the scan when you choose Previous/Next; a count ending in **+** is incomplete. Sustained searches show an animated loading ring, and invalid or timed-out expressions report an error in the search box. macOS also supports `Cmd+G` / `Cmd+Shift+G`. Customize bindings in VS Code Keyboard Shortcuts. Writing actions require editing permission and a body selection; they do not consume text inside annotation inputs. Modules can bind selection actions through `limr.runSelectionAction`; see the [plugin guide](skills/limr-annotations/references/reader-plugins.md#selection-action-keybindings).
 
 Reader-authored highlights, notes and checkbox edits broadcast immediately, bypassing the 250ms quiet period for source-editor typing. Large-document parsing and layout still take computation time.
 

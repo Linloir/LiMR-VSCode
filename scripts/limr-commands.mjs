@@ -68,7 +68,7 @@ export function commandCompatibilityModules(files, version) {
   if (targets.length !== 1) throw new Error('LiMR command adapter expected exactly one toolbar/search module.');
   const { filename, source } = targets[0];
   if (createHash('sha256').update(source).digest('hex') !== reviewedSHA256[version])
-    throw new Error(`LiMR ${version} commands differ from the reviewed npm artifact or local candidate; review the command adapter.`);
+    throw new Error(`LiMR ${version} commands differ from the reviewed npm artifact; review the command adapter.`);
   let result = source;
   // 1.3.11 exposes find() publicly and makes search an explicit Reader option.
   // Only the selection-action bridge still needs a source adapter.

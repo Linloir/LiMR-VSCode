@@ -47,7 +47,7 @@ export async function runReaderToolsAcceptance({ page, frame, host, artifacts })
   await frame.locator('h1').first().click();
   await page.keyboard.press('Control+f');
   const ordinaryFind = frame.locator('.limr-document-search input');
-  const ordinaryCount = frame.locator('.limr-document-search [role="status"]');
+  const ordinaryCount = frame.locator('.limr-search-count');
   await expect(ordinaryFind).toBeVisible();
   await expect(frame.locator('[data-limr-windowed]')).toHaveCount(0);
   await expect(page.locator('.simple-find-part[aria-hidden="false"]')).toHaveCount(0);
@@ -66,6 +66,36 @@ export async function runReaderToolsAcceptance({ page, frame, host, artifacts })
   await expect(ordinaryCount).toHaveText('0/0');
   await ordinaryFind.fill('SEARCH NEEDLE');
   await expect(ordinaryCount).toHaveText('1/2');
+  await expect(ordinaryFind).toBeFocused();
+  await expect(ordinaryFind).toHaveCSS('outline-style', 'none');
+  const activeMatch = frame.locator('[data-search-current]').first();
+  await expect(activeMatch).toBeInViewport();
+  expect(await activeMatch.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+  const matchCase = frame.getByRole('button', { name: 'Match case', exact: true });
+  const regex = frame.getByRole('button', { name: 'Use regular expression', exact: true });
+  await matchCase.click();
+  await expect(ordinaryCount).toHaveText('0/0');
+  await ordinaryFind.fill('Search n.e+dl[ae]');
+  await expect(ordinaryCount).toHaveText('0/0');
+  await regex.click();
+  await expect(ordinaryCount).toHaveText('1/2');
+  for (const button of [matchCase, regex]) {
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+    await expect(button).toHaveCSS('border-top-width', '0px');
+    await expect(button).toHaveCSS('box-shadow', 'none');
+  }
+  await ordinaryFind.fill('[');
+  await expect(ordinaryFind).toHaveAttribute('aria-invalid', 'true');
+  await expect(frame.locator('.limr-search-error')).toBeVisible();
+  await ordinaryFind.fill('Search needle');
+  await expect(ordinaryCount).toHaveText('1/2');
+  await expect(ordinaryFind).toHaveAttribute('aria-invalid', 'false');
+  await expect(activeMatch).toBeInViewport();
+  await matchCase.click();
+  await regex.click();
+  await ordinaryFind.fill('SEARCH NEEDLE');
+  await expect(ordinaryCount).toHaveText('1/2');
+  await record({ check: 'Published core regex Worker works under webview CSP; case sensitivity, invalid-pattern recovery, focused-input highlights and borderless controls work' });
   await page.screenshot({ path: path.join(artifacts, 'ordinary-find.png') });
   await page.keyboard.press('Escape');
   await expect(ordinaryFind).toHaveCount(0);
@@ -152,7 +182,7 @@ export async function runReaderToolsAcceptance({ page, frame, host, artifacts })
   await page.keyboard.press('Control+f');
   // Disabling the add-on above recreates the webview resource roots/frame.
   await frame.locator('.limr-document-search input').fill('folded_code_needle');
-  await expect(frame.locator('.limr-document-search [role="status"]')).toHaveText('1/1');
+  await expect(frame.locator('.limr-search-count')).toHaveText('1/1');
   await expect(block).not.toHaveAttribute('data-collapsed');
   await expect(block).toBeInViewport();
   await page.keyboard.press('Escape');
@@ -167,18 +197,18 @@ export async function runReaderToolsAcceptance({ page, frame, host, artifacts })
   await expect(virtualFind).toBeVisible();
   await expect(page.locator('.simple-find-part[aria-hidden="false"]')).toHaveCount(0);
   await virtualFind.fill('remote_search_needle');
-  await expect(frame.locator('.limr-document-search [role="status"]')).toHaveText('1/1', { timeout: 20_000 });
+  await expect(frame.locator('.limr-search-count')).toHaveText('1/1', { timeout: 20_000 });
   await expect(frame.locator('.limr-reader-content p').filter({ hasText: 'remote_search_needle' })).toBeInViewport();
   await virtualFind.fill('folded_code_needle');
-  await expect(frame.locator('.limr-document-search [role="status"]')).toHaveText('1/1', { timeout: 20_000 });
+  await expect(frame.locator('.limr-search-count')).toHaveText('1/1', { timeout: 20_000 });
   await expect(frame.locator('.limr-code-block')).not.toHaveAttribute('data-collapsed');
   await expect(frame.locator('.limr-code-block')).toBeInViewport();
   await virtualFind.fill('Long document reading text.');
-  await expect(frame.locator('.limr-document-search [role="status"]')).toHaveText('1/14000', { timeout: 20_000 });
+  await expect(frame.locator('.limr-search-count')).toHaveText('1/14000', { timeout: 20_000 });
   await page.keyboard.press('F3');
-  await expect(frame.locator('.limr-document-search [role="status"]')).toHaveText('2/14000');
+  await expect(frame.locator('.limr-search-count')).toHaveText('2/14000');
   await page.keyboard.press('Shift+F3');
-  await expect(frame.locator('.limr-document-search [role="status"]')).toHaveText('1/14000');
+  await expect(frame.locator('.limr-search-count')).toHaveText('1/14000');
   await page.keyboard.press('Escape');
   await expect(virtualFind).toHaveCount(0);
   await sourceIs(long);

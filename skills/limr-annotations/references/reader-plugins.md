@@ -1,6 +1,6 @@
 # Customize the LiMR VS Code reader
 
-Use reader plugins to change styles or add syntax without editing the installed LiMR extension bundle. LiMR for VS Code 1.1.0 exposes API v1 and uses LiMR 1.3.10. For changes scoped to one project, use its workspace manifest and preserve existing entries. For reusable functionality installed through VS Code, create an add-on extension and register its packaged files through the public API.
+Use reader plugins to change styles or add syntax without editing the installed LiMR extension bundle. LiMR for VS Code 1.1.1 exposes API v1 and uses LiMR 1.3.11. For changes scoped to one project, use its workspace manifest and preserve existing entries. For reusable functionality installed through VS Code, create an add-on extension and register its packaged files through the public API.
 
 ## Workspace files
 
@@ -115,11 +115,19 @@ Core worker registrations and internal standard-renderer identity checks belong 
 
 For a custom renderer that can safely be unmounted, `RendererExtension.virtualization[componentName]` or an override's `virtualization` must supply `copyText(node, context)`. It may also supply `searchText` and `keepAlive`. `context.children` is projected visible child text, and `context.value` is the selected, decoded literal value; use these rather than copying hidden Markdown syntax. A pure wrapper can return `context.children`. Stateful widgets must preserve their state outside transient DOM, or declare the appropriate `keepAlive` behavior. Keep-alive widgets consume DOM while retained, so it is not a general performance shortcut. Verify ordinary and cross-window copy, search, navigation, and widget state before claiming windowed compatibility. Existing `defineBlock` examples deliberately require no such declarations and retain compatibility behavior.
 
-For lower-level syntax, annotations, or actions, inspect the public LiMR 1.3.10 declarations and matching package documentation first. `RendererExtension` can contribute `components`, `annotationTypes`, `actions`, and `parameters` as well as syntax. Follow the existing source annotation serializer for source-backed notes; a presentation plugin must not write files itself. Read [the source annotation contract](source-annotations.md) when adding annotation UI or serialization. Custom reader syntax does not automatically extend Markdown source-editor highlighting.
+For lower-level syntax, annotations, or actions, inspect the public LiMR 1.3.11 declarations and matching package documentation first. `RendererExtension` can contribute `components`, `annotationTypes`, `actions`, and `parameters` as well as syntax. Follow the existing source annotation serializer for source-backed notes; a presentation plugin must not write files itself. Read [the source annotation contract](source-annotations.md) when adding annotation UI or serialization. Custom reader syntax does not automatically extend Markdown source-editor highlighting.
+
+## Search styling and host boundaries
+
+The host enables LiMR's default search component. Ctrl/Cmd+F opens it; Aa toggles case sensitivity and .* toggles regex. Search highlights are transient view state, not source annotations. Large-document counts ending in + are incomplete; explicit Previous/Next scans further. Search does not require editing permission.
+
+Workspace/add-on stylesheets may target `.limr-document-search`, `.limr-search-field`, `.limr-search-count`, `.limr-search-loading` and its buttons. Set `--limr-search-width` on the component, `--limr-search-accent` for its loading ring, and `--limr-search-match` / `--limr-search-current` (plus their `-border` variants) on the reading surface. Preserve theme contrast, keyboard focus, fixed inner geometry and reduced motion. Default selected toggles have no border and follow page colors.
+
+Core React consumers can replace Reader.search or compose DocumentSearch/useDocumentSearch, but the VS Code add-on API does not expose a root search-component slot. Do not register a second controller inside a content renderer or claim a renderer override replaces the host search UI. Native host commands already route to the one core controller.
 
 ## Selection action keybindings
 
-LiMR for VS Code 1.1.0 provides `limr.runSelectionAction` with `{ "actionId": "your.unique.action.id" }`. Both workspace modules and installed add-ons can contribute ordinary `RendererExtension.actions`. Use a unique action ID: actions are merged by ID, while only the extension's `name` receives the host namespace.
+LiMR for VS Code 1.1.1 provides `limr.runSelectionAction` with `{ "actionId": "your.unique.action.id" }`. Both workspace modules and installed add-ons can contribute ordinary `RendererExtension.actions`. Use a unique action ID: actions are merged by ID, while only the extension's `name` receives the host namespace.
 
 For a workspace module, add a binding in the user's **Keyboard Shortcuts (JSON)**:
 

@@ -15,7 +15,7 @@ LiMR is a Markdown reader designed for comfortable reading. This extension bring
 - **Reading preferences**: configure fonts, spacing, article width, contents, translation display, and paragraph layout. Source and reader can scroll together.
 - **Simple extensibility**: use workspace CSS to change appearance and JavaScript modules to add components, syntax, annotations, or actions. Reusable modules can also ship as VS Code add-ons.
 
-LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.10`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
+LiMR is also a Markdown rendering library for React projects. This extension uses `@linloir/limr 1.3.11`. Try reading and editing in the [Playground](https://linloir.github.io/LiMR/), or explore the [syntax documentation](https://linloir.github.io/LiMR/#/docs/en/syntax).
 
 ## Get started and configure
 
@@ -38,7 +38,7 @@ Reader shortcuts (replace `Ctrl` with `Cmd` on macOS):
 | Copy question context | `Ctrl+Alt+C` |
 | Delete annotations at selection | `Ctrl+Alt+Backspace` |
 
-Ordinary and virtualized documents use LiMR's complete reading-text search with case-insensitive literal matching, including unmounted paragraphs and folded code. macOS also supports `Cmd+G` / `Cmd+Shift+G`. Customize bindings in VS Code Keyboard Shortcuts. Writing actions require editing permission and a body selection; they do not consume text inside annotation inputs. Modules can bind selection actions through `limr.runSelectionAction`; see the [plugin guide](skills/limr-annotations/references/reader-plugins.md#selection-action-keybindings).
+Ordinary and virtualized documents use LiMR's reading-text search, including unmounted paragraphs and folded code. Matching is literal and case-insensitive by default; use **Aa** for case sensitivity and `.*` for regular expressions. Current and other matches stay highlighted while the input is focused. Large documents search nearby first and extend the scan when you choose Previous/Next; a count ending in **+** is incomplete. Sustained searches show an animated loading ring, and invalid or timed-out expressions report an error in the search box. macOS also supports `Cmd+G` / `Cmd+Shift+G`. Customize bindings in VS Code Keyboard Shortcuts. Writing actions require editing permission and a body selection; they do not consume text inside annotation inputs. Modules can bind selection actions through `limr.runSelectionAction`; see the [plugin guide](skills/limr-annotations/references/reader-plugins.md#selection-action-keybindings).
 
 Reader-authored highlights, notes and checkbox edits broadcast immediately, bypassing the 250ms quiet period for source-editor typing. Large-document parsing and layout still take computation time.
 

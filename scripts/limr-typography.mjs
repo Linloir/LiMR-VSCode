@@ -112,7 +112,7 @@ export function typographyCompatibilityModules(files, version) {
   if (targets.length !== 1) throw new Error('LiMR typography adapter expected exactly one typography module.');
   const { filename, source } = targets[0];
   if (createHash('sha256').update(source).digest('hex') !== reviewedSHA256) {
-    throw new Error(`LiMR ${version} typography differs from the reviewed npm artifact or local candidate; review the typography adapter.`);
+    throw new Error(`LiMR ${version} typography differs from the reviewed npm artifact; review the typography adapter.`);
   }
   let result = source;
   for (const [before, after] of replacements) {
