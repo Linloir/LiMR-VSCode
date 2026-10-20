@@ -148,6 +148,9 @@ body[data-reader-contrast='high'] [data-limr-appearance] .limr-copy-button:focus
 .lv-loading > button, .lv-empty button { padding: 7px 14px; background: var(--lv-surface); border: 1px solid var(--lv-border); border-radius: 5px; }
 .lv-empty { position: absolute; inset: 35% 24px auto; text-align: center; color: var(--lv-secondary); pointer-events: none; }
 .lv-empty svg { width: 32px; height: 32px; color: var(--lv-muted); }
+.limr-search-loading .limr-loading { color: inherit; }
+.limr-search-loading .limr-loading circle { stroke-width: 2.5; }
+.limr-search-loading .limr-loading-track { opacity: .14; }
 .lv-empty button { pointer-events: auto; }
 
 /* Apply the same tokens to every portalled surface, not only the article. */
