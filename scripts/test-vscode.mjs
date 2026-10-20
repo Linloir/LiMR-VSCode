@@ -234,6 +234,7 @@ try {
   const runAcceptance = skillSuite ? runSkillAcceptance
     : process.argv.includes('--search-interactions') ? (await import('../tests/browser/search-interactions.mjs')).runSearchInteractionsAcceptance
     : process.argv.includes('--annotation-controls') ? (await import('../tests/browser/annotation-controls.mjs')).runAnnotationControlsAcceptance
+    : process.argv.includes('--sidebar-hover') ? (await import('../tests/browser/sidebar-hover.mjs')).runSidebarHoverAcceptance
     : readerToolsSuite ? (await import('../tests/browser/reader-tools.mjs')).runReaderToolsAcceptance
     : entrypointsSuite ? (await import('../tests/browser/entrypoints.mjs')).runEntrypointsAcceptance
     : openModesSuite ? (await import('../tests/browser/open-modes.mjs')).runOpenModesAcceptance

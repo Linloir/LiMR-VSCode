@@ -27,8 +27,8 @@ export function shortAnnotationIdsPlugin() {
         patched.clear(); loaded.clear();
         const manifest = require.resolve('@linloir/limr/package.json');
         const version = JSON.parse(await readFile(manifest, 'utf8')).version;
-        if (!['1.3.11', '1.3.12', '1.3.13', '1.3.14'].includes(version)) {
-          throw new Error('The LiMR host adapters require reviewed @linloir/limr version 1.3.11, 1.3.12, 1.3.13 or 1.3.14.');
+        if (!['1.3.11', '1.3.12', '1.3.13', '1.3.14', '1.3.15'].includes(version)) {
+          throw new Error('The LiMR host adapters require reviewed @linloir/limr version 1.3.11, 1.3.12, 1.3.13, 1.3.14 or 1.3.15.');
         }
         const directory = path.join(path.dirname(manifest), 'dist');
         const files = await Promise.all((await readdir(directory)).filter(file => file.endsWith('.js')).map(async file => {

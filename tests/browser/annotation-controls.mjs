@@ -26,6 +26,10 @@ export async function runAnnotationControlsAcceptance({ page, frame, host, artif
   const verifyControls = async (card, sidebar) => {
     const title = card.locator(sidebar ? '.limr-sidebar-card-heading' : '.limr-overlay-header > span').first();
     const font = await title.evaluate(element => ({ size: getComputedStyle(element).fontSize, family: getComputedStyle(element).fontFamily }));
+    if (sidebar) {
+      const toggleSize = await card.locator('.limr-sidebar-toggle').evaluate(element => parseFloat(getComputedStyle(element).fontSize));
+      expect(toggleSize).toBeCloseTo(parseFloat(font.size) * .85, 2);
+    }
     if (!sidebar) {
       const toggle = card.locator('.limr-overlay-controls button').first();
       await expect(toggle).toHaveCSS('font-size', font.size);

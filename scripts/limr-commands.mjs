@@ -8,6 +8,7 @@ const reviewedSHA256 = {
   '1.3.12': 'ed2beab715617b7c9b213f4875f9172addba9abc11f8896d1b94295fb03ba94f',
   '1.3.13': 'ed2beab715617b7c9b213f4875f9172addba9abc11f8896d1b94295fb03ba94f',
   '1.3.14': 'c0bff7bc3c4dc18cf145b6fcc3980e6e068b46d606421c1453866cc774797ca4',
+  '1.3.15': '595e61ee39a21c40785947ed5464f9ba93fcf7ca2d20fbe83d410c766738c315',
 };
 const replacements = [
   [

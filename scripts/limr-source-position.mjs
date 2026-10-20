@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 const reviewedSHA256 = new Set([
   'c95e6d58085e89ba9807922d3dab9413c34fba8a1bb832c0d8730ed513fa858c', // 1.3.11–1.3.13
-  '1f7d4c63e286a97a7372811eb2f5563ac0a7ade6bdb2d2fd97af88c6791b989f', // 1.3.14: visibleReadingBlocks iterator
+  '1f7d4c63e286a97a7372811eb2f5563ac0a7ade6bdb2d2fd97af88c6791b989f', // 1.3.14–1.3.15: visibleReadingBlocks iterator
 ]);
 
 // Apply before the source-position seek correction in limr-scroll.mjs.
